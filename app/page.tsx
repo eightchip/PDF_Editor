@@ -2083,17 +2083,16 @@ export default function Home() {
         <div className="fixed left-0 top-0 bottom-0 w-52 bg-slate-50 border-r border-slate-200 overflow-y-auto p-3 shadow-lg" style={{ position: 'fixed', left: 0, top: 0, bottom: 0, width: '13rem', zIndex: 100, pointerEvents: 'auto' }}>
           <div className="mb-3 font-semibold flex justify-between items-center text-slate-700">
             <span>ページ一覧</span>
-            <Button
-              variant="ghost"
-              size="icon"
+            <button
               onClick={(e) => {
                 e.stopPropagation();
                 setShowThumbnails(false);
               }}
-              className="h-6 w-6"
+              className="h-6 w-6 text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded px-1 border-none bg-transparent cursor-pointer"
+              title="閉じる"
             >
               ×
-            </Button>
+            </button>
           </div>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
             <div
@@ -2140,37 +2139,33 @@ export default function Home() {
             >
               {showThumbnails ? '📑 サムネイル非表示' : '📑 サムネイル表示'}
             </Button>
-            <Button
-              variant="outline"
-              size={isMobile ? 'default' : 'sm'}
+            <button
               onClick={goToPrevPage}
               disabled={currentPage === 1}
               title="前のページに移動します"
+              className="px-3 py-1.5 border border-slate-300 rounded text-sm hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               前へ
-            </Button>
+            </button>
             <span className="text-sm font-medium text-slate-700 px-2">
               ページ {currentPage} / {totalPages}
             </span>
-            <Button
-              variant="outline"
-              size={isMobile ? 'default' : 'sm'}
+            <button
               onClick={goToNextPage}
               disabled={currentPage === totalPages}
               title="次のページに移動します"
+              className="px-3 py-1.5 border border-slate-300 rounded text-sm hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               次へ
-            </Button>
+            </button>
             <span className="text-slate-300 mx-1">|</span>
-            <Button
-              variant="outline"
-              size={isMobile ? 'default' : 'sm'}
+            <button
               onClick={() => setPageRotation((prev) => (prev + 90) % 360)}
               title="ページを90度回転します"
-              className="border-green-500 text-green-700 hover:bg-green-50"
+              className="px-3 py-1.5 border border-green-500 text-green-700 rounded text-sm hover:bg-green-50"
             >
               ↻ 回転 ({pageRotation}°)
-            </Button>
+            </button>
         </div>
 
           {/* ズーム */}
@@ -2203,7 +2198,7 @@ export default function Home() {
           </div>
 
           {/* ツールバー */}
-          <div className={`mb-4 flex gap-2 md:gap-3 items-center flex-wrap transition-all duration-300 relative z-50 ${showThumbnails ? 'ml-[13rem]' : 'ml-0'}`} style={{ pointerEvents: 'auto' }}>
+          <div className="mb-4 flex gap-2 md:gap-3 items-center flex-wrap transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
             <div className="flex gap-2 flex-wrap">
               <Button
                 variant={tool === 'pen' ? 'default' : 'outline'}
