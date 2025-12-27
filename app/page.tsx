@@ -2165,7 +2165,7 @@ export default function Home() {
         </div>
 
           {/* ズーム */}
-          <div className="mb-4 flex gap-2 items-center flex-wrap">
+          <div className="mb-4 flex gap-2 items-center flex-wrap relative z-10">
             <span className="text-sm font-medium text-slate-700">ズーム:</span>
             <Button
               variant={scale === 0.75 ? 'default' : 'outline'}
@@ -2194,7 +2194,7 @@ export default function Home() {
           </div>
 
           {/* ツールバー */}
-          <div className={`mb-4 flex gap-2 md:gap-3 items-center flex-wrap transition-all duration-300 ${showThumbnails ? 'ml-[13rem]' : 'ml-0'}`}>
+          <div className={`mb-4 flex gap-2 md:gap-3 items-center flex-wrap transition-all duration-300 relative z-10 ${showThumbnails ? 'ml-[13rem]' : 'ml-0'}`}>
             <div className="flex gap-2 flex-wrap">
               <Button
                 variant={tool === 'pen' ? 'default' : 'outline'}
@@ -2427,16 +2427,7 @@ export default function Home() {
           </div>
 
           {/* 操作ボタン */}
-          <div style={{ 
-            marginBottom: '10px', 
-            display: 'flex', 
-            gap: isMobile ? '8px' : '10px', 
-            flexWrap: 'wrap', 
-            alignItems: 'center', 
-            marginLeft: showThumbnails ? '210px' : '0', 
-            transition: 'margin-left 0.3s',
-            touchAction: 'manipulation',
-          }}>
+          <div className={`mb-4 flex gap-2 md:gap-3 items-center flex-wrap transition-all duration-300 relative z-10 ${showThumbnails ? 'ml-[13rem]' : 'ml-0'}`}>
             <button
               onClick={handleUndo}
               disabled={undoStack.length === 0}
@@ -2561,10 +2552,11 @@ export default function Home() {
             className={`relative inline-block border border-slate-300 bg-slate-50 rounded-lg shadow-sm transition-all duration-300 ${
               showThumbnails ? 'ml-[13rem]' : 'ml-0'
             } ${showAnnotationList ? 'mr-[16.5rem]' : 'mr-0'}`}
+            style={{ isolation: 'isolate' }}
           >
             <canvas
               ref={pdfCanvasRef}
-              style={{ display: 'block' }}
+              style={{ display: 'block', position: 'relative', zIndex: 1 }}
             />
             <canvas
               ref={inkCanvasRef}
@@ -2575,6 +2567,7 @@ export default function Home() {
                 touchAction: 'none',
                 cursor: tool === 'pen' || tool === 'highlight' ? 'crosshair' : tool === 'text' ? 'text' : (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow') ? 'crosshair' : 'default',
                 pointerEvents: (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow' || tool === 'select') ? 'none' : 'auto',
+                zIndex: 2,
               }}
               onPointerDown={(e) => {
                 if (tool !== 'select') {
@@ -2631,6 +2624,7 @@ export default function Home() {
                 touchAction: 'none',
                 cursor: tool === 'text' ? 'text' : tool === 'select' ? 'default' : 'default',
                 pointerEvents: (tool === 'text' || tool === 'select') ? 'auto' : 'none',
+                zIndex: 3,
               }}
             />
             <canvas
@@ -2642,6 +2636,7 @@ export default function Home() {
                 touchAction: 'none',
                 pointerEvents: (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow' || tool === 'select') ? 'auto' : 'none',
                 cursor: (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow') ? 'crosshair' : tool === 'select' ? 'default' : 'default',
+                zIndex: 4,
               }}
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
