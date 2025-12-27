@@ -97,3 +97,8 @@
   animation: gradient-shift 3s ease infinite;
   display: inline-block;
 }
+
+/* メインコンテンツのスクロールバーを非表示 */
+.main-content-scroll::-webkit-scrollbar {
+  display: none;
+}

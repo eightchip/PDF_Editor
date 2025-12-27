@@ -1547,9 +1547,39 @@ export default function Home() {
 
   // テキスト入力確定
   const handleTextSubmit = async () => {
-    if (!docId || !pageSize || !textInputPosition || !textInputValue.trim()) {
+    if (!docId || !pageSize || !textInputPosition) {
+      // 編集モードの場合は編集をキャンセル
+      if (editingTextId) {
+        setEditingTextId(null);
+        setTextInputValue('');
+        setTextInputPosition(null);
+      }
+      return;
+    }
+    // 空のテキストの場合は編集をキャンセル（新規追加時のみ）
+    if (!editingTextId && !textInputValue.trim()) {
       setTextInputPosition(null);
       setTextInputValue('');
+      return;
+    }
+    // 編集モードで空のテキストの場合は削除
+    if (editingTextId && !textInputValue.trim()) {
+      const newTexts = textAnnotations.filter(t => t.id !== editingTextId);
+      setTextAnnotations(newTexts);
+      await saveTextAnnotations(docId, currentPage, newTexts);
+      setEditingTextId(null);
+      setTextInputValue('');
+      setTextInputPosition(null);
+      // 再描画
+      if (textCanvasRef.current && pageSize) {
+        const ctx = textCanvasRef.current.getContext('2d');
+        if (ctx) {
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
+          redrawTextAnnotations(ctx, newTexts, pageSize.width, pageSize.height);
+        }
+      }
       return;
     }
 
@@ -1609,6 +1639,12 @@ export default function Home() {
 
   // テキスト注釈をクリックして編集（マウスでも動作）
   const handleTextCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // 編集モード中は処理をスキップ
+    if (editingTextId) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     // テキストツールまたは選択ツールの場合のみ処理
     if ((tool !== 'text' && tool !== 'select') || !textCanvasRef.current || !pageSize) return;
 
@@ -2024,7 +2060,9 @@ export default function Home() {
         marginRight: showAnnotationList ? '16.5rem' : 'auto',
         height: '100%',
         overflowY: 'auto',
-        overflowX: 'hidden'
+        overflowX: 'hidden',
+        scrollbarWidth: 'none', /* Firefox */
+        msOverflowStyle: 'none', /* IE and Edge */
       }}>
         <div className="relative flex items-center justify-between mb-6 md:mb-8">
           <h1 className="text-3xl md:text-4xl font-bold drop-shadow-sm relative inline-block">
@@ -3407,7 +3445,12 @@ export default function Home() {
               {textAnnotations.map((text, index) => (
                 <div
                   key={text.id}
-                  onClick={() => {
+                  onClick={(e) => {
+                    // 編集モード中は選択処理をスキップ
+                    if (editingTextId === text.id) {
+                      e.stopPropagation();
+                      return;
+                    }
                     setSelectedAnnotationIds(prev => ({
                       strokes: prev.strokes,
                       shapes: prev.shapes,
@@ -3421,21 +3464,32 @@ export default function Home() {
                   }`}
                 >
                   {editingTextId === text.id ? (
-                    <div className="flex-1 flex flex-col gap-1">
+                    <div className="flex-1 flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="text"
                         value={textInputValue}
-                        onChange={(e) => setTextInputValue(e.target.value)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          setTextInputValue(e.target.value);
+                        }}
                         onKeyDown={(e) => {
+                          e.stopPropagation();
                           if (e.key === 'Enter') {
+                            e.preventDefault();
                             handleTextSubmit();
                           } else if (e.key === 'Escape') {
+                            e.preventDefault();
                             setEditingTextId(null);
                             setTextInputValue('');
                             setTextInputPosition(null);
                           }
                         }}
                         onClick={(e) => e.stopPropagation()}
+                        onFocus={(e) => e.stopPropagation()}
+                        onBlur={(e) => {
+                          // フォーカスが外れたときに編集を確定しない（確定ボタンで確定）
+                          e.stopPropagation();
+                        }}
                         className="text-xs px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         autoFocus
                       />
