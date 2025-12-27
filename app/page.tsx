@@ -22,7 +22,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button"; // Dialog内でのみ使用
-import { MdClose, MdKeyboard, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload } from 'react-icons/md';
+import { MdClose, MdKeyboard, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode } from 'react-icons/md';
+import { QRCodeSVG } from 'qrcode.react';
 // PDF.jsの型は動的インポートで取得
 
 export default function Home() {
@@ -45,6 +46,7 @@ export default function Home() {
   const [isSaving, setIsSaving] = useState(false);
   const [showAnnotationList, setShowAnnotationList] = useState(false);
   const [isMobile, setIsMobile] = useState(false); // モバイルデバイスかどうか
+  const [showQRCode, setShowQRCode] = useState(false); // QRコードモーダルの表示状態
   
   // Dialog用のstate
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -1750,26 +1752,52 @@ export default function Home() {
     }
   };
 
-  // 名前を付けて保存
+  // 名前を付けて保存（ブラウザのネイティブファイル保存ダイアログを使用）
   const handleSaveAs = async () => {
-    const defaultFileName = originalFileName || 'annotated.pdf';
-    const fileName = await showPrompt('ファイル名を入力してください（拡張子は自動で追加されます）:', defaultFileName, '名前を付けて保存');
-    if (!fileName) return;
+    if (!pdfDoc) return;
 
     setIsExporting(true);
     try {
       const pdfBytes = await generateAnnotatedPDF();
       if (!pdfBytes) return;
 
-      // ファイル名に拡張子がない場合は追加
-      const finalFileName = fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`;
+      // File System Access APIを使用（サポートされている場合）
+      if ('showSaveFilePicker' in window) {
+        try {
+          const defaultFileName = originalFileName || 'annotated.pdf';
+          const fileHandle = await (window as any).showSaveFilePicker({
+            suggestedName: defaultFileName,
+            types: [{
+              description: 'PDF files',
+              accept: { 'application/pdf': ['.pdf'] },
+            }],
+          });
 
-      // ダウンロード
+          const writable = await fileHandle.createWritable();
+          await writable.write(pdfBytes);
+          await writable.close();
+
+          toast({
+            title: "成功",
+            description: "保存しました",
+          });
+          return;
+        } catch (error: any) {
+          // ユーザーがキャンセルした場合はエラーを無視
+          if (error.name === 'AbortError') {
+            return;
+          }
+          // その他のエラーはフォールバック処理に進む
+        }
+      }
+
+      // フォールバック: ダウンロード方式
+      const defaultFileName = originalFileName || 'annotated.pdf';
       const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = finalFileName;
+      a.download = defaultFileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1967,6 +1995,9 @@ export default function Home() {
     }
   };
 
+  // サイトのURLを取得
+  const siteUrl = typeof window !== 'undefined' ? window.location.origin : '';
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 relative">
       <div className="max-w-[1800px] mx-auto p-4 md:p-6 lg:p-8 transition-all duration-300" style={{ 
@@ -1975,7 +2006,22 @@ export default function Home() {
         marginLeft: showThumbnails ? '13rem' : 'auto',
         marginRight: showAnnotationList ? '16.5rem' : 'auto'
       }}>
-        <h1 className="text-3xl md:text-4xl font-bold text-slate-800 mb-6 md:mb-8 drop-shadow-sm">PDF注釈アプリ</h1>
+        <div className="relative flex items-center justify-between mb-6 md:mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold drop-shadow-sm relative inline-block">
+            <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent animate-gradient">
+              Snap-illustrator
+            </span>
+          </h1>
+          {/* QRコードアイコン */}
+          <button
+            onClick={() => setShowQRCode(true)}
+            className="p-2 rounded-lg bg-white/80 hover:bg-white shadow-md hover:shadow-lg transition-all hover:scale-110 active:scale-95"
+            title="このサイトのQRコードを表示"
+            style={{ zIndex: 100 }}
+          >
+            <MdQrCode className="text-2xl text-slate-700" />
+          </button>
+        </div>
 
       {/* ファイル選択 */}
       <div
@@ -3457,6 +3503,36 @@ export default function Home() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* QRコードモーダル */}
+      {showQRCode && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10002] p-4"
+          onClick={() => setShowQRCode(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-slate-800">このサイトのURL</h2>
+              <button
+                onClick={() => setShowQRCode(false)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                title="閉じる"
+              >
+                <MdClose className="text-xl text-slate-600" />
+              </button>
+            </div>
+            <div className="flex flex-col items-center gap-4">
+              <div className="bg-white p-4 rounded-lg">
+                <QRCodeSVG value={siteUrl} size={200} />
+              </div>
+              <p className="text-sm text-slate-600 break-all text-center">{siteUrl}</p>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
