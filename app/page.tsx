@@ -2076,11 +2076,9 @@ export default function Home() {
         </div>
       )}
 
-      {pdfDoc && (
-        <>
-          {/* サムネイル表示 */}
-          {showThumbnails && (
-            <div className="fixed left-0 top-0 bottom-0 w-52 bg-slate-50 border-r border-slate-200 overflow-y-auto p-3 z-[100] shadow-lg">
+      {/* サムネイル表示 */}
+      {pdfDoc && showThumbnails && (
+        <div className="fixed left-0 top-0 bottom-0 w-52 bg-slate-50 border-r border-slate-200 overflow-y-auto p-3 z-[100] shadow-lg" style={{ pointerEvents: 'auto' }}>
               <div className="mb-3 font-semibold flex justify-between items-center text-slate-700">
                 <span>ページ一覧</span>
                 <Button
