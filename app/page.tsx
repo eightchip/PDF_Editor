@@ -801,6 +801,13 @@ export default function Home() {
 
   // 描画中
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    // テキスト編集モード中はドラッグ処理を無効化
+    if (editingTextId) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
     // 選択ツールの場合は最初に処理（他のツールの描画を防ぐため）
     if (tool === 'select') {
       // 描画状態をリセット（重要：描画処理を防ぐため）
@@ -2003,8 +2010,8 @@ export default function Home() {
   const siteUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 relative">
-      <div className="max-w-[1800px] mx-auto p-4 md:p-6 lg:p-8 transition-all duration-300" style={{ 
+    <div className="h-screen bg-gradient-to-br from-slate-50 to-slate-100 relative overflow-hidden">
+      <div className="h-full max-w-[1800px] mx-auto p-4 md:p-6 lg:p-8 transition-all duration-300 overflow-y-auto" style={{ 
         position: 'relative', 
         zIndex: 1,
         marginLeft: showThumbnails ? '13rem' : 'auto',
@@ -2104,7 +2111,7 @@ export default function Home() {
             </div>
           </div>
         </label>
-        <div className="mt-4 px-5 py-4 bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 border-2 border-blue-400 rounded-xl shadow-lg">
+        <div className="mt-4 px-5 py-4 bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 border-3 border-blue-600 rounded-xl shadow-lg" style={{ borderWidth: '3px', borderStyle: 'solid', borderColor: '#2563eb' }}>
           <div className="text-sm text-slate-800 font-bold mb-2.5 flex items-center gap-2">
             <MdInsertDriveFile className="text-blue-600 text-lg" />
             PDFファイルまたは画像ファイル（PNG、JPEG、WebP、GIF）を選択できます
@@ -3468,12 +3475,24 @@ export default function Home() {
                         className={`overflow-hidden text-ellipsis whitespace-nowrap max-w-[150px] font-medium cursor-pointer ${selectedAnnotationIds.texts.includes(text.id) ? 'text-blue-800' : 'text-slate-700'}`}
                         onDoubleClick={(e) => {
                           e.stopPropagation();
+                          e.preventDefault();
+                          // ドラッグ状態をリセット
+                          setDragStart(null);
+                          setIsDragging(false);
+                          // 選択を解除
+                          setSelectedAnnotationIds({
+                            strokes: [],
+                            shapes: [],
+                            texts: [],
+                          });
                           if (pageSize) {
                             setEditingTextId(text.id);
                             setTextInputValue(text.text);
                             setTextInputPosition({ x: text.x * pageSize.width, y: text.y * pageSize.height });
                             setFontSize(text.fontSize || 16);
                             setColor(text.color || '#000000');
+                            // 編集モードに入る際に選択ツールに切り替え（ドラッグを無効化）
+                            setTool('text');
                           }
                         }}
                         title="ダブルクリックで編集"
