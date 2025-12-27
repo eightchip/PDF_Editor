@@ -23,6 +23,7 @@ export default function Home() {
   const [originalPdfBytes, setOriginalPdfBytes] = useState<ArrayBuffer | null>(null);
   const [pageSizes, setPageSizes] = useState<Record<number, { width: number; height: number }>>({});
   const [isExporting, setIsExporting] = useState(false);
+  const [originalFileName, setOriginalFileName] = useState<string | null>(null); // 元のファイル名を保持
   const [pageRotation, setPageRotation] = useState(0); // 0, 90, 180, 270
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [showThumbnails, setShowThumbnails] = useState(false);
@@ -118,6 +119,7 @@ export default function Home() {
         setDocId(id);
         
         setOriginalPdfBytes(arrayBuffer);
+        setOriginalFileName(pdfFile.name); // 変換後のPDFファイル名を保存
         
         const doc = await loadPDF(pdfFile);
         setPdfDoc(doc);
@@ -159,6 +161,7 @@ export default function Home() {
         setDocId(id);
         
         setOriginalPdfBytes(arrayBuffer);
+        setOriginalFileName(file.name); // 元のファイル名を保存
         
         const doc = await loadPDF(file);
         setPdfDoc(doc);
@@ -2255,16 +2258,30 @@ export default function Home() {
               Clear
             </button>
             <button
-              onClick={handleExport}
+              onClick={handleSave}
+              disabled={isExporting || !pdfDoc || !originalFileName}
+              style={{
+                padding: '5px 15px',
+                backgroundColor: isExporting || !pdfDoc || !originalFileName ? '#ccc' : '#28a745',
+                color: 'white',
+                cursor: isExporting || !pdfDoc || !originalFileName ? 'not-allowed' : 'pointer',
+              }}
+              title="上書き保存（元のファイル名で保存）"
+            >
+              {isExporting ? '保存中...' : '上書き保存'}
+            </button>
+            <button
+              onClick={handleSaveAs}
               disabled={isExporting || !pdfDoc}
               style={{
                 padding: '5px 15px',
-                backgroundColor: isExporting || !pdfDoc ? '#ccc' : '#28a745',
+                backgroundColor: isExporting || !pdfDoc ? '#ccc' : '#17a2b8',
                 color: 'white',
                 cursor: isExporting || !pdfDoc ? 'not-allowed' : 'pointer',
               }}
+              title="名前を付けて保存"
             >
-              {isExporting ? 'エクスポート中...' : 'PDFエクスポート'}
+              {isExporting ? '保存中...' : '名前を付けて保存'}
             </button>
             <button
               onClick={handleExportJSON}
