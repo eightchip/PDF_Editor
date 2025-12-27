@@ -3438,9 +3438,10 @@ export default function Home() {
                       />
                       <div className="flex gap-1">
                         <button
-                          onClick={async (e) => {
+                          onClick={(e) => {
                             e.stopPropagation();
-                            await handleTextSubmit();
+                            e.preventDefault();
+                            handleTextSubmit();
                           }}
                           className="h-5 px-2 text-xs bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded hover:from-green-600 hover:to-emerald-600 transition-all"
                           title="確定"
@@ -3450,6 +3451,7 @@ export default function Home() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            e.preventDefault();
                             setEditingTextId(null);
                             setTextInputValue('');
                             setTextInputPosition(null);
