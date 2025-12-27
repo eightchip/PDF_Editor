@@ -2130,7 +2130,7 @@ export default function Home() {
         {/* ページ操作 */}
         {pdfDoc && (
           <>
-            <div className={`mb-4 flex gap-2 md:gap-3 items-center flex-wrap transition-all duration-300 relative z-50 ${showThumbnails ? 'ml-[13rem]' : 'ml-0'}`} style={{ pointerEvents: 'auto' }}>
+            <div className="mb-4 flex gap-2 md:gap-3 items-center flex-wrap transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
             <Button
               variant={showThumbnails ? 'default' : 'secondary'}
               size={isMobile ? 'default' : 'sm'}
@@ -2431,7 +2431,7 @@ export default function Home() {
           </div>
 
           {/* 操作ボタン */}
-          <div className={`mb-4 flex gap-2 md:gap-3 items-center flex-wrap transition-all duration-300 relative z-50 ${showThumbnails ? 'ml-[13rem]' : 'ml-0'}`} style={{ pointerEvents: 'auto' }}>
+          <div className="mb-4 flex gap-2 md:gap-3 items-center flex-wrap transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
             <button
               onClick={handleUndo}
               disabled={undoStack.length === 0}
