@@ -3055,6 +3055,7 @@ export default function Home() {
               onChange={(e) => setDialogInputValue(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
+                  setDialogOpen(false);
                   dialogCallback?.(dialogInputValue);
                 }
               }}
@@ -3063,18 +3064,33 @@ export default function Home() {
           )}
           <DialogFooter>
             {dialogType === 'alert' && (
-              <Button onClick={() => dialogCallback?.()}>OK</Button>
+              <Button onClick={() => {
+                setDialogOpen(false);
+                dialogCallback?.();
+              }}>OK</Button>
             )}
             {dialogType === 'confirm' && (
               <>
-                <Button variant="outline" onClick={() => dialogCallback?.(false)}>キャンセル</Button>
-                <Button onClick={() => dialogCallback?.(true)}>OK</Button>
+                <Button variant="outline" onClick={() => {
+                  setDialogOpen(false);
+                  dialogCallback?.(false);
+                }}>キャンセル</Button>
+                <Button onClick={() => {
+                  setDialogOpen(false);
+                  dialogCallback?.(true);
+                }}>OK</Button>
               </>
             )}
             {dialogType === 'prompt' && (
               <>
-                <Button variant="outline" onClick={() => dialogCallback?.(undefined)}>キャンセル</Button>
-                <Button onClick={() => dialogCallback?.(dialogInputValue)}>OK</Button>
+                <Button variant="outline" onClick={() => {
+                  setDialogOpen(false);
+                  dialogCallback?.(undefined);
+                }}>キャンセル</Button>
+                <Button onClick={() => {
+                  setDialogOpen(false);
+                  dialogCallback?.(dialogInputValue);
+                }}>OK</Button>
               </>
             )}
           </DialogFooter>
