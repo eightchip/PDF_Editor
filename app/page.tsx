@@ -11,9 +11,21 @@ import { drawTextAnnotation, redrawTextAnnotations, generateTextId } from './lib
 import { drawShapeAnnotation, redrawShapeAnnotations, generateShapeId } from './lib/shapes';
 import { extractTextItems, findNearestTextLine, findTextBoundingBox, smoothStroke, type TextItem } from './lib/text-detection';
 import { convertImageToPDF } from './lib/image-to-pdf';
+import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 // PDF.jsの型は動的インポートで取得
 
 export default function Home() {
+  const { toast } = useToast();
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
@@ -32,7 +44,55 @@ export default function Home() {
   const [isSaving, setIsSaving] = useState(false);
   const [showAnnotationList, setShowAnnotationList] = useState(false);
   const [isMobile, setIsMobile] = useState(false); // モバイルデバイスかどうか
+  
+  // Dialog用のstate
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogTitle, setDialogTitle] = useState('');
+  const [dialogMessage, setDialogMessage] = useState('');
+  const [dialogType, setDialogType] = useState<'alert' | 'confirm' | 'prompt'>('alert');
+  const [dialogInputValue, setDialogInputValue] = useState('');
+  const [dialogCallback, setDialogCallback] = useState<((value?: string | boolean) => void) | null>(null);
 
+  // Dialog/Toastヘルパー関数
+  const showAlert = (message: string, title: string = '') => {
+    setDialogTitle(title || '通知');
+    setDialogMessage(message);
+    setDialogType('alert');
+    setDialogOpen(true);
+    return new Promise<void>((resolve) => {
+      setDialogCallback(() => () => {
+        setDialogOpen(false);
+        resolve();
+      });
+    });
+  };
+  
+  const showConfirm = (message: string, title: string = ''): Promise<boolean> => {
+    setDialogTitle(title || '確認');
+    setDialogMessage(message);
+    setDialogType('confirm');
+    setDialogOpen(true);
+    return new Promise((resolve) => {
+      setDialogCallback((value?: string | boolean) => {
+        setDialogOpen(false);
+        resolve(value === true);
+      });
+    });
+  };
+  
+  const showPrompt = (message: string, defaultValue: string = '', title: string = ''): Promise<string | null> => {
+    setDialogTitle(title || '入力');
+    setDialogMessage(message);
+    setDialogType('prompt');
+    setDialogInputValue(defaultValue);
+    setDialogOpen(true);
+    return new Promise((resolve) => {
+      setDialogCallback((value?: string | boolean) => {
+        setDialogOpen(false);
+        resolve(typeof value === 'string' ? value : null);
+      });
+    });
+  };
 
   // 描画関連
   const [tool, setTool] = useState<'pen' | 'eraser' | 'text' | 'line' | 'rectangle' | 'circle' | 'arrow' | 'highlight' | 'select'>('pen');
@@ -135,7 +195,11 @@ export default function Home() {
         setTextItems([]);
       } catch (error) {
         console.error('画像変換エラー:', error);
-        alert('画像の変換に失敗しました: ' + (error instanceof Error ? error.message : String(error)));
+        toast({
+          title: "エラー",
+          description: '画像の変換に失敗しました: ' + (error instanceof Error ? error.message : String(error)),
+          variant: "destructive",
+        });
       }
     };
     
@@ -176,10 +240,17 @@ export default function Home() {
         setTextItems([]);
       } catch (error) {
         console.error('ファイル読み込みエラー:', error);
-        alert('ファイルの読み込みに失敗しました: ' + (error instanceof Error ? error.message : String(error)));
+        toast({
+          title: "エラー",
+          description: 'ファイルの読み込みに失敗しました: ' + (error instanceof Error ? error.message : String(error)),
+          variant: "destructive",
+        });
       }
     } else {
-      alert('PDFファイルまたは画像ファイル（PNG、JPEG、WebPなど）を選択してください');
+      toast({
+        title: "通知",
+        description: "PDFファイルまたは画像ファイル（PNG、JPEG、WebPなど）を選択してください",
+      });
     }
   };
 
@@ -1583,7 +1654,11 @@ export default function Home() {
   // 注釈付きPDFを生成（共通処理）
   const generateAnnotatedPDF = async (): Promise<Uint8Array | null> => {
     if (!docId || !originalPdfBytes || !pdfDoc) {
-      alert('PDFが読み込まれていません');
+      toast({
+        title: "エラー",
+        description: "PDFが読み込まれていません",
+        variant: "destructive",
+      });
       return null;
     }
 
@@ -1621,7 +1696,11 @@ export default function Home() {
       return pdfBytes;
     } catch (error) {
       console.error('PDF生成エラー:', error);
-      alert('PDFの生成に失敗しました: ' + (error instanceof Error ? error.message : String(error)));
+      toast({
+        title: "エラー",
+        description: 'PDFの生成に失敗しました: ' + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive",
+      });
       return null;
     }
   };
@@ -1629,7 +1708,10 @@ export default function Home() {
   // 上書き保存（元のファイル名で保存）
   const handleSave = async () => {
     if (!originalFileName) {
-      alert('元のファイル名が不明です。名前を付けて保存を使用してください。');
+      toast({
+        title: "通知",
+        description: "元のファイル名が不明です。名前を付けて保存を使用してください。",
+      });
       return;
     }
 
@@ -1649,10 +1731,17 @@ export default function Home() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      alert('保存しました');
+      toast({
+        title: "成功",
+        description: "保存しました",
+      });
     } catch (error) {
       console.error('保存エラー:', error);
-      alert('保存に失敗しました');
+      toast({
+        title: "エラー",
+        description: "保存に失敗しました",
+        variant: "destructive",
+      });
     } finally {
       setIsExporting(false);
     }
@@ -1661,7 +1750,7 @@ export default function Home() {
   // 名前を付けて保存
   const handleSaveAs = async () => {
     const defaultFileName = originalFileName || 'annotated.pdf';
-    const fileName = prompt('ファイル名を入力してください（拡張子は自動で追加されます）:', defaultFileName);
+    const fileName = await showPrompt('ファイル名を入力してください（拡張子は自動で追加されます）:', defaultFileName, '名前を付けて保存');
     if (!fileName) return;
 
     setIsExporting(true);
@@ -1683,10 +1772,17 @@ export default function Home() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      alert('保存しました');
+      toast({
+        title: "成功",
+        description: "保存しました",
+      });
     } catch (error) {
       console.error('保存エラー:', error);
-      alert('保存に失敗しました');
+      toast({
+        title: "エラー",
+        description: "保存に失敗しました",
+        variant: "destructive",
+      });
     } finally {
       setIsExporting(false);
     }
@@ -1710,10 +1806,17 @@ export default function Home() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      alert('注釈付きPDFをエクスポートしました');
+      toast({
+        title: "成功",
+        description: "注釈付きPDFをエクスポートしました",
+      });
     } catch (error) {
       console.error('エクスポートエラー:', error);
-      alert('エクスポートに失敗しました: ' + (error instanceof Error ? error.message : String(error)));
+      toast({
+        title: "エラー",
+        description: 'エクスポートに失敗しました: ' + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive",
+      });
     } finally {
       setIsExporting(false);
     }
@@ -1722,7 +1825,11 @@ export default function Home() {
   // 注釈をJSON形式でエクスポート
   const handleExportJSON = async () => {
     if (!docId || !totalPages) {
-      alert('PDFが読み込まれていません');
+      toast({
+        title: "エラー",
+        description: "PDFが読み込まれていません",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -1743,10 +1850,17 @@ export default function Home() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      alert('注釈をJSON形式でエクスポートしました');
+      toast({
+        title: "成功",
+        description: "注釈をJSON形式でエクスポートしました",
+      });
     } catch (error) {
       console.error('JSONエクスポートエラー:', error);
-      alert('エクスポートに失敗しました: ' + (error instanceof Error ? error.message : String(error)));
+      toast({
+        title: "エラー",
+        description: 'エクスポートに失敗しました: ' + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive",
+      });
     }
   };
 
@@ -1754,7 +1868,10 @@ export default function Home() {
   const handleImportJSON = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || file.type !== 'application/json') {
-      alert('JSONファイルを選択してください');
+      toast({
+        title: "通知",
+        description: "JSONファイルを選択してください",
+      });
       return;
     }
 
@@ -1764,9 +1881,9 @@ export default function Home() {
 
       // 現在のPDFと一致するか確認
       if (importData.docId !== docId) {
-        const confirmImport = confirm(
-          `インポートする注釈は別のPDF（ID: ${importData.docId}）のものです。\n` +
-          `現在のPDF（ID: ${docId}）に上書きしますか？`
+        const confirmImport = await showConfirm(
+          `インポートする注釈は別のPDF（ID: ${importData.docId}）のものです。\n現在のPDF（ID: ${docId}）に上書きしますか？`,
+          '確認'
         );
         if (!confirmImport) {
           return;
@@ -1830,10 +1947,17 @@ export default function Home() {
         }
       }
 
-      alert(`${importedCount}ページの注釈をインポートしました`);
+      toast({
+        title: "成功",
+        description: `${importedCount}ページの注釈をインポートしました`,
+      });
     } catch (error) {
       console.error('JSONインポートエラー:', error);
-      alert('インポートに失敗しました: ' + (error instanceof Error ? error.message : String(error)));
+      toast({
+        title: "エラー",
+        description: 'インポートに失敗しました: ' + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive",
+      });
     } finally {
       // ファイル入力をリセット
       e.target.value = '';
@@ -1841,19 +1965,13 @@ export default function Home() {
   };
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'system-ui, sans-serif' }}>
-      <h1 style={{ marginBottom: '20px' }}>PDF注釈アプリ</h1>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-6 lg:p-8">
+      <div className="max-w-[1800px] mx-auto">
+        <h1 className="text-3xl md:text-4xl font-bold text-slate-800 mb-6 md:mb-8 drop-shadow-sm">PDF注釈アプリ</h1>
 
       {/* ファイル選択 */}
       <div
-        style={{
-          marginBottom: '20px',
-          padding: '20px',
-          border: '2px dashed #ccc',
-          borderRadius: '8px',
-          backgroundColor: '#f9f9f9',
-          textAlign: 'center',
-        }}
+        className="mb-6 p-6 border-2 border-dashed border-slate-300 rounded-lg bg-white hover:border-primary/50 transition-colors text-center"
         onDragOver={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -1896,11 +2014,18 @@ export default function Home() {
                   setOriginalFileName(file.name); // 元のファイル名を保存
                 } catch (error) {
                   console.error('ファイル読み込みエラー:', error);
-                  alert('ファイルの読み込みに失敗しました: ' + (error instanceof Error ? error.message : String(error)));
+                  toast({
+                    title: "エラー",
+                    description: 'ファイルの読み込みに失敗しました: ' + (error instanceof Error ? error.message : String(error)),
+                    variant: "destructive",
+                  });
                 }
               }
             } else {
-              alert('PDFファイルまたは画像ファイルを選択してください');
+              toast({
+                title: "通知",
+                description: "PDFファイルまたは画像ファイルを選択してください",
+              });
             }
           }
         }}
@@ -1909,12 +2034,12 @@ export default function Home() {
           type="file"
           accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp,image/gif"
           onChange={handleFileSelect}
-          style={{ marginBottom: '10px' }}
+          className="mb-4"
         />
-        <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
+        <div className="text-sm text-slate-600 mt-2">
           PDFファイルまたは画像ファイル（PNG、JPEG、WebP、GIF）を選択できます。画像ファイルは自動的にPDFに変換されます。
         </div>
-        <div style={{ fontSize: '12px', color: '#999', marginTop: '5px' }}>
+        <div className="text-xs text-slate-400 mt-2">
           または、ファイルをここにドラッグ&ドロップしてください
         </div>
       </div>
@@ -1922,40 +2047,19 @@ export default function Home() {
 
       {/* キーボードショートカット一覧 */}
       {showKeyboardShortcuts && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            backgroundColor: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-            zIndex: 10000,
-            maxWidth: '500px',
-            maxHeight: '80vh',
-            overflow: 'auto',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-            <h2 style={{ margin: 0 }}>キーボードショートカット</h2>
-            <button
+        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-6 rounded-lg shadow-xl z-[10000] max-w-lg max-h-[80vh] overflow-auto border border-slate-200">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-slate-800">キーボードショートカット</h2>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setShowKeyboardShortcuts(false)}
-              style={{
-                background: 'none',
-                border: 'none',
-                fontSize: '24px',
-                cursor: 'pointer',
-                padding: '0',
-                width: '30px',
-                height: '30px',
-              }}
+              className="h-8 w-8"
             >
               ×
-            </button>
+            </Button>
         </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <div className="grid grid-cols-2 gap-3 text-sm">
             <div><strong>Ctrl+Z</strong></div>
             <div>Undo（元に戻す）</div>
             <div><strong>Ctrl+Y / Ctrl+Shift+Z</strong></div>
@@ -1976,68 +2080,40 @@ export default function Home() {
         <div>
           {/* サムネイル表示 */}
           {showThumbnails && (
-            <div
-              style={{
-                position: 'fixed',
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: '200px',
-                backgroundColor: '#f5f5f5',
-                borderRight: '1px solid #ddd',
-                overflowY: 'auto',
-                padding: '10px',
-                zIndex: 1000,
-              }}
-            >
-              <div style={{ marginBottom: '10px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="fixed left-0 top-0 bottom-0 w-52 bg-slate-50 border-r border-slate-200 overflow-y-auto p-3 z-[1000] shadow-lg">
+              <div className="mb-3 font-semibold flex justify-between items-center text-slate-700">
                 <span>ページ一覧</span>
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setShowThumbnails(false)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    fontSize: '20px',
-                    cursor: 'pointer',
-                    padding: '0',
-                    width: '24px',
-                    height: '24px',
-                  }}
+                  className="h-6 w-6"
                 >
                   ×
-                </button>
-              </div>
+                </Button>
+        </div>
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
                 <div
                   key={pageNum}
                   onClick={() => setCurrentPage(pageNum)}
-                  style={{
-                    marginBottom: '10px',
-                    padding: '5px',
-                    backgroundColor: currentPage === pageNum ? '#e3f2fd' : 'white',
-                    border: currentPage === pageNum ? '2px solid #2196F3' : '1px solid #ddd',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                  }}
+                  className={`mb-2 p-2 rounded-md cursor-pointer transition-all ${
+                    currentPage === pageNum
+                      ? 'bg-primary/10 border-2 border-primary'
+                      : 'bg-white border border-slate-200 hover:border-primary/50'
+                  }`}
                 >
                   {thumbnails[pageNum] ? (
                     <img
                       src={thumbnails[pageNum]}
                       alt={`ページ ${pageNum}`}
-                      style={{
-                        width: '100%',
-                        height: 'auto',
-                        display: 'block',
-                        marginBottom: '5px',
-                      }}
+                      className="w-full h-auto block mb-1 rounded"
                     />
                   ) : (
-                    <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '12px' }}>
+                    <div className="py-5 text-center text-slate-400 text-xs">
                       読み込み中...
                     </div>
                   )}
-                  <div style={{ fontSize: '12px', fontWeight: currentPage === pageNum ? 'bold' : 'normal' }}>
+                  <div className={`text-xs text-center ${currentPage === pageNum ? 'font-bold text-primary' : 'text-slate-600'}`}>
                     ページ {pageNum}
                   </div>
                 </div>
@@ -2046,146 +2122,147 @@ export default function Home() {
           )}
 
           {/* ページ操作 */}
-          <div style={{ marginBottom: '10px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginLeft: showThumbnails ? '210px' : '0', transition: 'margin-left 0.3s' }}>
-            <button
+          <div className={`mb-4 flex gap-2 md:gap-3 items-center flex-wrap transition-all duration-300 ${showThumbnails ? 'ml-[13rem]' : 'ml-0'}`}>
+            <Button
+              variant={showThumbnails ? 'default' : 'secondary'}
+              size={isMobile ? 'default' : 'sm'}
               onClick={() => setShowThumbnails(!showThumbnails)}
-              style={{ padding: '5px 15px', backgroundColor: showThumbnails ? '#0070f3' : '#6c757d', color: 'white' }}
+              title="ページ一覧のサムネイルを表示/非表示します"
             >
               {showThumbnails ? '📑 サムネイル非表示' : '📑 サムネイル表示'}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              size={isMobile ? 'default' : 'sm'}
               onClick={goToPrevPage}
               disabled={currentPage === 1}
-              style={{ padding: '5px 15px' }}
+              title="前のページに移動します"
             >
               前へ
-            </button>
-            <span>
+            </Button>
+            <span className="text-sm font-medium text-slate-700 px-2">
               ページ {currentPage} / {totalPages}
             </span>
-            <button
+            <Button
+              variant="outline"
+              size={isMobile ? 'default' : 'sm'}
               onClick={goToNextPage}
               disabled={currentPage === totalPages}
-              style={{ padding: '5px 15px' }}
+              title="次のページに移動します"
             >
               次へ
-            </button>
-            <span style={{ marginLeft: '10px' }}>|</span>
-            <button
+            </Button>
+            <span className="text-slate-300 mx-1">|</span>
+            <Button
+              variant="outline"
+              size={isMobile ? 'default' : 'sm'}
               onClick={() => setPageRotation((prev) => (prev + 90) % 360)}
-              style={{ padding: '5px 15px', backgroundColor: '#4CAF50', color: 'white' }}
+              title="ページを90度回転します"
+              className="border-green-500 text-green-700 hover:bg-green-50"
             >
               ↻ 回転 ({pageRotation}°)
-            </button>
+            </Button>
         </div>
 
           {/* ズーム */}
-          <div style={{ marginBottom: '10px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <span>ズーム:</span>
-            <button
+          <div className="mb-4 flex gap-2 items-center flex-wrap">
+            <span className="text-sm font-medium text-slate-700">ズーム:</span>
+            <Button
+              variant={scale === 0.75 ? 'default' : 'outline'}
+              size={isMobile ? 'default' : 'sm'}
               onClick={() => setScale(0.75)}
-              style={{ padding: '5px 15px' }}
+              title="表示倍率を75%に設定します"
             >
               75%
-            </button>
-            <button
+            </Button>
+            <Button
+              variant={scale === 1.0 ? 'default' : 'outline'}
+              size={isMobile ? 'default' : 'sm'}
               onClick={() => setScale(1.0)}
-              style={{ padding: '5px 15px' }}
+              title="表示倍率を100%に設定します"
             >
               100%
-            </button>
-            <button
+            </Button>
+            <Button
+              variant={scale === 1.25 ? 'default' : 'outline'}
+              size={isMobile ? 'default' : 'sm'}
               onClick={() => setScale(1.25)}
-              style={{ padding: '5px 15px' }}
+              title="表示倍率を125%に設定します"
             >
               125%
-            </button>
+            </Button>
           </div>
 
           {/* ツールバー */}
-          <div style={{ marginBottom: '10px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginLeft: showThumbnails ? '210px' : '0', transition: 'margin-left 0.3s' }}>
-            <div>
-              <button
+          <div className={`mb-4 flex gap-2 md:gap-3 items-center flex-wrap transition-all duration-300 ${showThumbnails ? 'ml-[13rem]' : 'ml-0'}`}>
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                variant={tool === 'pen' ? 'default' : 'outline'}
+                size={isMobile ? 'default' : 'sm'}
                 onClick={() => setTool('pen')}
-                style={{
-                  padding: '5px 15px',
-                  backgroundColor: tool === 'pen' ? '#0070f3' : '#f0f0f0',
-                  color: tool === 'pen' ? 'white' : 'black',
-                }}
+                title="手書きで線を描画します"
               >
                 ペン
-              </button>
-              <button
+              </Button>
+              <Button
+                variant={tool === 'eraser' ? 'default' : 'outline'}
+                size={isMobile ? 'default' : 'sm'}
                 onClick={() => setTool('eraser')}
-                style={{
-                  padding: '5px 15px',
-                  backgroundColor: tool === 'eraser' ? '#0070f3' : '#f0f0f0',
-                  color: tool === 'eraser' ? 'white' : 'black',
-                }}
+                title="描画した線を消去します"
               >
                 消しゴム
-              </button>
-              <button
+              </Button>
+              <Button
+                variant={tool === 'text' ? 'default' : 'outline'}
+                size={isMobile ? 'default' : 'sm'}
                 onClick={() => setTool('text')}
-                style={{
-                  padding: '5px 15px',
-                  backgroundColor: tool === 'text' ? '#0070f3' : '#f0f0f0',
-                  color: tool === 'text' ? 'white' : 'black',
-                }}
+                title="テキストを追加します"
               >
                 テキスト
-              </button>
-              <button
+              </Button>
+              <Button
+                variant={tool === 'line' ? 'default' : 'outline'}
+                size={isMobile ? 'default' : 'sm'}
                 onClick={() => setTool('line')}
-                style={{
-                  padding: '5px 15px',
-                  backgroundColor: tool === 'line' ? '#0070f3' : '#f0f0f0',
-                  color: tool === 'line' ? 'white' : 'black',
-                }}
+                title="直線を描画します"
               >
                 線
-              </button>
-              <button
+              </Button>
+              <Button
+                variant={tool === 'rectangle' ? 'default' : 'outline'}
+                size={isMobile ? 'default' : 'sm'}
                 onClick={() => setTool('rectangle')}
-                style={{
-                  padding: '5px 15px',
-                  backgroundColor: tool === 'rectangle' ? '#0070f3' : '#f0f0f0',
-                  color: tool === 'rectangle' ? 'white' : 'black',
-                }}
+                title="四角形を描画します"
               >
-                矩形
-              </button>
-              <button
+                四角形
+              </Button>
+              <Button
+                variant={tool === 'circle' ? 'default' : 'outline'}
+                size={isMobile ? 'default' : 'sm'}
                 onClick={() => setTool('circle')}
-                style={{
-                  padding: '5px 15px',
-                  backgroundColor: tool === 'circle' ? '#0070f3' : '#f0f0f0',
-                  color: tool === 'circle' ? 'white' : 'black',
-                }}
+                title="円を描画します"
               >
                 円
-              </button>
-              <button
+              </Button>
+              <Button
+                variant={tool === 'arrow' ? 'default' : 'outline'}
+                size={isMobile ? 'default' : 'sm'}
                 onClick={() => setTool('arrow')}
-                style={{
-                  padding: '5px 15px',
-                  backgroundColor: tool === 'arrow' ? '#0070f3' : '#f0f0f0',
-                  color: tool === 'arrow' ? 'white' : 'black',
-                }}
+                title="矢印を描画します"
               >
                 矢印
-              </button>
-              <button
+              </Button>
+              <Button
+                variant={tool === 'highlight' ? 'default' : 'outline'}
+                size={isMobile ? 'default' : 'sm'}
                 onClick={() => setTool('highlight')}
-                style={{
-                  padding: '5px 15px',
-                  backgroundColor: tool === 'highlight' ? '#0070f3' : '#f0f0f0',
-                  color: tool === 'highlight' ? 'white' : 'black',
-                }}
+                title="テキストをハイライトします"
               >
                 ハイライト
-              </button>
-              <button
+              </Button>
+              <Button
+                variant={tool === 'select' ? 'default' : 'outline'}
+                size={isMobile ? 'default' : 'sm'}
                 onClick={() => {
                   setTool('select');
                   setSelectedAnnotationIds({ strokes: [], shapes: [], texts: [] });
@@ -2199,41 +2276,33 @@ export default function Home() {
                   setCurrentShape(null);
                   setShapeStartPoint(null);
                 }}
-                style={{
-                  padding: '5px 15px',
-                  backgroundColor: tool === 'select' ? '#0070f3' : '#f0f0f0',
-                  color: tool === 'select' ? 'white' : 'black',
-                }}
                 title="選択ツール: 注釈をクリックで選択、Ctrl+クリックで複数選択、Deleteキーで削除、ドラッグで移動"
               >
                 選択
-              </button>
-              <button
+              </Button>
+              <Button
+                variant={showAnnotationList ? 'default' : 'secondary'}
+                size={isMobile ? 'default' : 'sm'}
                 onClick={() => setShowAnnotationList(!showAnnotationList)}
-                style={{
-                  padding: '5px 15px',
-                  backgroundColor: showAnnotationList ? '#0070f3' : '#6c757d',
-                  color: 'white',
-                }}
                 title="注釈一覧を表示/非表示"
               >
                 📋 注釈一覧
-              </button>
+              </Button>
             </div>
 
             {(tool === 'pen' || tool === 'highlight') && (
-              <>
-                <label>
+              <div className="flex gap-3 items-center flex-wrap">
+                <label className="flex items-center gap-2 text-sm text-slate-700">
                   色:
                   <input
                     type="color"
                     value={color}
                     onChange={(e) => setColor(e.target.value)}
-                    style={{ marginLeft: '5px' }}
+                    className="w-10 h-8 rounded border border-slate-300 cursor-pointer"
                   />
                 </label>
                 {tool === 'pen' && (
-                  <label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
                     太さ:
                     <input
                       type="range"
@@ -2241,43 +2310,43 @@ export default function Home() {
                       max="10"
                       value={width}
                       onChange={(e) => setWidth(Number(e.target.value))}
-                      style={{ marginLeft: '5px' }}
+                      className="w-20"
                     />
-                    <span style={{ marginLeft: '5px' }}>{width}px</span>
+                    <span className="w-10 text-xs">{width}px</span>
                   </label>
                 )}
                 {tool === 'highlight' && (
-                  <label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
                     モード:
                     <select
                       value={highlightMode}
                       onChange={(e) => setHighlightMode(e.target.value as 'auto' | 'manual')}
-                      style={{ marginLeft: '5px', padding: '2px 5px' }}
+                      className="px-2 py-1 text-xs border border-slate-300 rounded"
                     >
                       <option value="auto">自動（クリックで文字列全体）</option>
                       <option value="manual">手動（ドラッグで範囲指定）</option>
                     </select>
                   </label>
                 )}
-                <label>
+                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={smoothStrokeEnabled}
                     onChange={(e) => setSmoothStrokeEnabled(e.target.checked)}
-                    style={{ marginLeft: '5px' }}
+                    className="w-4 h-4"
                   />
                   ストローク平滑化
                 </label>
-                <label>
+                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={snapToTextEnabled}
                     onChange={(e) => setSnapToTextEnabled(e.target.checked)}
-                    style={{ marginLeft: '5px' }}
+                    className="w-4 h-4"
                   />
                   テキストスナップ
                 </label>
-              </>
+              </div>
             )}
 
             {tool === 'text' && (
@@ -2307,17 +2376,17 @@ export default function Home() {
             )}
 
             {(tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow') && (
-              <>
-                <label>
+              <div className="flex gap-3 items-center flex-wrap">
+                <label className="flex items-center gap-2 text-sm text-slate-700">
                   色:
                   <input
                     type="color"
                     value={color}
                     onChange={(e) => setColor(e.target.value)}
-                    style={{ marginLeft: '5px' }}
+                    className="w-10 h-8 rounded border border-slate-300 cursor-pointer"
                   />
                 </label>
-                <label>
+                <label className="flex items-center gap-2 text-sm text-slate-700">
                   太さ:
                   <input
                     type="range"
@@ -2325,24 +2394,24 @@ export default function Home() {
                     max="10"
                     value={width}
                     onChange={(e) => setWidth(Number(e.target.value))}
-                    style={{ marginLeft: '5px' }}
+                    className="w-20"
                   />
-                  <span style={{ marginLeft: '5px' }}>{width}px</span>
+                  <span className="w-10 text-xs">{width}px</span>
                 </label>
-                <label>
+                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={fillShape}
                     onChange={(e) => setFillShape(e.target.checked)}
-                    style={{ marginLeft: '5px' }}
+                    className="w-4 h-4"
                   />
                   塗りつぶし
                 </label>
-              </>
+              </div>
             )}
 
             {tool === 'eraser' && (
-              <label>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
                 消しゴムサイズ:
                 <input
                   type="range"
@@ -2350,9 +2419,9 @@ export default function Home() {
                   max="30"
                   value={width}
                   onChange={(e) => setWidth(Number(e.target.value))}
-                  style={{ marginLeft: '5px' }}
+                  className="w-24"
                 />
-                <span style={{ marginLeft: '5px' }}>{width}px</span>
+                <span className="w-10 text-xs">{width}px</span>
               </label>
             )}
           </div>
@@ -2449,6 +2518,7 @@ export default function Home() {
                 color: 'white',
                 cursor: !pdfDoc ? 'not-allowed' : 'pointer',
               }}
+              title="注釈データをJSON形式でエクスポートします（バックアップ用）"
             >
               JSONエクスポート
             </button>
@@ -2472,6 +2542,7 @@ export default function Home() {
                 cursor: !pdfDoc ? 'not-allowed' : 'pointer',
                 display: 'inline-block',
               }}
+              title="JSON形式の注釈データをインポートします"
             >
               <input
                 type="file"
@@ -2487,15 +2558,9 @@ export default function Home() {
           {/* PDF表示領域 */}
           <div
             ref={containerRef}
-            style={{
-              position: 'relative',
-              display: 'inline-block',
-              border: '1px solid #ccc',
-              backgroundColor: '#f5f5f5',
-              marginLeft: showThumbnails ? '210px' : '0',
-              marginRight: showAnnotationList ? '260px' : '0',
-              transition: 'margin-left 0.3s, margin-right 0.3s',
-            }}
+            className={`relative inline-block border border-slate-300 bg-slate-50 rounded-lg shadow-sm transition-all duration-300 ${
+              showThumbnails ? 'ml-[13rem]' : 'ml-0'
+            } ${showAnnotationList ? 'mr-[16.5rem]' : 'mr-0'}`}
           >
             <canvas
               ref={pdfCanvasRef}
@@ -2630,14 +2695,17 @@ export default function Home() {
                   autoFocus
                   placeholder="テキストを入力（Ctrl+Enterで確定、Escでキャンセル）"
                 />
-                <div style={{ marginTop: '4px', display: 'flex', gap: '4px' }}>
-                  <button
+                <div className="mt-1 flex gap-2">
+                  <Button
+                    size="sm"
                     onClick={handleTextSubmit}
-                    style={{ padding: '4px 8px', fontSize: '12px' }}
+                    className="h-7 px-2 text-xs"
                   >
                     確定
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
                     onClick={() => {
                       if (editingTextId) {
                         handleDeleteText(editingTextId);
@@ -2646,20 +2714,22 @@ export default function Home() {
                       setTextInputValue('');
                       setEditingTextId(null);
                     }}
-                    style={{ padding: '4px 8px', fontSize: '12px', backgroundColor: '#ff4444', color: 'white' }}
+                    className="h-7 px-2 text-xs"
                   >
                     削除
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => {
                       setTextInputPosition(null);
                       setTextInputValue('');
                       setEditingTextId(null);
                     }}
-                    style={{ padding: '4px 8px', fontSize: '12px' }}
+                    className="h-7 px-2 text-xs"
                   >
                     キャンセル
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -2669,42 +2739,23 @@ export default function Home() {
 
       {/* 右側注釈一覧パネル */}
       {pdfDoc && showAnnotationList && (
-        <div
-          style={{
-            position: 'fixed',
-            right: 0,
-            top: 0,
-            bottom: 0,
-            width: '250px',
-            backgroundColor: '#f5f5f5',
-            borderLeft: '1px solid #ddd',
-            overflowY: 'auto',
-            padding: '10px',
-            zIndex: 1000,
-          }}
-        >
-          <div style={{ marginBottom: '10px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="fixed right-0 top-0 bottom-0 w-64 bg-slate-50 border-l border-slate-200 overflow-y-auto p-3 z-[1000] shadow-lg">
+          <div className="mb-3 font-semibold flex justify-between items-center text-slate-700">
             <span>注釈一覧（ページ {currentPage}）</span>
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setShowAnnotationList(false)}
-              style={{
-                background: 'none',
-                border: 'none',
-                fontSize: '20px',
-                cursor: 'pointer',
-                padding: '0',
-                width: '24px',
-                height: '24px',
-              }}
+              className="h-6 w-6"
             >
               ×
-            </button>
+            </Button>
           </div>
           
           {/* ストローク一覧 */}
           {strokes.length > 0 && (
-            <div style={{ marginBottom: '15px' }}>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '5px' }}>ペン/ハイライト ({strokes.length})</div>
+            <div className="mb-4">
+              <div className="text-sm font-semibold mb-2 text-slate-700">ペン/ハイライト ({strokes.length})</div>
               {strokes.map((stroke, index) => (
                 <div
                   key={stroke.id || index}
@@ -2717,21 +2768,16 @@ export default function Home() {
                       }));
                     }
                   }}
-                  style={{
-                    padding: '5px',
-                    marginBottom: '3px',
-                    backgroundColor: selectedAnnotationIds.strokes.includes(stroke.id || '') ? '#e3f2fd' : 'white',
-                    border: selectedAnnotationIds.strokes.includes(stroke.id || '') ? '2px solid #2196F3' : '1px solid #ddd',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
+                  className={`p-2 mb-1 rounded-md cursor-pointer text-xs flex justify-between items-center transition-colors ${
+                    selectedAnnotationIds.strokes.includes(stroke.id || '')
+                      ? 'bg-primary/10 border-2 border-primary'
+                      : 'bg-white border border-slate-200 hover:border-primary/50'
+                  }`}
                 >
                   <span>ストローク {index + 1}</span>
-                  <button
+                  <Button
+                    variant="destructive"
+                    size="sm"
                     onClick={async (e) => {
                       e.stopPropagation();
                       if (stroke.id && docId && pageSize) {
@@ -2751,18 +2797,10 @@ export default function Home() {
                         }
                       }
                     }}
-                    style={{
-                      background: '#ff4444',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '3px',
-                      padding: '2px 6px',
-                      fontSize: '10px',
-                      cursor: 'pointer',
-                    }}
+                    className="h-6 px-2 text-xs"
                   >
                     削除
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
@@ -2770,8 +2808,8 @@ export default function Home() {
 
           {/* 図形一覧 */}
           {shapeAnnotations.length > 0 && (
-            <div style={{ marginBottom: '15px' }}>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '5px' }}>図形 ({shapeAnnotations.length})</div>
+            <div className="mb-4">
+              <div className="text-sm font-semibold mb-2 text-slate-700">図形 ({shapeAnnotations.length})</div>
               {shapeAnnotations.map((shape, index) => (
                 <div
                   key={shape.id}
@@ -2782,21 +2820,16 @@ export default function Home() {
                       texts: prev.texts,
                     }));
                   }}
-                  style={{
-                    padding: '5px',
-                    marginBottom: '3px',
-                    backgroundColor: selectedAnnotationIds.shapes.includes(shape.id) ? '#e3f2fd' : 'white',
-                    border: selectedAnnotationIds.shapes.includes(shape.id) ? '2px solid #2196F3' : '1px solid #ddd',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
+                  className={`p-2 mb-1 rounded-md cursor-pointer text-xs flex justify-between items-center transition-colors ${
+                    selectedAnnotationIds.shapes.includes(shape.id)
+                      ? 'bg-primary/10 border-2 border-primary'
+                      : 'bg-white border border-slate-200 hover:border-primary/50'
+                  }`}
                 >
-                  <span>{shape.type === 'line' ? '線' : shape.type === 'rectangle' ? '矩形' : shape.type === 'circle' ? '円' : '矢印'} {index + 1}</span>
-                  <button
+                  <span>{shape.type === 'line' ? '線' : shape.type === 'rectangle' ? '四角形' : shape.type === 'circle' ? '円' : '矢印'} {index + 1}</span>
+                  <Button
+                    variant="destructive"
+                    size="sm"
                     onClick={async (e) => {
                       e.stopPropagation();
                       if (docId && pageSize) {
@@ -2816,18 +2849,10 @@ export default function Home() {
                         }
                       }
                     }}
-                    style={{
-                      background: '#ff4444',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '3px',
-                      padding: '2px 6px',
-                      fontSize: '10px',
-                      cursor: 'pointer',
-                    }}
+                    className="h-6 px-2 text-xs"
                   >
                     削除
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
@@ -2835,8 +2860,8 @@ export default function Home() {
 
           {/* テキスト一覧 */}
           {textAnnotations.length > 0 && (
-            <div style={{ marginBottom: '15px' }}>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '5px' }}>テキスト ({textAnnotations.length})</div>
+            <div className="mb-4">
+              <div className="text-sm font-semibold mb-2 text-slate-700">テキスト ({textAnnotations.length})</div>
               {textAnnotations.map((text, index) => (
                 <div
                   key={text.id}
@@ -2847,23 +2872,18 @@ export default function Home() {
                       texts: prev.texts.includes(text.id) ? prev.texts.filter(id => id !== text.id) : [...prev.texts, text.id],
                     }));
                   }}
-                  style={{
-                    padding: '5px',
-                    marginBottom: '3px',
-                    backgroundColor: selectedAnnotationIds.texts.includes(text.id) ? '#e3f2fd' : 'white',
-                    border: selectedAnnotationIds.texts.includes(text.id) ? '2px solid #2196F3' : '1px solid #ddd',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
+                  className={`p-2 mb-1 rounded-md cursor-pointer text-xs flex justify-between items-center transition-colors ${
+                    selectedAnnotationIds.texts.includes(text.id)
+                      ? 'bg-primary/10 border-2 border-primary'
+                      : 'bg-white border border-slate-200 hover:border-primary/50'
+                  }`}
                 >
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '150px' }}>
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap max-w-[150px]">
                     {text.text.substring(0, 20)}{text.text.length > 20 ? '...' : ''}
                   </span>
-                  <button
+                  <Button
+                    variant="destructive"
+                    size="sm"
                     onClick={async (e) => {
                       e.stopPropagation();
                       if (docId && pageSize) {
@@ -2883,30 +2903,62 @@ export default function Home() {
                         }
                       }
                     }}
-                    style={{
-                      background: '#ff4444',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '3px',
-                      padding: '2px 6px',
-                      fontSize: '10px',
-                      cursor: 'pointer',
-                    }}
+                    className="h-6 px-2 text-xs"
                   >
                     削除
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
           )}
 
           {strokes.length === 0 && shapeAnnotations.length === 0 && textAnnotations.length === 0 && (
-            <div style={{ color: '#999', fontSize: '12px', textAlign: 'center', padding: '20px' }}>
+            <div className="text-slate-400 text-xs text-center py-5">
               このページには注釈がありません
             </div>
           )}
         </div>
       )}
+
+      {/* Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{dialogTitle}</DialogTitle>
+            <DialogDescription>{dialogMessage}</DialogDescription>
+          </DialogHeader>
+          {dialogType === 'prompt' && (
+            <Input
+              value={dialogInputValue}
+              onChange={(e) => setDialogInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  dialogCallback?.(dialogInputValue);
+                }
+              }}
+              autoFocus
+            />
+          )}
+          <DialogFooter>
+            {dialogType === 'alert' && (
+              <Button onClick={() => dialogCallback?.()}>OK</Button>
+            )}
+            {dialogType === 'confirm' && (
+              <>
+                <Button variant="outline" onClick={() => dialogCallback?.(false)}>キャンセル</Button>
+                <Button onClick={() => dialogCallback?.(true)}>OK</Button>
+              </>
+            )}
+            {dialogType === 'prompt' && (
+              <>
+                <Button variant="outline" onClick={() => dialogCallback?.(undefined)}>キャンセル</Button>
+                <Button onClick={() => dialogCallback?.(dialogInputValue)}>OK</Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      </div>
     </div>
   );
 }
