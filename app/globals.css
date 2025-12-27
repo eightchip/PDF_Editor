@@ -68,16 +68,32 @@
   }
 }
 
-@keyframes gradient {
-  0%, 100% {
+@keyframes gradient-shift {
+  0% {
     background-position: 0% 50%;
   }
   50% {
     background-position: 100% 50%;
   }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 .animate-gradient {
+  background: linear-gradient(
+    90deg,
+    #4f46e5 0%,
+    #6366f1 25%,
+    #9333ea 50%,
+    #db2777 75%,
+    #4f46e5 100%
+  );
   background-size: 200% 200%;
-  animation: gradient 3s ease infinite;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: gradient-shift 3s ease infinite;
+  display: inline-block;
 }

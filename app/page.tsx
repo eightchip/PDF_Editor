@@ -2008,7 +2008,7 @@ export default function Home() {
       }}>
         <div className="relative flex items-center justify-between mb-6 md:mb-8">
           <h1 className="text-3xl md:text-4xl font-bold drop-shadow-sm relative inline-block">
-            <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent animate-gradient">
+            <span className="animate-gradient">
               Snap-illustrator
             </span>
           </h1>
