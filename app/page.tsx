@@ -1967,8 +1967,8 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 relative">
       <div className={`max-w-[1800px] mx-auto p-4 md:p-6 lg:p-8 transition-all duration-300 ${
-        showThumbnails ? 'pl-[13rem]' : 'pl-4 md:pl-6 lg:pl-8'
-      } ${showAnnotationList ? 'pr-[16.5rem]' : 'pr-4 md:pr-6 lg:pr-8'}`} style={{ position: 'relative', zIndex: 1 }}>
+        showThumbnails ? 'ml-[13rem]' : 'ml-0'
+      } ${showAnnotationList ? 'mr-[16.5rem]' : 'mr-0'}`} style={{ position: 'relative', zIndex: 1 }}>
         <h1 className="text-3xl md:text-4xl font-bold text-slate-800 mb-6 md:mb-8 drop-shadow-sm">PDF注釈アプリ</h1>
 
       {/* ファイル選択 */}
