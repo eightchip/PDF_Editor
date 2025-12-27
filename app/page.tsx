@@ -21,7 +21,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button"; // Dialog内でのみ使用
+import { MdClose, MdKeyboard, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove } from 'react-icons/md';
 // PDF.jsの型は動的インポートで取得
 
 export default function Home() {
@@ -2052,17 +2053,19 @@ export default function Home() {
 
       {/* キーボードショートカット一覧 */}
       {showKeyboardShortcuts && (
-        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-6 rounded-lg shadow-xl z-[10000] max-w-lg max-h-[80vh] overflow-auto border border-slate-200">
+        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-6 rounded-lg shadow-2xl max-w-lg max-h-[80vh] overflow-auto border border-slate-200" style={{ zIndex: 10000 }}>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-slate-800">キーボードショートカット</h2>
-            <Button
-              variant="ghost"
-              size="icon"
+            <h2 className="text-xl font-semibold text-slate-800 flex items-center gap-2">
+              <MdKeyboard className="text-2xl text-slate-600" />
+              キーボードショートカット
+            </h2>
+            <button
               onClick={() => setShowKeyboardShortcuts(false)}
-              className="h-8 w-8"
+              className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors"
+              title="閉じる"
             >
-              ×
-            </Button>
+              <MdClose className="text-xl" />
+            </button>
         </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div><strong>Ctrl+Z</strong></div>
@@ -2083,7 +2086,7 @@ export default function Home() {
 
       {/* サムネイル表示 */}
       {pdfDoc && showThumbnails && (
-        <div className="fixed left-0 top-0 bottom-0 w-52 bg-slate-50 border-r border-slate-200 overflow-y-auto p-3 shadow-lg" style={{ position: 'fixed', left: 0, top: 0, bottom: 0, width: '13rem', zIndex: 100, pointerEvents: 'auto' }}>
+        <div className="fixed left-0 top-0 bottom-0 w-52 bg-slate-50 border-r border-slate-200 p-3 shadow-lg" style={{ position: 'fixed', left: 0, top: 0, bottom: 0, width: '13rem', zIndex: 100, pointerEvents: 'auto', overflowY: 'auto', overflowX: 'hidden' }}>
           <div className="mb-3 font-semibold flex justify-between items-center text-slate-700">
             <span>ページ一覧</span>
             <button
@@ -2091,10 +2094,10 @@ export default function Home() {
                 e.stopPropagation();
                 setShowThumbnails(false);
               }}
-              className="h-6 w-6 text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded px-1 border-none bg-transparent cursor-pointer"
+              className="h-6 w-6 flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded px-1 border-none bg-transparent cursor-pointer transition-colors"
               title="閉じる"
             >
-              ×
+              <MdClose className="text-lg" />
             </button>
           </div>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
@@ -2134,20 +2137,25 @@ export default function Home() {
         {pdfDoc && (
           <>
             <div className="mb-4 flex gap-2 md:gap-3 items-center flex-wrap transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
-            <Button
-              variant={showThumbnails ? 'default' : 'secondary'}
-              size={isMobile ? 'default' : 'sm'}
+            <button
               onClick={() => setShowThumbnails(!showThumbnails)}
               title="ページ一覧のサムネイルを表示/非表示します"
+              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+                showThumbnails 
+                  ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' 
+                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+              }`}
             >
-              {showThumbnails ? '📑 サムネイル非表示' : '📑 サムネイル表示'}
-            </Button>
+              <MdList className="text-lg" />
+              {showThumbnails ? 'サムネイル非表示' : 'サムネイル表示'}
+            </button>
             <button
               onClick={goToPrevPage}
               disabled={currentPage === 1}
               title="前のページに移動します"
-              className="px-3 py-1.5 border border-slate-300 rounded text-sm hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 border border-slate-300 rounded-md text-sm hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
             >
+              <MdNavigateBefore className="text-lg" />
               前へ
             </button>
             <span className="text-sm font-medium text-slate-700 px-2">
@@ -2157,119 +2165,163 @@ export default function Home() {
               onClick={goToNextPage}
               disabled={currentPage === totalPages}
               title="次のページに移動します"
-              className="px-3 py-1.5 border border-slate-300 rounded text-sm hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 border border-slate-300 rounded-md text-sm hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
             >
               次へ
+              <MdNavigateNext className="text-lg" />
             </button>
             <span className="text-slate-300 mx-1">|</span>
             <button
               onClick={() => setPageRotation((prev) => (prev + 90) % 360)}
               title="ページを90度回転します"
-              className="px-3 py-1.5 border border-green-500 text-green-700 rounded text-sm hover:bg-green-50"
+              className="px-3 py-1.5 border border-green-500 text-green-700 rounded-md text-sm hover:bg-green-50 flex items-center gap-1 transition-colors"
             >
-              ↻ 回転 ({pageRotation}°)
+              <MdRotateRight className="text-lg" />
+              回転 ({pageRotation}°)
             </button>
         </div>
 
           {/* ズーム */}
           <div className="mb-4 flex gap-2 items-center flex-wrap relative z-50" style={{ pointerEvents: 'auto' }}>
-            <span className="text-sm font-medium text-slate-700">ズーム:</span>
-            <Button
-              variant={scale === 0.75 ? 'default' : 'outline'}
-              size={isMobile ? 'default' : 'sm'}
+            <span className="text-sm font-medium text-slate-700 flex items-center gap-1">
+              <MdZoomOut className="text-base" />
+              ズーム:
+            </span>
+            <button
               onClick={() => setScale(0.75)}
               title="表示倍率を75%に設定します"
+              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors ${
+                scale === 0.75 
+                  ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' 
+                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+              }`}
             >
               75%
-            </Button>
-            <Button
-              variant={scale === 1.0 ? 'default' : 'outline'}
-              size={isMobile ? 'default' : 'sm'}
+            </button>
+            <button
               onClick={() => setScale(1.0)}
               title="表示倍率を100%に設定します"
+              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors ${
+                scale === 1.0 
+                  ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' 
+                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+              }`}
             >
               100%
-            </Button>
-            <Button
-              variant={scale === 1.25 ? 'default' : 'outline'}
-              size={isMobile ? 'default' : 'sm'}
+            </button>
+            <button
               onClick={() => setScale(1.25)}
               title="表示倍率を125%に設定します"
+              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors ${
+                scale === 1.25 
+                  ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' 
+                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+              }`}
             >
               125%
-            </Button>
+            </button>
           </div>
 
           {/* ツールバー */}
           <div className="mb-4 flex gap-2 md:gap-3 items-center flex-wrap transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
             <div className="flex gap-2 flex-wrap">
-              <Button
-                variant={tool === 'pen' ? 'default' : 'outline'}
-                size={isMobile ? 'default' : 'sm'}
+              <button
                 onClick={() => setTool('pen')}
                 title="手書きで線を描画します"
+                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                  tool === 'pen'
+                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
               >
+                <MdBrush className="text-base" />
                 ペン
-              </Button>
-              <Button
-                variant={tool === 'eraser' ? 'default' : 'outline'}
-                size={isMobile ? 'default' : 'sm'}
+              </button>
+              <button
                 onClick={() => setTool('eraser')}
                 title="描画した線を消去します"
+                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                  tool === 'eraser'
+                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
               >
+                <MdClear className="text-base" />
                 消しゴム
-              </Button>
-              <Button
-                variant={tool === 'text' ? 'default' : 'outline'}
-                size={isMobile ? 'default' : 'sm'}
+              </button>
+              <button
                 onClick={() => setTool('text')}
                 title="テキストを追加します"
+                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                  tool === 'text'
+                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
               >
+                <MdTextFields className="text-base" />
                 テキスト
-              </Button>
-              <Button
-                variant={tool === 'line' ? 'default' : 'outline'}
-                size={isMobile ? 'default' : 'sm'}
+              </button>
+              <button
                 onClick={() => setTool('line')}
                 title="直線を描画します"
+                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                  tool === 'line'
+                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
               >
+                <MdRemove className="text-base" />
                 線
-              </Button>
-              <Button
-                variant={tool === 'rectangle' ? 'default' : 'outline'}
-                size={isMobile ? 'default' : 'sm'}
+              </button>
+              <button
                 onClick={() => setTool('rectangle')}
                 title="四角形を描画します"
+                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                  tool === 'rectangle'
+                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
               >
+                <MdRectangle className="text-base" />
                 四角形
-              </Button>
-              <Button
-                variant={tool === 'circle' ? 'default' : 'outline'}
-                size={isMobile ? 'default' : 'sm'}
+              </button>
+              <button
                 onClick={() => setTool('circle')}
                 title="円を描画します"
+                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                  tool === 'circle'
+                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
               >
+                <MdCircle className="text-base" />
                 円
-              </Button>
-              <Button
-                variant={tool === 'arrow' ? 'default' : 'outline'}
-                size={isMobile ? 'default' : 'sm'}
+              </button>
+              <button
                 onClick={() => setTool('arrow')}
                 title="矢印を描画します"
+                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                  tool === 'arrow'
+                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
               >
+                <MdArrowForward className="text-base" />
                 矢印
-              </Button>
-              <Button
-                variant={tool === 'highlight' ? 'default' : 'outline'}
-                size={isMobile ? 'default' : 'sm'}
+              </button>
+              <button
                 onClick={() => setTool('highlight')}
                 title="テキストをハイライトします"
+                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                  tool === 'highlight'
+                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
               >
+                <MdHighlight className="text-base" />
                 ハイライト
-              </Button>
-              <Button
-                variant={tool === 'select' ? 'default' : 'outline'}
-                size={isMobile ? 'default' : 'sm'}
+              </button>
+              <button
                 onClick={() => {
                   setTool('select');
                   setSelectedAnnotationIds({ strokes: [], shapes: [], texts: [] });
@@ -2284,17 +2336,27 @@ export default function Home() {
                   setShapeStartPoint(null);
                 }}
                 title="選択ツール: 注釈をクリックで選択、Ctrl+クリックで複数選択、Deleteキーで削除、ドラッグで移動"
+                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                  tool === 'select'
+                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
               >
+                <MdSelectAll className="text-base" />
                 選択
-              </Button>
-              <Button
-                variant={showAnnotationList ? 'default' : 'secondary'}
-                size={isMobile ? 'default' : 'sm'}
+              </button>
+              <button
                 onClick={() => setShowAnnotationList(!showAnnotationList)}
                 title="注釈一覧を表示/非表示"
+                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                  showAnnotationList
+                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
               >
-                📋 注釈一覧
-              </Button>
+                <MdList className="text-base" />
+                注釈一覧
+              </button>
             </div>
 
             {(tool === 'pen' || tool === 'highlight') && (
