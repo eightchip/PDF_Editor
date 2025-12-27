@@ -44,11 +44,71 @@ export async function exportAnnotatedPDFV2(
     // ストロークを描画
     if (pageStrokes && pageStrokes.length > 0) {
       for (const stroke of pageStrokes) {
-        if (stroke.tool === 'eraser' || stroke.points.length < 2) {
+        if (stroke.tool === 'eraser') {
           continue;
         }
 
         const color = hexToRgb(stroke.color);
+        
+        // ハイライトの場合は半透明の矩形として描画
+        if (stroke.tool === 'highlight') {
+          if (stroke.points.length >= 4) {
+            // 矩形の4つの角から矩形を計算
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+            
+            for (const point of stroke.points) {
+              const x = point.x * pageSize.width;
+              const y = (1 - point.y) * pageSize.height; // Y座標を反転
+              minX = Math.min(minX, x);
+              minY = Math.min(minY, y);
+              maxX = Math.max(maxX, x);
+              maxY = Math.max(maxY, y);
+            }
+            
+            const rectX = minX;
+            const rectY = minY;
+            const rectW = maxX - minX;
+            const rectH = maxY - minY;
+            
+            // 半透明の矩形を描画（opacity: 0.3）
+            page.drawRectangle({
+              x: rectX,
+              y: rectY,
+              width: rectW,
+              height: rectH,
+              color: rgb(color.r, color.g, color.b),
+              opacity: 0.3,
+            });
+          } else if (stroke.points.length >= 2) {
+            // 点が少ない場合は線として描画（後方互換性）
+            for (let j = 0; j < stroke.points.length - 1; j++) {
+              const p1 = stroke.points[j];
+              const p2 = stroke.points[j + 1];
+              
+              const x1 = p1.x * pageSize.width;
+              const y1 = (1 - p1.y) * pageSize.height; // Y座標を反転
+              const x2 = p2.x * pageSize.width;
+              const y2 = (1 - p2.y) * pageSize.height; // Y座標を反転
+
+              page.drawLine({
+                start: { x: x1, y: y1 },
+                end: { x: x2, y: y2 },
+                thickness: stroke.width,
+                color: rgb(color.r, color.g, color.b),
+                opacity: 0.3,
+              });
+            }
+          }
+          continue; // ハイライトはここで終了
+        }
+
+        // 通常のペンストローク
+        if (stroke.points.length < 2) {
+          continue;
+        }
         
         // 各線分を個別に描画
         for (let j = 0; j < stroke.points.length - 1; j++) {
@@ -127,12 +187,14 @@ export async function exportAnnotatedPDFV2(
             const rectW = Math.abs(x2 - x1);
             const rectH = Math.abs(y2 - y1);
             if (shape.fill) {
+              // 塗りつぶしの場合は半透明にする
               page.drawRectangle({
                 x: rectX,
                 y: rectY,
                 width: rectW,
                 height: rectH,
                 color: rgb(color.r, color.g, color.b),
+                opacity: 0.5,
               });
             } else {
               page.drawRectangle({
@@ -151,11 +213,13 @@ export async function exportAnnotatedPDFV2(
             const centerY = (y1 + y2) / 2;
             const radius = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)) / 2;
             if (shape.fill) {
+              // 塗りつぶしの場合は半透明にする
               page.drawCircle({
                 x: centerX,
                 y: centerY,
                 size: radius * 2,
                 color: rgb(color.r, color.g, color.b),
+                opacity: 0.5,
               });
             } else {
               page.drawCircle({
