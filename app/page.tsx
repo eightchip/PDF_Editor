@@ -2077,10 +2077,10 @@ export default function Home() {
       )}
 
       {pdfDoc && (
-        <div>
+        <div className="relative">
           {/* サムネイル表示 */}
           {showThumbnails && (
-            <div className="fixed left-0 top-0 bottom-0 w-52 bg-slate-50 border-r border-slate-200 overflow-y-auto p-3 z-[1000] shadow-lg">
+            <div className="fixed left-0 top-0 bottom-0 w-52 bg-slate-50 border-r border-slate-200 overflow-y-auto p-3 z-[100] shadow-lg">
               <div className="mb-3 font-semibold flex justify-between items-center text-slate-700">
                 <span>ページ一覧</span>
                 <Button
