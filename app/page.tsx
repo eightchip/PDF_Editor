@@ -1319,7 +1319,7 @@ export default function Home() {
     if (!docId || !pageSize) return;
 
     // Undoスタックに追加
-    setUndoStack([...undoStack, { strokes, shapes: shapeAnnotations }]);
+    setUndoStack([...undoStack, { strokes, shapes: shapeAnnotations, texts: textAnnotations }]);
     setRedoStack([]);
 
     // 選択されたストロークを削除
