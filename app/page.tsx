@@ -2153,11 +2153,24 @@ export default function Home() {
             <button
               onClick={() => setShowThumbnails(!showThumbnails)}
               title="ページ一覧のサムネイルを表示/非表示します"
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-2 shadow-sm ${
-                showThumbnails 
-                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-indigo-600 hover:from-indigo-700 hover:to-purple-700 shadow-md' 
-                  : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-indigo-50 hover:to-purple-50 hover:border-indigo-300 hover:shadow-md'
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-2 shadow-sm text-white border-indigo-600 shadow-md hover:shadow-lg hover:scale-105 active:scale-95 ${
+                !showThumbnails ? 'text-slate-700 border-slate-300' : ''
               }`}
+              style={{
+                background: showThumbnails 
+                  ? 'linear-gradient(to right, #4f46e5, #9333ea)' 
+                  : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+              }}
+              onMouseEnter={(e) => {
+                if (showThumbnails) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #4338ca, #7e22ce)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (showThumbnails) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #4f46e5, #9333ea)';
+                }
+              }}
             >
               <MdList className={`text-lg ${showThumbnails ? 'text-white' : 'text-indigo-600'}`} />
               {showThumbnails ? 'サムネイル非表示' : 'サムネイル表示'}
@@ -2166,11 +2179,25 @@ export default function Home() {
               onClick={goToPrevPage}
               disabled={currentPage === 1}
               title="前のページに移動します"
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
-                currentPage === 1
-                  ? 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white border-cyan-500 hover:from-cyan-600 hover:to-blue-600 shadow-md hover:scale-105 active:scale-95'
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-cyan-500 shadow-md hover:scale-105 active:scale-95 ${
+                currentPage === 1 ? 'cursor-not-allowed' : ''
               }`}
+              style={{
+                background: currentPage === 1
+                  ? '#e2e8f0'
+                  : 'linear-gradient(to right, #06b6d4, #3b82f6)',
+                color: currentPage === 1 ? '#94a3b8' : 'white',
+              }}
+              onMouseEnter={(e) => {
+                if (currentPage !== 1) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #0891b2, #2563eb)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (currentPage !== 1) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #06b6d4, #3b82f6)';
+                }
+              }}
             >
               <MdNavigateBefore className={`text-lg ${currentPage === 1 ? 'text-slate-400' : 'text-white'}`} />
               前へ
@@ -2182,11 +2209,25 @@ export default function Home() {
               onClick={goToNextPage}
               disabled={currentPage === totalPages}
               title="次のページに移動します"
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
-                currentPage === totalPages
-                  ? 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white border-cyan-500 hover:from-cyan-600 hover:to-blue-600 shadow-md hover:scale-105 active:scale-95'
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-cyan-500 shadow-md hover:scale-105 active:scale-95 ${
+                currentPage === totalPages ? 'cursor-not-allowed' : ''
               }`}
+              style={{
+                background: currentPage === totalPages
+                  ? '#e2e8f0'
+                  : 'linear-gradient(to right, #06b6d4, #3b82f6)',
+                color: currentPage === totalPages ? '#94a3b8' : 'white',
+              }}
+              onMouseEnter={(e) => {
+                if (currentPage !== totalPages) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #0891b2, #2563eb)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (currentPage !== totalPages) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #06b6d4, #3b82f6)';
+                }
+              }}
             >
               次へ
               <MdNavigateNext className={`text-lg ${currentPage === totalPages ? 'text-slate-400' : 'text-white'}`} />
@@ -2195,7 +2236,16 @@ export default function Home() {
             <button
               onClick={() => setPageRotation((prev) => (prev + 90) % 360)}
               title="ページを90度回転します"
-              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-500 hover:from-emerald-600 hover:to-teal-600 shadow-md hover:scale-105 active:scale-95"
+              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm text-white border-emerald-500 shadow-md hover:scale-105 active:scale-95"
+              style={{
+                background: 'linear-gradient(to right, #10b981, #14b8a6)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #059669, #0d9488)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #10b981, #14b8a6)';
+              }}
             >
               <MdRotateRight className="text-lg" />
               回転 ({pageRotation}°)
@@ -2211,33 +2261,75 @@ export default function Home() {
             <button
               onClick={() => setScale(0.75)}
               title="表示倍率を75%に設定します"
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm ${
-                scale === 0.75 
-                  ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white border-violet-500 hover:from-violet-600 hover:to-purple-600 shadow-md' 
-                  : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-violet-50 hover:to-purple-50 hover:border-violet-300 hover:shadow-md'
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm border-violet-500 ${
+                scale === 0.75 ? 'shadow-md' : ''
               }`}
+              style={{
+                background: scale === 0.75
+                  ? 'linear-gradient(to right, #8b5cf6, #a855f7)'
+                  : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                color: scale === 0.75 ? 'white' : '#334155',
+              }}
+              onMouseEnter={(e) => {
+                if (scale === 0.75) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #7c3aed, #9333ea)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (scale === 0.75) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #8b5cf6, #a855f7)';
+                }
+              }}
             >
               75%
             </button>
             <button
               onClick={() => setScale(1.0)}
               title="表示倍率を100%に設定します"
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm ${
-                scale === 1.0 
-                  ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white border-violet-500 hover:from-violet-600 hover:to-purple-600 shadow-md' 
-                  : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-violet-50 hover:to-purple-50 hover:border-violet-300 hover:shadow-md'
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm border-violet-500 ${
+                scale === 1.0 ? 'shadow-md' : ''
               }`}
+              style={{
+                background: scale === 1.0
+                  ? 'linear-gradient(to right, #8b5cf6, #a855f7)'
+                  : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                color: scale === 1.0 ? 'white' : '#334155',
+              }}
+              onMouseEnter={(e) => {
+                if (scale === 1.0) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #7c3aed, #9333ea)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (scale === 1.0) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #8b5cf6, #a855f7)';
+                }
+              }}
             >
               100%
             </button>
             <button
               onClick={() => setScale(1.25)}
               title="表示倍率を125%に設定します"
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm ${
-                scale === 1.25 
-                  ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white border-violet-500 hover:from-violet-600 hover:to-purple-600 shadow-md' 
-                  : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-violet-50 hover:to-purple-50 hover:border-violet-300 hover:shadow-md'
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm border-violet-500 ${
+                scale === 1.25 ? 'shadow-md' : ''
               }`}
+              style={{
+                background: scale === 1.25
+                  ? 'linear-gradient(to right, #8b5cf6, #a855f7)'
+                  : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                color: scale === 1.25 ? 'white' : '#334155',
+              }}
+              onMouseEnter={(e) => {
+                if (scale === 1.25) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #7c3aed, #9333ea)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (scale === 1.25) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #8b5cf6, #a855f7)';
+                }
+              }}
             >
               125%
             </button>
@@ -2249,11 +2341,25 @@ export default function Home() {
               <button
                 onClick={() => setTool('pen')}
                 title="手書きで線を描画します"
-                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
-                  tool === 'pen'
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-indigo-600 hover:from-indigo-700 hover:to-purple-700 shadow-md'
-                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-indigo-50 hover:to-purple-50 hover:border-indigo-300 hover:shadow-md'
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-indigo-600 ${
+                  tool === 'pen' ? 'shadow-md' : ''
                 }`}
+                style={{
+                  background: tool === 'pen'
+                    ? 'linear-gradient(to right, #4f46e5, #9333ea)'
+                    : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                  color: tool === 'pen' ? 'white' : '#334155',
+                }}
+                onMouseEnter={(e) => {
+                  if (tool === 'pen') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #4338ca, #7e22ce)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (tool === 'pen') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #4f46e5, #9333ea)';
+                  }
+                }}
               >
                 <MdBrush className={`text-base ${tool === 'pen' ? 'text-white' : 'text-indigo-600'}`} />
                 ペン
@@ -2261,11 +2367,25 @@ export default function Home() {
               <button
                 onClick={() => setTool('eraser')}
                 title="描画した線を消去します"
-                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
-                  tool === 'eraser'
-                    ? 'bg-gradient-to-r from-red-500 to-pink-500 text-white border-red-500 hover:from-red-600 hover:to-pink-600 shadow-md'
-                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-red-50 hover:to-pink-50 hover:border-red-300 hover:shadow-md'
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-red-500 ${
+                  tool === 'eraser' ? 'shadow-md' : ''
                 }`}
+                style={{
+                  background: tool === 'eraser'
+                    ? 'linear-gradient(to right, #ef4444, #ec4899)'
+                    : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                  color: tool === 'eraser' ? 'white' : '#334155',
+                }}
+                onMouseEnter={(e) => {
+                  if (tool === 'eraser') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #dc2626, #db2777)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (tool === 'eraser') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #ef4444, #ec4899)';
+                  }
+                }}
               >
                 <MdClear className={`text-base ${tool === 'eraser' ? 'text-white' : 'text-red-500'}`} />
                 消しゴム
@@ -2273,11 +2393,25 @@ export default function Home() {
               <button
                 onClick={() => setTool('text')}
                 title="テキストを追加します"
-                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
-                  tool === 'text'
-                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-blue-500 hover:from-blue-600 hover:to-cyan-600 shadow-md'
-                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-blue-50 hover:to-cyan-50 hover:border-blue-300 hover:shadow-md'
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-blue-500 ${
+                  tool === 'text' ? 'shadow-md' : ''
                 }`}
+                style={{
+                  background: tool === 'text'
+                    ? 'linear-gradient(to right, #3b82f6, #06b6d4)'
+                    : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                  color: tool === 'text' ? 'white' : '#334155',
+                }}
+                onMouseEnter={(e) => {
+                  if (tool === 'text') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #2563eb, #0891b2)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (tool === 'text') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #3b82f6, #06b6d4)';
+                  }
+                }}
               >
                 <MdTextFields className={`text-base ${tool === 'text' ? 'text-white' : 'text-blue-500'}`} />
                 テキスト
@@ -2285,11 +2419,25 @@ export default function Home() {
               <button
                 onClick={() => setTool('line')}
                 title="直線を描画します"
-                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
-                  tool === 'line'
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-500 hover:from-emerald-600 hover:to-teal-600 shadow-md'
-                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-emerald-50 hover:to-teal-50 hover:border-emerald-300 hover:shadow-md'
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-emerald-500 ${
+                  tool === 'line' ? 'shadow-md' : ''
                 }`}
+                style={{
+                  background: tool === 'line'
+                    ? 'linear-gradient(to right, #10b981, #14b8a6)'
+                    : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                  color: tool === 'line' ? 'white' : '#334155',
+                }}
+                onMouseEnter={(e) => {
+                  if (tool === 'line') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #059669, #0d9488)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (tool === 'line') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #10b981, #14b8a6)';
+                  }
+                }}
               >
                 <MdRemove className={`text-base ${tool === 'line' ? 'text-white' : 'text-emerald-500'}`} />
                 線
@@ -2297,11 +2445,25 @@ export default function Home() {
               <button
                 onClick={() => setTool('rectangle')}
                 title="四角形を描画します"
-                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
-                  tool === 'rectangle'
-                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white border-orange-500 hover:from-orange-600 hover:to-amber-600 shadow-md'
-                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-orange-50 hover:to-amber-50 hover:border-orange-300 hover:shadow-md'
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-orange-500 ${
+                  tool === 'rectangle' ? 'shadow-md' : ''
                 }`}
+                style={{
+                  background: tool === 'rectangle'
+                    ? 'linear-gradient(to right, #f97316, #f59e0b)'
+                    : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                  color: tool === 'rectangle' ? 'white' : '#334155',
+                }}
+                onMouseEnter={(e) => {
+                  if (tool === 'rectangle') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #ea580c, #d97706)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (tool === 'rectangle') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #f97316, #f59e0b)';
+                  }
+                }}
               >
                 <MdRectangle className={`text-base ${tool === 'rectangle' ? 'text-white' : 'text-orange-500'}`} />
                 四角形
@@ -2309,11 +2471,25 @@ export default function Home() {
               <button
                 onClick={() => setTool('circle')}
                 title="円を描画します"
-                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
-                  tool === 'circle'
-                    ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white border-violet-500 hover:from-violet-600 hover:to-fuchsia-600 shadow-md'
-                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-violet-50 hover:to-fuchsia-50 hover:border-violet-300 hover:shadow-md'
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-violet-500 ${
+                  tool === 'circle' ? 'shadow-md' : ''
                 }`}
+                style={{
+                  background: tool === 'circle'
+                    ? 'linear-gradient(to right, #8b5cf6, #d946ef)'
+                    : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                  color: tool === 'circle' ? 'white' : '#334155',
+                }}
+                onMouseEnter={(e) => {
+                  if (tool === 'circle') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #7c3aed, #c026d3)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (tool === 'circle') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #8b5cf6, #d946ef)';
+                  }
+                }}
               >
                 <MdCircle className={`text-base ${tool === 'circle' ? 'text-white' : 'text-violet-500'}`} />
                 円
@@ -2321,11 +2497,25 @@ export default function Home() {
               <button
                 onClick={() => setTool('arrow')}
                 title="矢印を描画します"
-                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
-                  tool === 'arrow'
-                    ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white border-rose-500 hover:from-rose-600 hover:to-pink-600 shadow-md'
-                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-rose-50 hover:to-pink-50 hover:border-rose-300 hover:shadow-md'
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-rose-500 ${
+                  tool === 'arrow' ? 'shadow-md' : ''
                 }`}
+                style={{
+                  background: tool === 'arrow'
+                    ? 'linear-gradient(to right, #f43f5e, #ec4899)'
+                    : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                  color: tool === 'arrow' ? 'white' : '#334155',
+                }}
+                onMouseEnter={(e) => {
+                  if (tool === 'arrow') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #e11d48, #db2777)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (tool === 'arrow') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #f43f5e, #ec4899)';
+                  }
+                }}
               >
                 <MdArrowForward className={`text-base ${tool === 'arrow' ? 'text-white' : 'text-rose-500'}`} />
                 矢印
@@ -2333,11 +2523,25 @@ export default function Home() {
               <button
                 onClick={() => setTool('highlight')}
                 title="テキストをハイライトします"
-                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
-                  tool === 'highlight'
-                    ? 'bg-gradient-to-r from-yellow-400 to-amber-400 text-slate-800 border-yellow-400 hover:from-yellow-500 hover:to-amber-500 shadow-md'
-                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-yellow-50 hover:to-amber-50 hover:border-yellow-300 hover:shadow-md'
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-yellow-400 ${
+                  tool === 'highlight' ? 'shadow-md' : ''
                 }`}
+                style={{
+                  background: tool === 'highlight'
+                    ? 'linear-gradient(to right, #facc15, #fbbf24)'
+                    : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                  color: tool === 'highlight' ? '#1e293b' : '#334155',
+                }}
+                onMouseEnter={(e) => {
+                  if (tool === 'highlight') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #eab308, #f59e0b)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (tool === 'highlight') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #facc15, #fbbf24)';
+                  }
+                }}
               >
                 <MdHighlight className={`text-base ${tool === 'highlight' ? 'text-slate-800' : 'text-yellow-500'}`} />
                 ハイライト
@@ -2357,11 +2561,25 @@ export default function Home() {
                   setShapeStartPoint(null);
                 }}
                 title="選択ツール: 注釈をクリックで選択、Ctrl+クリックで複数選択、Deleteキーで削除、ドラッグで移動"
-                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
-                  tool === 'select'
-                    ? 'bg-gradient-to-r from-slate-600 to-slate-700 text-white border-slate-600 hover:from-slate-700 hover:to-slate-800 shadow-md'
-                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-slate-50 hover:to-slate-100 hover:border-slate-400 hover:shadow-md'
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-slate-600 ${
+                  tool === 'select' ? 'shadow-md' : ''
                 }`}
+                style={{
+                  background: tool === 'select'
+                    ? 'linear-gradient(to right, #475569, #334155)'
+                    : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                  color: tool === 'select' ? 'white' : '#334155',
+                }}
+                onMouseEnter={(e) => {
+                  if (tool === 'select') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #334155, #1e293b)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (tool === 'select') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #475569, #334155)';
+                  }
+                }}
               >
                 <MdSelectAll className={`text-base ${tool === 'select' ? 'text-white' : 'text-slate-600'}`} />
                 選択
@@ -2369,11 +2587,25 @@ export default function Home() {
               <button
                 onClick={() => setShowAnnotationList(!showAnnotationList)}
                 title="注釈一覧を表示/非表示"
-                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
-                  showAnnotationList
-                    ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white border-green-500 hover:from-green-600 hover:to-emerald-600 shadow-md'
-                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-green-50 hover:to-emerald-50 hover:border-green-300 hover:shadow-md'
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-green-500 ${
+                  showAnnotationList ? 'shadow-md' : ''
                 }`}
+                style={{
+                  background: showAnnotationList
+                    ? 'linear-gradient(to right, #22c55e, #10b981)'
+                    : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                  color: showAnnotationList ? 'white' : '#334155',
+                }}
+                onMouseEnter={(e) => {
+                  if (showAnnotationList) {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #16a34a, #059669)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (showAnnotationList) {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #22c55e, #10b981)';
+                  }
+                }}
               >
                 <MdList className={`text-base ${showAnnotationList ? 'text-white' : 'text-green-500'}`} />
                 注釈一覧
@@ -2553,10 +2785,8 @@ export default function Home() {
             <button
               onClick={handleUndo}
               disabled={undoStack.length === 0}
-              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
-                undoStack.length === 0
-                  ? 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-slate-600 to-slate-700 text-white border-slate-600 hover:from-slate-700 hover:to-slate-800 shadow-md'
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-slate-600 ${
+                undoStack.length === 0 ? 'cursor-not-allowed' : 'shadow-md'
               }`}
               style={{ 
                 minHeight: isMobile ? '44px' : 'auto',
@@ -2564,6 +2794,20 @@ export default function Home() {
                 touchAction: 'manipulation',
                 userSelect: 'none',
                 WebkitTapHighlightColor: 'transparent',
+                background: undoStack.length === 0
+                  ? '#e2e8f0'
+                  : 'linear-gradient(to right, #475569, #334155)',
+                color: undoStack.length === 0 ? '#94a3b8' : 'white',
+              }}
+              onMouseEnter={(e) => {
+                if (undoStack.length !== 0) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #334155, #1e293b)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (undoStack.length !== 0) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #475569, #334155)';
+                }
               }}
               title="元に戻す"
             >
@@ -2573,10 +2817,8 @@ export default function Home() {
             <button
               onClick={handleRedo}
               disabled={redoStack.length === 0}
-              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
-                redoStack.length === 0
-                  ? 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-slate-600 to-slate-700 text-white border-slate-600 hover:from-slate-700 hover:to-slate-800 shadow-md'
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-slate-600 ${
+                redoStack.length === 0 ? 'cursor-not-allowed' : 'shadow-md'
               }`}
               style={{ 
                 minHeight: isMobile ? '44px' : 'auto',
@@ -2584,6 +2826,20 @@ export default function Home() {
                 touchAction: 'manipulation',
                 userSelect: 'none',
                 WebkitTapHighlightColor: 'transparent',
+                background: redoStack.length === 0
+                  ? '#e2e8f0'
+                  : 'linear-gradient(to right, #475569, #334155)',
+                color: redoStack.length === 0 ? '#94a3b8' : 'white',
+              }}
+              onMouseEnter={(e) => {
+                if (redoStack.length !== 0) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #334155, #1e293b)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (redoStack.length !== 0) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #475569, #334155)';
+                }
               }}
               title="やり直し"
             >
@@ -2592,13 +2848,20 @@ export default function Home() {
             </button>
             <button
               onClick={handleClear}
-              className="px-3 py-1.5 border rounded-md text-sm font-medium transition-all flex items-center gap-1 shadow-sm bg-gradient-to-r from-red-500 to-pink-500 text-white border-red-500 hover:from-red-600 hover:to-pink-600 shadow-md"
+              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm text-white border-red-500 shadow-md hover:scale-105 active:scale-95"
               style={{ 
                 minHeight: isMobile ? '44px' : 'auto',
                 minWidth: isMobile ? '44px' : 'auto',
                 touchAction: 'manipulation',
                 userSelect: 'none',
                 WebkitTapHighlightColor: 'transparent',
+                background: 'linear-gradient(to right, #ef4444, #ec4899)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #dc2626, #db2777)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #ef4444, #ec4899)';
               }}
               title="すべてクリア"
             >
@@ -2608,11 +2871,25 @@ export default function Home() {
             <button
               onClick={handleSave}
               disabled={isExporting || !pdfDoc || !originalFileName}
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
-                isExporting || !pdfDoc || !originalFileName
-                  ? 'bg-slate-300 text-slate-500 border-slate-300 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white border-green-500 hover:from-green-600 hover:to-emerald-600 shadow-md hover:scale-105 active:scale-95'
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-green-500 hover:scale-105 active:scale-95 ${
+                isExporting || !pdfDoc || !originalFileName ? 'cursor-not-allowed' : 'shadow-md'
               }`}
+              style={{
+                background: isExporting || !pdfDoc || !originalFileName
+                  ? '#cbd5e1'
+                  : 'linear-gradient(to right, #22c55e, #10b981)',
+                color: isExporting || !pdfDoc || !originalFileName ? '#64748b' : 'white',
+              }}
+              onMouseEnter={(e) => {
+                if (!isExporting && pdfDoc && originalFileName) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #16a34a, #059669)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isExporting && pdfDoc && originalFileName) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #22c55e, #10b981)';
+                }
+              }}
               title="上書き保存（元のファイル名で保存）"
             >
               <MdSave className={`text-base ${isExporting || !pdfDoc || !originalFileName ? 'text-slate-500' : 'text-white'}`} />
@@ -2621,11 +2898,25 @@ export default function Home() {
             <button
               onClick={handleSaveAs}
               disabled={isExporting || !pdfDoc}
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
-                isExporting || !pdfDoc
-                  ? 'bg-slate-300 text-slate-500 border-slate-300 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white border-cyan-500 hover:from-cyan-600 hover:to-blue-600 shadow-md hover:scale-105 active:scale-95'
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-cyan-500 hover:scale-105 active:scale-95 ${
+                isExporting || !pdfDoc ? 'cursor-not-allowed' : 'shadow-md'
               }`}
+              style={{
+                background: isExporting || !pdfDoc
+                  ? '#cbd5e1'
+                  : 'linear-gradient(to right, #06b6d4, #3b82f6)',
+                color: isExporting || !pdfDoc ? '#64748b' : 'white',
+              }}
+              onMouseEnter={(e) => {
+                if (!isExporting && pdfDoc) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #0891b2, #2563eb)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isExporting && pdfDoc) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #06b6d4, #3b82f6)';
+                }
+              }}
               title="名前を付けて保存"
             >
               <MdFileDownload className={`text-base ${isExporting || !pdfDoc ? 'text-slate-500' : 'text-white'}`} />
@@ -2634,11 +2925,25 @@ export default function Home() {
             <button
               onClick={handleExportJSON}
               disabled={!pdfDoc}
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
-                !pdfDoc
-                  ? 'bg-slate-300 text-slate-500 border-slate-300 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-teal-500 hover:from-teal-600 hover:to-cyan-600 shadow-md hover:scale-105 active:scale-95'
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-teal-500 hover:scale-105 active:scale-95 ${
+                !pdfDoc ? 'cursor-not-allowed' : 'shadow-md'
               }`}
+              style={{
+                background: !pdfDoc
+                  ? '#cbd5e1'
+                  : 'linear-gradient(to right, #14b8a6, #06b6d4)',
+                color: !pdfDoc ? '#64748b' : 'white',
+              }}
+              onMouseEnter={(e) => {
+                if (pdfDoc) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #0d9488, #0891b2)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (pdfDoc) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #14b8a6, #06b6d4)';
+                }
+              }}
               title="注釈データをJSON形式でエクスポートします（バックアップ用）"
             >
               <MdFileDownload className={`text-base ${!pdfDoc ? 'text-slate-500' : 'text-white'}`} />
@@ -2662,11 +2967,25 @@ export default function Home() {
               ショートカット
             </button>
             <label
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm cursor-pointer ${
-                !pdfDoc
-                  ? 'bg-slate-300 text-slate-500 border-slate-300 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 text-white border-purple-500 hover:from-purple-600 hover:via-pink-600 hover:to-rose-600 shadow-md hover:shadow-lg hover:scale-105 active:scale-95'
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm cursor-pointer border-purple-500 hover:shadow-lg hover:scale-105 active:scale-95 ${
+                !pdfDoc ? 'cursor-not-allowed' : 'shadow-md'
               }`}
+              style={{
+                background: !pdfDoc
+                  ? '#cbd5e1'
+                  : 'linear-gradient(to right, #a855f7, #ec4899, #f43f5e)',
+                color: !pdfDoc ? '#64748b' : 'white',
+              }}
+              onMouseEnter={(e) => {
+                if (pdfDoc) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #9333ea, #db2777, #e11d48)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (pdfDoc) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #a855f7, #ec4899, #f43f5e)';
+                }
+              }}
               title="JSON形式の注釈データをインポートします"
             >
               <input
