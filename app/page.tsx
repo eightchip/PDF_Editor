@@ -3450,18 +3450,33 @@ export default function Home() {
                     if (editingTextId) {
                       e.stopPropagation();
                       e.preventDefault();
-                      return;
+                      return false;
                     }
                     // 編集ボタンや確定ボタンなどの子要素からのクリックは無視
                     const target = e.target as HTMLElement;
-                    if (target.tagName === 'BUTTON' || target.closest('button')) {
-                      return;
+                    if (target.tagName === 'BUTTON' || target.closest('button') || target.tagName === 'INPUT') {
+                      e.stopPropagation();
+                      return false;
                     }
                     setSelectedAnnotationIds(prev => ({
                       strokes: prev.strokes,
                       shapes: prev.shapes,
                       texts: prev.texts.includes(text.id) ? prev.texts.filter(id => id !== text.id) : [...prev.texts, text.id],
                     }));
+                  }}
+                  onMouseDown={(e) => {
+                    // 編集モード中はマウスダウンも無視
+                    if (editingTextId) {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      return false;
+                    }
+                    // ボタンや入力フィールドからのマウスダウンは無視
+                    const target = e.target as HTMLElement;
+                    if (target.tagName === 'BUTTON' || target.closest('button') || target.tagName === 'INPUT') {
+                      e.stopPropagation();
+                      return false;
+                    }
                   }}
                   className={`p-2.5 mb-2 rounded-lg cursor-pointer text-xs flex justify-between items-center transition-all shadow-sm ${
                     selectedAnnotationIds.texts.includes(text.id)
