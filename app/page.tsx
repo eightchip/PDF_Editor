@@ -2247,97 +2247,97 @@ export default function Home() {
               <button
                 onClick={() => setTool('pen')}
                 title="手書きで線を描画します"
-                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
                   tool === 'pen'
-                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-indigo-600 hover:from-indigo-700 hover:to-purple-700 shadow-md'
+                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-indigo-50 hover:to-purple-50 hover:border-indigo-300 hover:shadow-md'
                 }`}
               >
-                <MdBrush className="text-base" />
+                <MdBrush className={`text-base ${tool === 'pen' ? 'text-white' : 'text-indigo-600'}`} />
                 ペン
               </button>
               <button
                 onClick={() => setTool('eraser')}
                 title="描画した線を消去します"
-                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
                   tool === 'eraser'
-                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                    ? 'bg-gradient-to-r from-red-500 to-pink-500 text-white border-red-500 hover:from-red-600 hover:to-pink-600 shadow-md'
+                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-red-50 hover:to-pink-50 hover:border-red-300 hover:shadow-md'
                 }`}
               >
-                <MdClear className="text-base" />
+                <MdClear className={`text-base ${tool === 'eraser' ? 'text-white' : 'text-red-500'}`} />
                 消しゴム
               </button>
               <button
                 onClick={() => setTool('text')}
                 title="テキストを追加します"
-                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
                   tool === 'text'
-                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-blue-500 hover:from-blue-600 hover:to-cyan-600 shadow-md'
+                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-blue-50 hover:to-cyan-50 hover:border-blue-300 hover:shadow-md'
                 }`}
               >
-                <MdTextFields className="text-base" />
+                <MdTextFields className={`text-base ${tool === 'text' ? 'text-white' : 'text-blue-500'}`} />
                 テキスト
               </button>
               <button
                 onClick={() => setTool('line')}
                 title="直線を描画します"
-                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
                   tool === 'line'
-                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-500 hover:from-emerald-600 hover:to-teal-600 shadow-md'
+                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-emerald-50 hover:to-teal-50 hover:border-emerald-300 hover:shadow-md'
                 }`}
               >
-                <MdRemove className="text-base" />
+                <MdRemove className={`text-base ${tool === 'line' ? 'text-white' : 'text-emerald-500'}`} />
                 線
               </button>
               <button
                 onClick={() => setTool('rectangle')}
                 title="四角形を描画します"
-                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
                   tool === 'rectangle'
-                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white border-orange-500 hover:from-orange-600 hover:to-amber-600 shadow-md'
+                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-orange-50 hover:to-amber-50 hover:border-orange-300 hover:shadow-md'
                 }`}
               >
-                <MdRectangle className="text-base" />
+                <MdRectangle className={`text-base ${tool === 'rectangle' ? 'text-white' : 'text-orange-500'}`} />
                 四角形
               </button>
               <button
                 onClick={() => setTool('circle')}
                 title="円を描画します"
-                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
                   tool === 'circle'
-                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                    ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white border-violet-500 hover:from-violet-600 hover:to-fuchsia-600 shadow-md'
+                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-violet-50 hover:to-fuchsia-50 hover:border-violet-300 hover:shadow-md'
                 }`}
               >
-                <MdCircle className="text-base" />
+                <MdCircle className={`text-base ${tool === 'circle' ? 'text-white' : 'text-violet-500'}`} />
                 円
               </button>
               <button
                 onClick={() => setTool('arrow')}
                 title="矢印を描画します"
-                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
                   tool === 'arrow'
-                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                    ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white border-rose-500 hover:from-rose-600 hover:to-pink-600 shadow-md'
+                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-rose-50 hover:to-pink-50 hover:border-rose-300 hover:shadow-md'
                 }`}
               >
-                <MdArrowForward className="text-base" />
+                <MdArrowForward className={`text-base ${tool === 'arrow' ? 'text-white' : 'text-rose-500'}`} />
                 矢印
               </button>
               <button
                 onClick={() => setTool('highlight')}
                 title="テキストをハイライトします"
-                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
                   tool === 'highlight'
-                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                    ? 'bg-gradient-to-r from-yellow-400 to-amber-400 text-slate-800 border-yellow-400 hover:from-yellow-500 hover:to-amber-500 shadow-md'
+                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-yellow-50 hover:to-amber-50 hover:border-yellow-300 hover:shadow-md'
                 }`}
               >
-                <MdHighlight className="text-base" />
+                <MdHighlight className={`text-base ${tool === 'highlight' ? 'text-slate-800' : 'text-yellow-500'}`} />
                 ハイライト
               </button>
               <button
@@ -2355,25 +2355,25 @@ export default function Home() {
                   setShapeStartPoint(null);
                 }}
                 title="選択ツール: 注釈をクリックで選択、Ctrl+クリックで複数選択、Deleteキーで削除、ドラッグで移動"
-                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
                   tool === 'select'
-                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                    ? 'bg-gradient-to-r from-slate-600 to-slate-700 text-white border-slate-600 hover:from-slate-700 hover:to-slate-800 shadow-md'
+                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-slate-50 hover:to-slate-100 hover:border-slate-400 hover:shadow-md'
                 }`}
               >
-                <MdSelectAll className="text-base" />
+                <MdSelectAll className={`text-base ${tool === 'select' ? 'text-white' : 'text-slate-600'}`} />
                 選択
               </button>
               <button
                 onClick={() => setShowAnnotationList(!showAnnotationList)}
                 title="注釈一覧を表示/非表示"
-                className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
                   showAnnotationList
-                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white border-green-500 hover:from-green-600 hover:to-emerald-600 shadow-md'
+                    : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-green-50 hover:to-emerald-50 hover:border-green-300 hover:shadow-md'
                 }`}
               >
-                <MdList className="text-base" />
+                <MdList className={`text-base ${showAnnotationList ? 'text-white' : 'text-green-500'}`} />
                 注釈一覧
               </button>
             </div>
