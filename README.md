@@ -1,36 +1,124 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PDF注釈アプリ
 
-## Getting Started
+PDF教材を読み込み、各ページにタッチペンで手書き注釈できるWebアプリケーション（MVP）です。
 
-First, run the development server:
+## 機能
+
+- PDFファイルの読み込みと表示
+- ページごとの手書き注釈（ペン/消しゴム）
+- 注釈の永続化（IndexedDB使用）
+- ページ移動
+- ズーム機能（75% / 100% / 125%）
+- Undo/Redo機能
+- ページ単位のClear機能
+
+## 技術スタック
+
+- **フレームワーク**: Next.js 16 (App Router)
+- **言語**: TypeScript
+- **PDF表示**: pdfjs-dist
+- **データ永続化**: IndexedDB (idb)
+
+## 起動手順
+
+### 1. 依存関係のインストール
+
+```bash
+npm install
+```
+
+### 2. 開発サーバーの起動
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 3. ブラウザでアクセス
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+[http://localhost:3000](http://localhost:3000) を開いてください。
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 使い方
 
-## Learn More
+### PDFファイルの読み込み
 
-To learn more about Next.js, take a look at the following resources:
+1. 画面上部の「ファイル選択」ボタンをクリック
+2. PDFファイルを選択
+3. 1ページ目が自動的に表示されます
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 注釈の追加
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. **ペンツール**を選択
+2. 色と太さを設定（必要に応じて）
+3. PDF上でマウスをドラッグして描画
+4. タッチペンや指でも描画可能です
 
-## Deploy on Vercel
+### 消しゴムツール
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. **消しゴム**を選択
+2. 消しゴムサイズを設定
+3. 消したい部分をドラッグ
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### ページ移動
+
+- **前へ** / **次へ** ボタンでページを移動
+- ページごとに注釈が独立して保存されます
+
+### ズーム
+
+- **75%** / **100%** / **125%** ボタンでズーム変更
+- ズーム変更後も注釈の位置は正しく表示されます
+
+### Undo/Redo
+
+- **Undo**: 直前の操作を取り消し
+- **Redo**: 取り消した操作を元に戻す
+
+### Clear
+
+- **Clear** ボタンで現在のページの全注釈を削除
+
+### 注釈の保存
+
+- 注釈は自動的にIndexedDBに保存されます
+- ブラウザをリロードしても注釈は復元されます
+- 同じPDFファイルを再度読み込むと、以前の注釈が表示されます
+
+## プロジェクト構造
+
+```
+pdf_annotator_web/
+├── app/
+│   ├── lib/
+│   │   ├── id.ts      # docId生成
+│   │   ├── db.ts      # IndexedDB操作
+│   │   ├── pdf.ts     # PDF.js操作
+│   │   └── ink.ts     # ストローク描画
+│   └── page.tsx        # メインUI
+├── package.json
+└── README.md
+```
+
+## 注意事項
+
+- このアプリはローカル完結型です（認証/サーバー保存なし）
+- 注釈はブラウザのIndexedDBに保存されます
+- ブラウザのデータを削除すると注釈も削除されます
+- PDFファイルは読み込まれた時点でメモリに保持されます（サーバーには送信されません）
+
+## 開発
+
+### ビルド
+
+```bash
+npm run build
+```
+
+### 本番環境での起動
+
+```bash
+npm start
+```
+
+## ライセンス
+
+このプロジェクトは個人利用・学習目的で作成されています。
