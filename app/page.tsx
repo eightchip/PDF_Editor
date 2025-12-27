@@ -834,6 +834,14 @@ export default function Home() {
     
     if (!isDrawingRef.current || !pageSize) return;
 
+    // 選択ツールの場合は絶対に描画処理を実行しない（念のため再チェック）
+    if (tool === 'select') {
+      isDrawingRef.current = false;
+      setCurrentStroke(null);
+      setCurrentShape(null);
+      return;
+    }
+
     // 図形ツールの場合
     if (currentShape && (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow')) {
       // shapeCanvasRefからのイベントであることを確認
@@ -873,14 +881,6 @@ export default function Home() {
         }
       }
       e.preventDefault();
-      return;
-    }
-
-    // 選択ツールの場合は絶対に描画処理を実行しない（念のため再チェック）
-    if (tool === 'select') {
-      isDrawingRef.current = false;
-      setCurrentStroke(null);
-      setCurrentShape(null);
       return;
     }
     
