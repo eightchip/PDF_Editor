@@ -2036,16 +2036,26 @@ export default function Home() {
           }
         }}
       >
-        <input
-          type="file"
-          accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp,image/gif"
-          onChange={handleFileSelect}
-          className="mb-4"
-        />
-        <div className="text-sm text-slate-600 mt-2">
+        <label className="inline-block">
+          <input
+            type="file"
+            accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp,image/gif"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          <div className="px-6 py-4 border-2 border-dashed rounded-xl bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 hover:from-blue-100 hover:via-purple-100 hover:to-pink-100 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-lg border-blue-300 hover:border-purple-400">
+            <div className="flex items-center justify-center gap-3">
+              <MdInsertDriveFile className="text-3xl text-blue-600" />
+              <span className="text-base font-semibold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                ファイルを選択
+              </span>
+            </div>
+          </div>
+        </label>
+        <div className="text-sm text-slate-600 mt-3 px-2">
           PDFファイルまたは画像ファイル（PNG、JPEG、WebP、GIF）を選択できます。画像ファイルは自動的にPDFに変換されます。
         </div>
-        <div className="text-xs text-slate-400 mt-2">
+        <div className="text-xs text-slate-400 mt-1 px-2">
           または、ファイルをここにドラッグ&ドロップしてください
         </div>
       </div>
@@ -2141,41 +2151,49 @@ export default function Home() {
             <button
               onClick={() => setShowThumbnails(!showThumbnails)}
               title="ページ一覧のサムネイルを表示/非表示します"
-              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-2 shadow-sm ${
                 showThumbnails 
-                  ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' 
-                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-indigo-600 hover:from-indigo-700 hover:to-purple-700 shadow-md' 
+                  : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-indigo-50 hover:to-purple-50 hover:border-indigo-300 hover:shadow-md'
               }`}
             >
-              <MdList className="text-lg" />
+              <MdList className={`text-lg ${showThumbnails ? 'text-white' : 'text-indigo-600'}`} />
               {showThumbnails ? 'サムネイル非表示' : 'サムネイル表示'}
             </button>
             <button
               onClick={goToPrevPage}
               disabled={currentPage === 1}
               title="前のページに移動します"
-              className="px-3 py-1.5 border border-slate-300 rounded-md text-sm hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
+                currentPage === 1
+                  ? 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white border-cyan-500 hover:from-cyan-600 hover:to-blue-600 shadow-md hover:scale-105 active:scale-95'
+              }`}
             >
-              <MdNavigateBefore className="text-lg" />
+              <MdNavigateBefore className={`text-lg ${currentPage === 1 ? 'text-slate-400' : 'text-white'}`} />
               前へ
             </button>
-            <span className="text-sm font-medium text-slate-700 px-2">
+            <span className="text-sm font-semibold bg-gradient-to-r from-slate-600 to-slate-700 bg-clip-text text-transparent px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
               ページ {currentPage} / {totalPages}
             </span>
             <button
               onClick={goToNextPage}
               disabled={currentPage === totalPages}
               title="次のページに移動します"
-              className="px-3 py-1.5 border border-slate-300 rounded-md text-sm hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
+                currentPage === totalPages
+                  ? 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white border-cyan-500 hover:from-cyan-600 hover:to-blue-600 shadow-md hover:scale-105 active:scale-95'
+              }`}
             >
               次へ
-              <MdNavigateNext className="text-lg" />
+              <MdNavigateNext className={`text-lg ${currentPage === totalPages ? 'text-slate-400' : 'text-white'}`} />
             </button>
             <span className="text-slate-300 mx-1">|</span>
             <button
               onClick={() => setPageRotation((prev) => (prev + 90) % 360)}
               title="ページを90度回転します"
-              className="px-3 py-1.5 border border-green-500 text-green-700 rounded-md text-sm hover:bg-green-50 flex items-center gap-1 transition-colors"
+              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-500 hover:from-emerald-600 hover:to-teal-600 shadow-md hover:scale-105 active:scale-95"
             >
               <MdRotateRight className="text-lg" />
               回転 ({pageRotation}°)
@@ -2191,10 +2209,10 @@ export default function Home() {
             <button
               onClick={() => setScale(0.75)}
               title="表示倍率を75%に設定します"
-              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors ${
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm ${
                 scale === 0.75 
-                  ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' 
-                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                  ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white border-violet-500 hover:from-violet-600 hover:to-purple-600 shadow-md' 
+                  : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-violet-50 hover:to-purple-50 hover:border-violet-300 hover:shadow-md'
               }`}
             >
               75%
@@ -2202,10 +2220,10 @@ export default function Home() {
             <button
               onClick={() => setScale(1.0)}
               title="表示倍率を100%に設定します"
-              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors ${
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm ${
                 scale === 1.0 
-                  ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' 
-                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                  ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white border-violet-500 hover:from-violet-600 hover:to-purple-600 shadow-md' 
+                  : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-violet-50 hover:to-purple-50 hover:border-violet-300 hover:shadow-md'
               }`}
             >
               100%
@@ -2213,10 +2231,10 @@ export default function Home() {
             <button
               onClick={() => setScale(1.25)}
               title="表示倍率を125%に設定します"
-              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors ${
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm ${
                 scale === 1.25 
-                  ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' 
-                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                  ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white border-violet-500 hover:from-violet-600 hover:to-purple-600 shadow-md' 
+                  : 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 border-slate-300 hover:from-violet-50 hover:to-purple-50 hover:border-violet-300 hover:shadow-md'
               }`}
             >
               125%
