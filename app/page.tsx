@@ -1965,10 +1965,10 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 relative">
       <div className={`max-w-[1800px] mx-auto p-4 md:p-6 lg:p-8 transition-all duration-300 ${
         showThumbnails ? 'pl-[13rem]' : 'pl-4 md:pl-6 lg:pl-8'
-      } ${showAnnotationList ? 'pr-[16.5rem]' : 'pr-4 md:pr-6 lg:pr-8'}`}>
+      } ${showAnnotationList ? 'pr-[16.5rem]' : 'pr-4 md:pr-6 lg:pr-8'}`} style={{ position: 'relative', zIndex: 1 }}>
         <h1 className="text-3xl md:text-4xl font-bold text-slate-800 mb-6 md:mb-8 drop-shadow-sm">PDF注釈アプリ</h1>
 
       {/* ファイル選択 */}
@@ -2080,7 +2080,7 @@ export default function Home() {
 
       {/* サムネイル表示 */}
       {pdfDoc && showThumbnails && (
-        <div className="fixed left-0 top-0 bottom-0 w-52 bg-slate-50 border-r border-slate-200 overflow-y-auto p-3 z-[100] shadow-lg" style={{ position: 'fixed', left: 0, top: 0, bottom: 0, width: '13rem', pointerEvents: 'auto' }}>
+        <div className="fixed left-0 top-0 bottom-0 w-52 bg-slate-50 border-r border-slate-200 overflow-y-auto p-3 shadow-lg" style={{ position: 'fixed', left: 0, top: 0, bottom: 0, width: '13rem', zIndex: 100, pointerEvents: 'auto' }}>
           <div className="mb-3 font-semibold flex justify-between items-center text-slate-700">
             <span>ページ一覧</span>
             <Button
