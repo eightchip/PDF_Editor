@@ -3470,7 +3470,17 @@ export default function Home() {
                   }`}
                 >
                   {editingTextId === text.id ? (
-                    <div className="flex-1 flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+                    <div 
+                      className="flex-1 flex flex-col gap-1" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                      }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                      }}
+                    >
                       <input
                         type="text"
                         value={textInputValue}
