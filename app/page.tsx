@@ -1977,7 +1977,7 @@ export default function Home() {
 
       {/* ファイル選択 */}
       <div
-        className="mb-6 p-6 border-2 border-dashed border-slate-300 rounded-lg bg-white hover:border-primary/50 transition-colors text-center"
+        className="mb-6 p-6 border-2 border-dashed rounded-xl bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 hover:from-blue-100 hover:via-purple-100 hover:to-pink-100 transition-all duration-300 text-center hover:scale-[1.02] hover:shadow-lg border-blue-300 hover:border-purple-400"
         onDragOver={(e) => {
           e.preventDefault();
           e.stopPropagation();
