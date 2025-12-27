@@ -3400,9 +3400,10 @@ export default function Home() {
           className={showThumbnails ? '!left-[calc(50%+6.5rem)]' : ''}
           style={{
             zIndex: 10001,
-            top: '15%',
-            transform: showThumbnails ? 'translateX(calc(-50% - 6.5rem)) translateY(0)' : 'translateX(-50%) translateY(0)',
-          }}
+            top: '15% !important',
+            left: showThumbnails ? 'calc(50% + 6.5rem) !important' : '50% !important',
+            transform: showThumbnails ? 'translateX(calc(-50% - 6.5rem)) translateY(0) !important' : 'translateX(-50%) translateY(0) !important',
+          } as React.CSSProperties}
         >
           <DialogHeader>
             <DialogTitle>{dialogTitle}</DialogTitle>
