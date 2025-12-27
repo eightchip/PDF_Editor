@@ -2260,7 +2260,7 @@ export default function Home() {
         {/* ページ操作 */}
         {pdfDoc && (
           <>
-            <div className="mb-4 flex gap-2 md:gap-3 items-center flex-wrap transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
+            <div className="mb-4 flex gap-3 md:gap-4 items-center flex-wrap transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
             <button
               onClick={() => setShowThumbnails(!showThumbnails)}
               title="ページ一覧のサムネイルを表示/非表示します"
@@ -2364,7 +2364,7 @@ export default function Home() {
         </div>
 
           {/* ズーム */}
-          <div className="mb-4 flex gap-2 items-center flex-wrap relative z-50" style={{ pointerEvents: 'auto' }}>
+          <div className="mb-4 flex gap-3 items-center flex-wrap relative z-50" style={{ pointerEvents: 'auto' }}>
             <span className="text-sm font-medium text-slate-700 flex items-center gap-1">
               <MdZoomOut className="text-base" />
               ズーム:
