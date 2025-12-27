@@ -2130,6 +2130,7 @@ export default function Home() {
                   </div>
                 </div>
               ))}
+            <div className="h-8"></div> {/* スクロール用の余白 */}
           </div>
         )}
 
@@ -2420,15 +2421,31 @@ export default function Home() {
 
             {tool === 'text' && (
               <>
-                <label>
-                  色:
-                  <input
-                    type="color"
-                    value={color}
-                    onChange={(e) => setColor(e.target.value)}
-                    style={{ marginLeft: '5px' }}
-                  />
-                </label>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <MdPalette className="text-lg text-purple-600" />
+                    色:
+                  </label>
+                  <div className="flex gap-1 items-center">
+                    {['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500'].map((presetColor) => (
+                      <button
+                        key={presetColor}
+                        onClick={() => setColor(presetColor)}
+                        className={`w-8 h-8 rounded border-2 transition-all hover:scale-110 ${
+                          color === presetColor ? 'border-slate-800 ring-2 ring-offset-1 ring-slate-400' : 'border-slate-300'
+                        }`}
+                        style={{ backgroundColor: presetColor }}
+                        title={presetColor}
+                      />
+                    ))}
+                    <input
+                      type="color"
+                      value={color}
+                      onChange={(e) => setColor(e.target.value)}
+                      className="w-10 h-8 rounded border border-slate-300 cursor-pointer ml-1"
+                    />
+                  </div>
+                </div>
                 <label>
                   フォントサイズ:
                   <input
@@ -2446,15 +2463,31 @@ export default function Home() {
 
             {(tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow') && (
               <div className="flex gap-3 items-center flex-wrap">
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  色:
-                  <input
-                    type="color"
-                    value={color}
-                    onChange={(e) => setColor(e.target.value)}
-                    className="w-10 h-8 rounded border border-slate-300 cursor-pointer"
-                  />
-                </label>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <MdPalette className="text-lg text-purple-600" />
+                    色:
+                  </label>
+                  <div className="flex gap-1 items-center">
+                    {['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500'].map((presetColor) => (
+                      <button
+                        key={presetColor}
+                        onClick={() => setColor(presetColor)}
+                        className={`w-8 h-8 rounded border-2 transition-all hover:scale-110 ${
+                          color === presetColor ? 'border-slate-800 ring-2 ring-offset-1 ring-slate-400' : 'border-slate-300'
+                        }`}
+                        style={{ backgroundColor: presetColor }}
+                        title={presetColor}
+                      />
+                    ))}
+                    <input
+                      type="color"
+                      value={color}
+                      onChange={(e) => setColor(e.target.value)}
+                      className="w-10 h-8 rounded border border-slate-300 cursor-pointer ml-1"
+                    />
+                  </div>
+                </div>
                 <label className="flex items-center gap-2 text-sm text-slate-700">
                   太さ:
                   <input
@@ -2500,99 +2533,104 @@ export default function Home() {
             <button
               onClick={handleUndo}
               disabled={undoStack.length === 0}
+              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
+                undoStack.length === 0
+                  ? 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-slate-600 to-slate-700 text-white border-slate-600 hover:from-slate-700 hover:to-slate-800 shadow-md'
+              }`}
               style={{ 
-                padding: isMobile ? '10px 18px' : '5px 15px',
-                fontSize: isMobile ? '16px' : '14px',
                 minHeight: isMobile ? '44px' : 'auto',
                 minWidth: isMobile ? '44px' : 'auto',
                 touchAction: 'manipulation',
                 userSelect: 'none',
                 WebkitTapHighlightColor: 'transparent',
               }}
+              title="元に戻す"
             >
+              <MdUndo className={`text-base ${undoStack.length === 0 ? 'text-slate-400' : 'text-white'}`} />
               Undo
             </button>
             <button
               onClick={handleRedo}
               disabled={redoStack.length === 0}
+              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
+                redoStack.length === 0
+                  ? 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-slate-600 to-slate-700 text-white border-slate-600 hover:from-slate-700 hover:to-slate-800 shadow-md'
+              }`}
               style={{ 
-                padding: isMobile ? '10px 18px' : '5px 15px',
-                fontSize: isMobile ? '16px' : '14px',
                 minHeight: isMobile ? '44px' : 'auto',
                 minWidth: isMobile ? '44px' : 'auto',
                 touchAction: 'manipulation',
                 userSelect: 'none',
                 WebkitTapHighlightColor: 'transparent',
               }}
+              title="やり直し"
             >
+              <MdRedo className={`text-base ${redoStack.length === 0 ? 'text-slate-400' : 'text-white'}`} />
               Redo
             </button>
             <button
               onClick={handleClear}
+              className="px-3 py-1.5 border rounded-md text-sm font-medium transition-all flex items-center gap-1 shadow-sm bg-gradient-to-r from-red-500 to-pink-500 text-white border-red-500 hover:from-red-600 hover:to-pink-600 shadow-md"
               style={{ 
-                padding: isMobile ? '10px 18px' : '5px 15px',
-                fontSize: isMobile ? '16px' : '14px',
                 minHeight: isMobile ? '44px' : 'auto',
                 minWidth: isMobile ? '44px' : 'auto',
-                backgroundColor: '#ff4444', 
-                color: 'white',
                 touchAction: 'manipulation',
                 userSelect: 'none',
                 WebkitTapHighlightColor: 'transparent',
               }}
+              title="すべてクリア"
             >
+              <MdDelete className="text-base" />
               Clear
             </button>
             <button
               onClick={handleSave}
               disabled={isExporting || !pdfDoc || !originalFileName}
-              style={{
-                padding: '5px 15px',
-                backgroundColor: isExporting || !pdfDoc || !originalFileName ? '#ccc' : '#28a745',
-                color: 'white',
-                cursor: isExporting || !pdfDoc || !originalFileName ? 'not-allowed' : 'pointer',
-              }}
+              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
+                isExporting || !pdfDoc || !originalFileName
+                  ? 'bg-slate-300 text-slate-500 border-slate-300 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white border-green-500 hover:from-green-600 hover:to-emerald-600 shadow-md'
+              }`}
               title="上書き保存（元のファイル名で保存）"
             >
+              <MdSave className={`text-base ${isExporting || !pdfDoc || !originalFileName ? 'text-slate-500' : 'text-white'}`} />
               {isExporting ? '保存中...' : '上書き保存'}
             </button>
             <button
               onClick={handleSaveAs}
               disabled={isExporting || !pdfDoc}
-              style={{
-                padding: '5px 15px',
-                backgroundColor: isExporting || !pdfDoc ? '#ccc' : '#17a2b8',
-                color: 'white',
-                cursor: isExporting || !pdfDoc ? 'not-allowed' : 'pointer',
-              }}
+              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
+                isExporting || !pdfDoc
+                  ? 'bg-slate-300 text-slate-500 border-slate-300 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white border-cyan-500 hover:from-cyan-600 hover:to-blue-600 shadow-md'
+              }`}
               title="名前を付けて保存"
             >
+              <MdFileDownload className={`text-base ${isExporting || !pdfDoc ? 'text-slate-500' : 'text-white'}`} />
               {isExporting ? '保存中...' : '名前を付けて保存'}
             </button>
             <button
               onClick={handleExportJSON}
               disabled={!pdfDoc}
-              style={{
-                padding: '5px 15px',
-                backgroundColor: !pdfDoc ? '#ccc' : '#17a2b8',
-                color: 'white',
-                cursor: !pdfDoc ? 'not-allowed' : 'pointer',
-              }}
+              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
+                !pdfDoc
+                  ? 'bg-slate-300 text-slate-500 border-slate-300 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-teal-500 hover:from-teal-600 hover:to-cyan-600 shadow-md'
+              }`}
               title="注釈データをJSON形式でエクスポートします（バックアップ用）"
             >
+              <MdFileDownload className={`text-base ${!pdfDoc ? 'text-slate-500' : 'text-white'}`} />
               JSONエクスポート
             </button>
             <button
               onClick={() => setShowKeyboardShortcuts(!showKeyboardShortcuts)}
-              style={{
-                padding: '5px 15px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                cursor: 'pointer',
-              }}
+              className="px-3 py-1.5 border rounded-md text-sm font-medium transition-all flex items-center gap-1 shadow-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-500 hover:from-amber-600 hover:to-orange-600 shadow-md"
               title="キーボードショートカット"
             >
-              ⌨️ ショートカット
+              <MdKeyboard className="text-base" />
+              ショートカット
             </button>
             <label
               style={{
@@ -2995,10 +3033,12 @@ export default function Home() {
           )}
 
           {strokes.length === 0 && shapeAnnotations.length === 0 && textAnnotations.length === 0 && (
-            <div className="text-slate-400 text-xs text-center py-5">
-              このページには注釈がありません
+            <div className="text-center py-8 text-slate-400">
+              <MdList className="text-4xl mx-auto mb-2 text-slate-300" />
+              <p className="text-sm">このページには注釈がありません</p>
             </div>
           )}
+          <div className="h-8"></div> {/* スクロール用の余白 */}
         </div>
       )}
 
