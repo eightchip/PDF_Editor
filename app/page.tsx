@@ -3449,6 +3449,11 @@ export default function Home() {
                     // 編集モード中は選択処理をスキップ
                     if (editingTextId === text.id) {
                       e.stopPropagation();
+                      e.preventDefault();
+                      return;
+                    }
+                    // 編集モードに入る場合は選択処理をスキップ
+                    if (editingTextId) {
                       return;
                     }
                     setSelectedAnnotationIds(prev => ({
