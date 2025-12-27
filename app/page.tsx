@@ -3301,14 +3301,65 @@ export default function Home() {
 
       {/* 右側注釈一覧パネル */}
       {pdfDoc && showAnnotationList && (
-        <div className="fixed right-0 top-0 bottom-0 w-64 bg-gradient-to-b from-slate-50 to-slate-100 border-l border-slate-200 z-[100] shadow-lg flex flex-col" style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: '16rem', pointerEvents: 'auto', height: '100vh', display: 'flex', flexDirection: 'column' }}>
-          <div className="flex-shrink-0 p-3 mb-0 font-semibold flex justify-between items-center bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md" style={{ flexShrink: 0 }}>
+        <div 
+          className="fixed right-0 top-0 bottom-0 w-64 bg-gradient-to-b from-slate-50 to-slate-100 border-l border-slate-200 z-[100] shadow-lg flex flex-col" 
+          style={{ 
+            position: 'fixed', 
+            right: 0, 
+            top: 0, 
+            bottom: 0, 
+            width: '16rem', 
+            pointerEvents: editingTextId ? 'none' : 'auto', 
+            height: '100vh', 
+            display: 'flex', 
+            flexDirection: 'column' 
+          }}
+          onClick={(e) => {
+            // 編集モード中はすべてのクリックイベントを無視
+            if (editingTextId) {
+              e.stopPropagation();
+              e.preventDefault();
+              e.nativeEvent.stopImmediatePropagation();
+              return false;
+            }
+          }}
+          onMouseDown={(e) => {
+            // 編集モード中はすべてのマウスダウンイベントを無視
+            if (editingTextId) {
+              e.stopPropagation();
+              e.preventDefault();
+              e.nativeEvent.stopImmediatePropagation();
+              return false;
+            }
+          }}
+        >
+          <div 
+            className="flex-shrink-0 p-3 mb-0 font-semibold flex justify-between items-center bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md" 
+            style={{ flexShrink: 0, pointerEvents: editingTextId ? 'none' : 'auto' }}
+            onClick={(e) => {
+              // 編集モード中はクリックイベントを無視
+              if (editingTextId) {
+                e.stopPropagation();
+                e.preventDefault();
+                e.nativeEvent.stopImmediatePropagation();
+                return false;
+              }
+            }}
+          >
             <span className="flex items-center gap-2">
               <MdList className="text-lg" />
               注釈一覧（ページ {currentPage}）
             </span>
             <button
-              onClick={() => setShowAnnotationList(false)}
+              onClick={(e) => {
+                if (editingTextId) {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  e.nativeEvent.stopImmediatePropagation();
+                  return;
+                }
+                setShowAnnotationList(false);
+              }}
               className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-white/20 text-white transition-colors"
               title="閉じる"
             >
@@ -3317,12 +3368,19 @@ export default function Home() {
           </div>
           <div 
             className="flex-1 overflow-y-auto overflow-x-hidden p-3" 
-            style={{ flex: '1 1 0%', minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}
+            style={{ 
+              flex: '1 1 0%', 
+              minHeight: 0, 
+              overflowY: 'auto', 
+              overflowX: 'hidden',
+              pointerEvents: editingTextId ? 'none' : 'auto'
+            }}
             onClick={(e) => {
               // 編集モード中はクリックイベントを無視
               if (editingTextId) {
                 e.stopPropagation();
                 e.preventDefault();
+                e.nativeEvent.stopImmediatePropagation();
                 return false;
               }
             }}
@@ -3331,6 +3389,7 @@ export default function Home() {
               if (editingTextId) {
                 e.stopPropagation();
                 e.preventDefault();
+                e.nativeEvent.stopImmediatePropagation();
                 return false;
               }
             }}
