@@ -3490,10 +3490,17 @@ export default function Home() {
                       onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
+                        e.nativeEvent.stopImmediatePropagation();
                       }}
                       onMouseDown={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
+                        e.nativeEvent.stopImmediatePropagation();
+                      }}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        e.nativeEvent.stopImmediatePropagation();
                       }}
                     >
                       <input
@@ -3587,6 +3594,7 @@ export default function Home() {
                           onClick={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
+                            e.nativeEvent.stopImmediatePropagation();
                             // ドラッグ状態をリセット
                             setDragStart(null);
                             setIsDragging(false);
@@ -3597,15 +3605,22 @@ export default function Home() {
                               texts: [],
                             });
                             if (pageSize) {
-                              // 即座に編集モードに入る（setTimeoutは不要、親要素のonClickで既にスキップされている）
-                              setEditingTextId(text.id);
-                              setTextInputValue(text.text);
-                              setTextInputPosition({ x: text.x * pageSize.width, y: text.y * pageSize.height });
-                              setFontSize(text.fontSize || 16);
-                              setColor(text.color || '#000000');
-                              // 編集モードに入る際にテキストツールに切り替え（ドラッグを無効化）
-                              setTool('text');
+                              // requestAnimationFrameを使って次のフレームで実行し、親要素のイベントハンドラーが実行された後に状態を更新
+                              requestAnimationFrame(() => {
+                                setEditingTextId(text.id);
+                                setTextInputValue(text.text);
+                                setTextInputPosition({ x: text.x * pageSize.width, y: text.y * pageSize.height });
+                                setFontSize(text.fontSize || 16);
+                                setColor(text.color || '#000000');
+                                // 編集モードに入る際にテキストツールに切り替え（ドラッグを無効化）
+                                setTool('text');
+                              });
                             }
+                          }}
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            e.nativeEvent.stopImmediatePropagation();
                           }}
                           className="h-6 px-2 text-xs bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-md hover:from-blue-600 hover:to-cyan-600 transition-all shadow-sm hover:shadow-md"
                           title="編集"
