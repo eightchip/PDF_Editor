@@ -3397,13 +3397,13 @@ export default function Home() {
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent 
+          topPosition="top-[15%]"
           className={showThumbnails ? '!left-[calc(50%+6.5rem)]' : ''}
           style={{
             zIndex: 10001,
-            top: '15% !important',
-            left: showThumbnails ? 'calc(50% + 6.5rem) !important' : '50% !important',
-            transform: showThumbnails ? 'translateX(calc(-50% - 6.5rem)) translateY(0) !important' : 'translateX(-50%) translateY(0) !important',
-          } as React.CSSProperties}
+            left: showThumbnails ? 'calc(50% + 6.5rem)' : '50%',
+            transform: 'translateX(-50%) translateY(0)',
+          }}
         >
           <DialogHeader>
             <DialogTitle>{dialogTitle}</DialogTitle>
