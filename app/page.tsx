@@ -83,15 +83,17 @@ export default function Home() {
   
   const showPrompt = (message: string, defaultValue: string = '', title: string = ''): Promise<string | null> => {
     return new Promise((resolve) => {
+      const callback = (value?: string | boolean) => {
+        setDialogOpen(false);
+        setDialogCallback(null);
+        resolve(typeof value === 'string' ? value : null);
+      };
       setDialogTitle(title || '入力');
       setDialogMessage(message);
       setDialogType('prompt');
       setDialogInputValue(defaultValue);
+      setDialogCallback(() => callback);
       setDialogOpen(true);
-      setDialogCallback((value?: string | boolean) => {
-        setDialogOpen(false);
-        resolve(typeof value === 'string' ? value : null);
-      });
     });
   };
 
@@ -3071,9 +3073,8 @@ export default function Home() {
               value={dialogInputValue}
               onChange={(e) => setDialogInputValue(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  setDialogOpen(false);
-                  dialogCallback?.(dialogInputValue);
+                if (e.key === 'Enter' && dialogCallback) {
+                  dialogCallback(dialogInputValue);
                 }
               }}
               autoFocus
@@ -3101,12 +3102,14 @@ export default function Home() {
             {dialogType === 'prompt' && (
               <>
                 <Button variant="outline" onClick={() => {
-                  setDialogOpen(false);
-                  dialogCallback?.(undefined);
+                  if (dialogCallback) {
+                    dialogCallback(undefined);
+                  }
                 }}>キャンセル</Button>
                 <Button onClick={() => {
-                  setDialogOpen(false);
-                  dialogCallback?.(dialogInputValue);
+                  if (dialogCallback) {
+                    dialogCallback(dialogInputValue);
+                  }
                 }}>OK</Button>
               </>
             )}
