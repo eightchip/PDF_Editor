@@ -1108,6 +1108,12 @@ export default function Home() {
 
   // 描画終了
   const handlePointerUp = async (e: React.PointerEvent<HTMLCanvasElement>) => {
+    // テキスト編集モード中はドラッグ処理を無効化
+    if (editingTextId) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     // 選択ツールの場合は最初に処理（他のツールの描画を防ぐため）
     if (tool === 'select') {
       // 描画状態をリセット（重要：描画処理を防ぐため）
