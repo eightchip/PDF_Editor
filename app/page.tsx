@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button"; // Dialog内でのみ使用
-import { MdClose, MdKeyboard, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove } from 'react-icons/md';
+import { MdClose, MdKeyboard, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette } from 'react-icons/md';
 // PDF.jsの型は動的インポートで取得
 
 export default function Home() {
@@ -82,12 +82,12 @@ export default function Home() {
   };
   
   const showPrompt = (message: string, defaultValue: string = '', title: string = ''): Promise<string | null> => {
-    setDialogTitle(title || '入力');
-    setDialogMessage(message);
-    setDialogType('prompt');
-    setDialogInputValue(defaultValue);
-    setDialogOpen(true);
     return new Promise((resolve) => {
+      setDialogTitle(title || '入力');
+      setDialogMessage(message);
+      setDialogType('prompt');
+      setDialogInputValue(defaultValue);
+      setDialogOpen(true);
       setDialogCallback((value?: string | boolean) => {
         setDialogOpen(false);
         resolve(typeof value === 'string' ? value : null);
@@ -2086,7 +2086,7 @@ export default function Home() {
 
       {/* サムネイル表示 */}
       {pdfDoc && showThumbnails && (
-        <div className="fixed left-0 top-0 bottom-0 w-52 bg-slate-50 border-r border-slate-200 p-3 shadow-lg" style={{ position: 'fixed', left: 0, top: 0, bottom: 0, width: '13rem', zIndex: 100, pointerEvents: 'auto', overflowY: 'auto', overflowX: 'hidden' }}>
+        <div className="fixed left-0 top-0 bottom-0 w-52 bg-slate-50 border-r border-slate-200 p-3 shadow-lg" style={{ position: 'fixed', left: 0, top: 0, bottom: 0, width: '13rem', zIndex: 100, pointerEvents: 'auto', overflowY: 'auto', overflowX: 'hidden', paddingBottom: '2rem' }}>
           <div className="mb-3 font-semibold flex justify-between items-center text-slate-700">
             <span>ページ一覧</span>
             <button
@@ -2099,7 +2099,7 @@ export default function Home() {
             >
               <MdClose className="text-lg" />
             </button>
-          </div>
+        </div>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
             <div
               key={pageNum}
@@ -2803,23 +2803,28 @@ export default function Home() {
 
       {/* 右側注釈一覧パネル */}
       {pdfDoc && showAnnotationList && (
-        <div className="fixed right-0 top-0 bottom-0 w-64 bg-slate-50 border-l border-slate-200 overflow-y-auto p-3 z-[100] shadow-lg" style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: '16rem', pointerEvents: 'auto' }}>
-          <div className="mb-3 font-semibold flex justify-between items-center text-slate-700">
-            <span>注釈一覧（ページ {currentPage}）</span>
-            <Button
-              variant="ghost"
-              size="icon"
+        <div className="fixed right-0 top-0 bottom-0 w-64 bg-gradient-to-b from-slate-50 to-slate-100 border-l border-slate-200 overflow-y-auto p-3 z-[100] shadow-lg" style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: '16rem', pointerEvents: 'auto', paddingBottom: '2rem' }}>
+          <div className="mb-3 font-semibold flex justify-between items-center bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-2 rounded-lg shadow-md">
+            <span className="flex items-center gap-2">
+              <MdList className="text-lg" />
+              注釈一覧（ページ {currentPage}）
+            </span>
+            <button
               onClick={() => setShowAnnotationList(false)}
-              className="h-6 w-6"
+              className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-white/20 text-white transition-colors"
+              title="閉じる"
             >
-              ×
-            </Button>
+              <MdClose className="text-lg" />
+            </button>
           </div>
           
           {/* ストローク一覧 */}
           {strokes.length > 0 && (
             <div className="mb-4">
-              <div className="text-sm font-semibold mb-2 text-slate-700">ペン/ハイライト ({strokes.length})</div>
+              <div className="text-sm font-semibold mb-2 text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md flex items-center gap-2">
+                <MdBrush className="text-indigo-600" />
+                ペン/ハイライト ({strokes.length})
+              </div>
               {strokes.map((stroke, index) => (
                 <div
                   key={stroke.id || index}
@@ -2832,16 +2837,17 @@ export default function Home() {
                       }));
                     }
                   }}
-                  className={`p-2 mb-1 rounded-md cursor-pointer text-xs flex justify-between items-center transition-colors ${
+                  className={`p-2.5 mb-2 rounded-lg cursor-pointer text-xs flex justify-between items-center transition-all shadow-sm ${
                     selectedAnnotationIds.strokes.includes(stroke.id || '')
-                      ? 'bg-primary/10 border-2 border-primary'
-                      : 'bg-white border border-slate-200 hover:border-primary/50'
+                      ? 'bg-gradient-to-r from-indigo-100 to-purple-100 border-2 border-indigo-400 shadow-md'
+                      : 'bg-white border border-indigo-200 hover:border-indigo-400 hover:shadow-md hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50'
                   }`}
                 >
-                  <span>ストローク {index + 1}</span>
-                  <Button
-                    variant="destructive"
-                    size="sm"
+                  <span className={`font-medium ${selectedAnnotationIds.strokes.includes(stroke.id || '') ? 'text-indigo-800' : 'text-slate-700'}`}>
+                    <MdBrush className="inline mr-1 text-indigo-600" />
+                    ストローク {index + 1}
+                  </span>
+                  <button
                     onClick={async (e) => {
                       e.stopPropagation();
                       if (stroke.id && docId && pageSize) {
@@ -2861,10 +2867,11 @@ export default function Home() {
                         }
                       }
                     }}
-                    className="h-6 px-2 text-xs"
+                    className="h-6 px-2 text-xs bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-md hover:from-red-600 hover:to-pink-600 transition-all shadow-sm hover:shadow-md"
                   >
+                    <MdDelete className="inline mr-1" />
                     削除
-                  </Button>
+                  </button>
                 </div>
               ))}
             </div>
@@ -2873,7 +2880,10 @@ export default function Home() {
           {/* 図形一覧 */}
           {shapeAnnotations.length > 0 && (
             <div className="mb-4">
-              <div className="text-sm font-semibold mb-2 text-slate-700">図形 ({shapeAnnotations.length})</div>
+              <div className="text-sm font-semibold mb-2 text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md flex items-center gap-2">
+                <MdShapeLine className="text-emerald-600" />
+                図形 ({shapeAnnotations.length})
+              </div>
               {shapeAnnotations.map((shape, index) => (
                 <div
                   key={shape.id}
@@ -2884,16 +2894,20 @@ export default function Home() {
                       texts: prev.texts,
                     }));
                   }}
-                  className={`p-2 mb-1 rounded-md cursor-pointer text-xs flex justify-between items-center transition-colors ${
+                  className={`p-2.5 mb-2 rounded-lg cursor-pointer text-xs flex justify-between items-center transition-all shadow-sm ${
                     selectedAnnotationIds.shapes.includes(shape.id)
-                      ? 'bg-primary/10 border-2 border-primary'
-                      : 'bg-white border border-slate-200 hover:border-primary/50'
+                      ? 'bg-gradient-to-r from-emerald-100 to-teal-100 border-2 border-emerald-400 shadow-md'
+                      : 'bg-white border border-emerald-200 hover:border-emerald-400 hover:shadow-md hover:bg-gradient-to-r hover:from-emerald-50 hover:to-teal-50'
                   }`}
                 >
-                  <span>{shape.type === 'line' ? '線' : shape.type === 'rectangle' ? '四角形' : shape.type === 'circle' ? '円' : '矢印'} {index + 1}</span>
-                  <Button
-                    variant="destructive"
-                    size="sm"
+                  <span className={`font-medium ${selectedAnnotationIds.shapes.includes(shape.id) ? 'text-emerald-800' : 'text-slate-700'}`}>
+                    {shape.type === 'line' ? <MdRemove className="inline mr-1 text-emerald-600" /> : 
+                     shape.type === 'rectangle' ? <MdRectangle className="inline mr-1 text-emerald-600" /> : 
+                     shape.type === 'circle' ? <MdCircle className="inline mr-1 text-emerald-600" /> : 
+                     <MdArrowForward className="inline mr-1 text-emerald-600" />}
+                    {shape.type === 'line' ? '線' : shape.type === 'rectangle' ? '四角形' : shape.type === 'circle' ? '円' : '矢印'} {index + 1}
+                  </span>
+                  <button
                     onClick={async (e) => {
                       e.stopPropagation();
                       if (docId && pageSize) {
@@ -2913,10 +2927,11 @@ export default function Home() {
                         }
                       }
                     }}
-                    className="h-6 px-2 text-xs"
+                    className="h-6 px-2 text-xs bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-md hover:from-red-600 hover:to-pink-600 transition-all shadow-sm hover:shadow-md"
                   >
+                    <MdDelete className="inline mr-1" />
                     削除
-                  </Button>
+                  </button>
                 </div>
               ))}
             </div>
@@ -2925,7 +2940,10 @@ export default function Home() {
           {/* テキスト一覧 */}
           {textAnnotations.length > 0 && (
             <div className="mb-4">
-              <div className="text-sm font-semibold mb-2 text-slate-700">テキスト ({textAnnotations.length})</div>
+              <div className="text-sm font-semibold mb-2 text-blue-700 bg-blue-50 px-2 py-1 rounded-md flex items-center gap-2">
+                <MdTextFields className="text-blue-600" />
+                テキスト ({textAnnotations.length})
+              </div>
               {textAnnotations.map((text, index) => (
                 <div
                   key={text.id}
@@ -2936,18 +2954,17 @@ export default function Home() {
                       texts: prev.texts.includes(text.id) ? prev.texts.filter(id => id !== text.id) : [...prev.texts, text.id],
                     }));
                   }}
-                  className={`p-2 mb-1 rounded-md cursor-pointer text-xs flex justify-between items-center transition-colors ${
+                  className={`p-2.5 mb-2 rounded-lg cursor-pointer text-xs flex justify-between items-center transition-all shadow-sm ${
                     selectedAnnotationIds.texts.includes(text.id)
-                      ? 'bg-primary/10 border-2 border-primary'
-                      : 'bg-white border border-slate-200 hover:border-primary/50'
+                      ? 'bg-gradient-to-r from-blue-100 to-cyan-100 border-2 border-blue-400 shadow-md'
+                      : 'bg-white border border-blue-200 hover:border-blue-400 hover:shadow-md hover:bg-gradient-to-r hover:from-blue-50 hover:to-cyan-50'
                   }`}
                 >
-                  <span className="overflow-hidden text-ellipsis whitespace-nowrap max-w-[150px]">
+                  <span className={`overflow-hidden text-ellipsis whitespace-nowrap max-w-[150px] font-medium ${selectedAnnotationIds.texts.includes(text.id) ? 'text-blue-800' : 'text-slate-700'}`}>
+                    <MdTextFields className="inline mr-1 text-blue-600" />
                     {text.text.substring(0, 20)}{text.text.length > 20 ? '...' : ''}
                   </span>
-                  <Button
-                    variant="destructive"
-                    size="sm"
+                  <button
                     onClick={async (e) => {
                       e.stopPropagation();
                       if (docId && pageSize) {
@@ -2967,10 +2984,11 @@ export default function Home() {
                         }
                       }
                     }}
-                    className="h-6 px-2 text-xs"
+                    className="h-6 px-2 text-xs bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-md hover:from-red-600 hover:to-pink-600 transition-all shadow-sm hover:shadow-md"
                   >
+                    <MdDelete className="inline mr-1" />
                     削除
-                  </Button>
+                  </button>
                 </div>
               ))}
             </div>
