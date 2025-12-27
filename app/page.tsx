@@ -2646,7 +2646,16 @@ export default function Home() {
             </button>
             <button
               onClick={() => setShowKeyboardShortcuts(!showKeyboardShortcuts)}
-              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white border-amber-500 hover:from-amber-600 hover:via-orange-600 hover:to-red-600 shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
+              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm text-white border-amber-500 shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
+              style={{
+                background: 'linear-gradient(to right, #f59e0b, #f97316, #ef4444)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #d97706, #ea580c, #dc2626)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #f59e0b, #f97316, #ef4444)';
+              }}
               title="キーボードショートカット"
             >
               <MdKeyboard className="text-base text-white" />
