@@ -3446,14 +3446,15 @@ export default function Home() {
                 <div
                   key={text.id}
                   onClick={(e) => {
-                    // 編集モード中は選択処理をスキップ
-                    if (editingTextId === text.id) {
+                    // 編集モード中は選択処理を完全にスキップ
+                    if (editingTextId) {
                       e.stopPropagation();
                       e.preventDefault();
                       return;
                     }
-                    // 編集モードに入る場合は選択処理をスキップ
-                    if (editingTextId) {
+                    // 編集ボタンや確定ボタンなどの子要素からのクリックは無視
+                    const target = e.target as HTMLElement;
+                    if (target.tagName === 'BUTTON' || target.closest('button')) {
                       return;
                     }
                     setSelectedAnnotationIds(prev => ({
@@ -3558,7 +3559,7 @@ export default function Home() {
                       </span>
                       <div className="flex gap-1">
                         <button
-                          onClick={async (e) => {
+                          onClick={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
                             // ドラッグ状態をリセット
@@ -3571,16 +3572,14 @@ export default function Home() {
                               texts: [],
                             });
                             if (pageSize) {
-                              // 編集モードに入る前に少し遅延を入れて、親要素のonClickが実行されないようにする
-                              setTimeout(() => {
-                                setEditingTextId(text.id);
-                                setTextInputValue(text.text);
-                                setTextInputPosition({ x: text.x * pageSize.width, y: text.y * pageSize.height });
-                                setFontSize(text.fontSize || 16);
-                                setColor(text.color || '#000000');
-                                // 編集モードに入る際にテキストツールに切り替え（ドラッグを無効化）
-                                setTool('text');
-                              }, 0);
+                              // 即座に編集モードに入る（setTimeoutは不要、親要素のonClickで既にスキップされている）
+                              setEditingTextId(text.id);
+                              setTextInputValue(text.text);
+                              setTextInputPosition({ x: text.x * pageSize.width, y: text.y * pageSize.height });
+                              setFontSize(text.fontSize || 16);
+                              setColor(text.color || '#000000');
+                              // 編集モードに入る際にテキストツールに切り替え（ドラッグを無効化）
+                              setTool('text');
                             }
                           }}
                           className="h-6 px-2 text-xs bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-md hover:from-blue-600 hover:to-cyan-600 transition-all shadow-sm hover:shadow-md"
