@@ -3571,13 +3571,16 @@ export default function Home() {
                               texts: [],
                             });
                             if (pageSize) {
-                              setEditingTextId(text.id);
-                              setTextInputValue(text.text);
-                              setTextInputPosition({ x: text.x * pageSize.width, y: text.y * pageSize.height });
-                              setFontSize(text.fontSize || 16);
-                              setColor(text.color || '#000000');
-                              // 編集モードに入る際にテキストツールに切り替え（ドラッグを無効化）
-                              setTool('text');
+                              // 編集モードに入る前に少し遅延を入れて、親要素のonClickが実行されないようにする
+                              setTimeout(() => {
+                                setEditingTextId(text.id);
+                                setTextInputValue(text.text);
+                                setTextInputPosition({ x: text.x * pageSize.width, y: text.y * pageSize.height });
+                                setFontSize(text.fontSize || 16);
+                                setColor(text.color || '#000000');
+                                // 編集モードに入る際にテキストツールに切り替え（ドラッグを無効化）
+                                setTool('text');
+                              }, 0);
                             }
                           }}
                           className="h-6 px-2 text-xs bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-md hover:from-blue-600 hover:to-cyan-600 transition-all shadow-sm hover:shadow-md"
