@@ -2080,7 +2080,7 @@ export default function Home() {
 
       {/* サムネイル表示 */}
       {pdfDoc && showThumbnails && (
-        <div className="fixed left-0 top-0 bottom-0 w-52 bg-slate-50 border-r border-slate-200 overflow-y-auto p-3 z-[100] shadow-lg" style={{ pointerEvents: 'auto' }}>
+        <div className="fixed left-0 top-0 bottom-0 w-52 bg-slate-50 border-r border-slate-200 overflow-y-auto p-3 z-[100] shadow-lg" style={{ position: 'fixed', left: 0, top: 0, bottom: 0, width: '13rem', pointerEvents: 'auto' }}>
           <div className="mb-3 font-semibold flex justify-between items-center text-slate-700">
             <span>ページ一覧</span>
             <Button
@@ -2743,7 +2743,7 @@ export default function Home() {
 
       {/* 右側注釈一覧パネル */}
       {pdfDoc && showAnnotationList && (
-        <div className="fixed right-0 top-0 bottom-0 w-64 bg-slate-50 border-l border-slate-200 overflow-y-auto p-3 z-[100] shadow-lg" style={{ pointerEvents: 'auto' }}>
+        <div className="fixed right-0 top-0 bottom-0 w-64 bg-slate-50 border-l border-slate-200 overflow-y-auto p-3 z-[100] shadow-lg" style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: '16rem', pointerEvents: 'auto' }}>
           <div className="mb-3 font-semibold flex justify-between items-center text-slate-700">
             <span>注釈一覧（ページ {currentPage}）</span>
             <Button
