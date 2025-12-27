@@ -3397,9 +3397,11 @@ export default function Home() {
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent 
-          className={showThumbnails ? 'left-[calc(50%+6.5rem)] top-[20%] translate-y-0' : 'top-[20%] translate-y-0'}
+          className={showThumbnails ? '!left-[calc(50%+6.5rem)]' : ''}
           style={{
             zIndex: 10001,
+            top: '15%',
+            transform: showThumbnails ? 'translateX(calc(-50% - 6.5rem)) translateY(0)' : 'translateX(-50%) translateY(0)',
           }}
         >
           <DialogHeader>
