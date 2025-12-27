@@ -2633,13 +2633,11 @@ export default function Home() {
               ショートカット
             </button>
             <label
-              style={{
-                padding: '5px 15px',
-                backgroundColor: !pdfDoc ? '#ccc' : '#6c757d',
-                color: 'white',
-                cursor: !pdfDoc ? 'not-allowed' : 'pointer',
-                display: 'inline-block',
-              }}
+              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-all flex items-center gap-1 shadow-sm cursor-pointer ${
+                !pdfDoc
+                  ? 'bg-slate-300 text-slate-500 border-slate-300 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 text-white border-purple-500 hover:from-purple-600 hover:via-pink-600 hover:to-rose-600 shadow-md hover:shadow-lg hover:scale-105 active:scale-95'
+              }`}
               title="JSON形式の注釈データをインポートします"
             >
               <input
@@ -2649,6 +2647,7 @@ export default function Home() {
                 disabled={!pdfDoc}
                 style={{ display: 'none' }}
               />
+              <MdUpload className={`text-base ${!pdfDoc ? 'text-slate-500' : 'text-white'}`} />
               JSONインポート
             </label>
           </div>
