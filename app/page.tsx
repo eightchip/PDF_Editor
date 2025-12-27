@@ -1539,14 +1539,13 @@ export default function Home() {
     }
   };
 
-  // 注釈付きPDFをエクスポート
-  const handleExport = async () => {
+  // 注釈付きPDFを生成（共通処理）
+  const generateAnnotatedPDF = async (): Promise<Uint8Array | null> => {
     if (!docId || !originalPdfBytes || !pdfDoc) {
       alert('PDFが読み込まれていません');
-      return;
+      return null;
     }
 
-    setIsExporting(true);
     try {
       // 全ページの注釈を取得
       const annotations = await getAllAnnotations(docId, totalPages);
@@ -1578,12 +1577,93 @@ export default function Home() {
         shapeAnnotations
       );
 
+      return pdfBytes;
+    } catch (error) {
+      console.error('PDF生成エラー:', error);
+      alert('PDFの生成に失敗しました: ' + (error instanceof Error ? error.message : String(error)));
+      return null;
+    }
+  };
+
+  // 上書き保存（元のファイル名で保存）
+  const handleSave = async () => {
+    if (!originalFileName) {
+      alert('元のファイル名が不明です。名前を付けて保存を使用してください。');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const pdfBytes = await generateAnnotatedPDF();
+      if (!pdfBytes) return;
+
+      // ダウンロード（元のファイル名で）
+      const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = originalFileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      alert('保存しました');
+    } catch (error) {
+      console.error('保存エラー:', error);
+      alert('保存に失敗しました');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // 名前を付けて保存
+  const handleSaveAs = async () => {
+    const defaultFileName = originalFileName || 'annotated.pdf';
+    const fileName = prompt('ファイル名を入力してください（拡張子は自動で追加されます）:', defaultFileName);
+    if (!fileName) return;
+
+    setIsExporting(true);
+    try {
+      const pdfBytes = await generateAnnotatedPDF();
+      if (!pdfBytes) return;
+
+      // ファイル名に拡張子がない場合は追加
+      const finalFileName = fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`;
+
       // ダウンロード
       const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `annotated_${docId}.pdf`;
+      a.download = finalFileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      alert('保存しました');
+    } catch (error) {
+      console.error('保存エラー:', error);
+      alert('保存に失敗しました');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // 既存のエクスポート関数（後方互換性のため残す）
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const pdfBytes = await generateAnnotatedPDF();
+      if (!pdfBytes) return;
+
+      // ダウンロード（タイムスタンプ付きファイル名）
+      const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `annotated_${Date.now()}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
