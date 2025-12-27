@@ -2093,12 +2093,16 @@ export default function Home() {
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
                 <div
                   key={pageNum}
-                  onClick={() => setCurrentPage(pageNum)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentPage(pageNum);
+                  }}
                   className={`mb-2 p-2 rounded-md cursor-pointer transition-all ${
                     currentPage === pageNum
                       ? 'bg-primary/10 border-2 border-primary'
                       : 'bg-white border border-slate-200 hover:border-primary/50'
                   }`}
+                  style={{ pointerEvents: 'auto' }}
                 >
                   {thumbnails[pageNum] ? (
                     <img
@@ -2734,7 +2738,7 @@ export default function Home() {
 
       {/* 右側注釈一覧パネル */}
       {pdfDoc && showAnnotationList && (
-        <div className="fixed right-0 top-0 bottom-0 w-64 bg-slate-50 border-l border-slate-200 overflow-y-auto p-3 z-[100] shadow-lg">
+        <div className="fixed right-0 top-0 bottom-0 w-64 bg-slate-50 border-l border-slate-200 overflow-y-auto p-3 z-[100] shadow-lg" style={{ pointerEvents: 'auto' }}>
           <div className="mb-3 font-semibold flex justify-between items-center text-slate-700">
             <span>注釈一覧（ページ {currentPage}）</span>
             <Button
