@@ -2104,12 +2104,14 @@ export default function Home() {
             </div>
           </div>
         </label>
-        <div className="mt-4 px-4 py-3 bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 border border-blue-200 rounded-lg shadow-sm">
-          <div className="text-sm text-slate-700 font-medium mb-1">
-            PDFファイルまたは画像ファイル（PNG、JPEG、WebP、GIF）を選択できます。
+        <div className="mt-4 px-5 py-4 bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 border-2 border-blue-400 rounded-xl shadow-lg">
+          <div className="text-sm text-slate-800 font-bold mb-2.5 flex items-center gap-2">
+            <MdInsertDriveFile className="text-blue-600 text-lg" />
+            PDFファイルまたは画像ファイル（PNG、JPEG、WebP、GIF）を選択できます
           </div>
-          <div className="text-xs text-slate-600">
-            画像ファイルは自動的にPDFに変換されます。または、ファイルをここにドラッグ&ドロップしてください。
+          <div className="text-xs text-slate-700 pl-7 space-y-1">
+            <div>• 画像ファイルは自動的にPDFに変換されます</div>
+            <div>• または、ファイルをここにドラッグ&ドロップしてください</div>
           </div>
         </div>
       </div>
@@ -3245,7 +3247,21 @@ export default function Home() {
 
       {/* 右側注釈一覧パネル */}
       {pdfDoc && showAnnotationList && (
-        <div className="fixed right-0 top-0 bottom-0 w-64 bg-gradient-to-b from-slate-50 to-slate-100 border-l border-slate-200 overflow-y-auto p-3 z-[100] shadow-lg" style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: '16rem', pointerEvents: 'auto', paddingBottom: '2rem' }}>
+        <div className="fixed right-0 top-0 bottom-0 w-64 bg-gradient-to-b from-slate-50 to-slate-100 border-l border-slate-200 p-3 z-[100] shadow-lg flex flex-col" style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: '16rem', pointerEvents: 'auto' }}>
+          <div className="flex-shrink-0 mb-3 font-semibold flex justify-between items-center bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-2 rounded-lg shadow-md">
+            <span className="flex items-center gap-2">
+              <MdList className="text-lg" />
+              注釈一覧（ページ {currentPage}）
+            </span>
+            <button
+              onClick={() => setShowAnnotationList(false)}
+              className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-white/20 text-white transition-colors"
+              title="閉じる"
+            >
+              <MdClose className="text-lg" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto" style={{ paddingBottom: '2rem' }}>
           <div className="mb-3 font-semibold flex justify-between items-center bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-2 rounded-lg shadow-md">
             <span className="flex items-center gap-2">
               <MdList className="text-lg" />
@@ -3402,26 +3418,87 @@ export default function Home() {
                       : 'bg-white border border-blue-200 hover:border-blue-400 hover:shadow-md hover:bg-gradient-to-r hover:from-blue-50 hover:to-cyan-50'
                   }`}
                 >
-                  <span className={`overflow-hidden text-ellipsis whitespace-nowrap max-w-[150px] font-medium ${selectedAnnotationIds.texts.includes(text.id) ? 'text-blue-800' : 'text-slate-700'}`}>
-                    <MdTextFields className="inline mr-1 text-blue-600" />
-                    {text.text.substring(0, 20)}{text.text.length > 20 ? '...' : ''}
-                  </span>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        setEditingTextId(text.id);
-                        setTextInputValue(text.text);
-                        setTextInputPosition({ x: text.x, y: text.y });
-                        setFontSize(text.fontSize || 16);
-                        setColor(text.color || '#000000');
-                      }}
-                      className="h-6 px-2 text-xs bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-md hover:from-blue-600 hover:to-cyan-600 transition-all shadow-sm hover:shadow-md"
-                      title="編集"
-                    >
-                      <MdEdit className="inline mr-1" />
-                      編集
-                    </button>
+                  {editingTextId === text.id ? (
+                    <div className="flex-1 flex flex-col gap-1">
+                      <input
+                        type="text"
+                        value={textInputValue}
+                        onChange={(e) => setTextInputValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleTextSubmit();
+                          } else if (e.key === 'Escape') {
+                            setEditingTextId(null);
+                            setTextInputValue('');
+                            setTextInputPosition(null);
+                          }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        autoFocus
+                      />
+                      <div className="flex gap-1">
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await handleTextSubmit();
+                          }}
+                          className="h-5 px-2 text-xs bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded hover:from-green-600 hover:to-emerald-600 transition-all"
+                          title="確定"
+                        >
+                          確定
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTextId(null);
+                            setTextInputValue('');
+                            setTextInputPosition(null);
+                          }}
+                          className="h-5 px-2 text-xs bg-gradient-to-r from-gray-500 to-slate-500 text-white rounded hover:from-gray-600 hover:to-slate-600 transition-all"
+                          title="キャンセル"
+                        >
+                          キャンセル
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <span 
+                        className={`overflow-hidden text-ellipsis whitespace-nowrap max-w-[150px] font-medium cursor-pointer ${selectedAnnotationIds.texts.includes(text.id) ? 'text-blue-800' : 'text-slate-700'}`}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          if (pageSize) {
+                            setEditingTextId(text.id);
+                            setTextInputValue(text.text);
+                            setTextInputPosition({ x: text.x * pageSize.width, y: text.y * pageSize.height });
+                            setFontSize(text.fontSize || 16);
+                            setColor(text.color || '#000000');
+                          }
+                        }}
+                        title="ダブルクリックで編集"
+                      >
+                        <MdTextFields className="inline mr-1 text-blue-600" />
+                        {text.text.substring(0, 20)}{text.text.length > 20 ? '...' : ''}
+                      </span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (pageSize) {
+                              setEditingTextId(text.id);
+                              setTextInputValue(text.text);
+                              setTextInputPosition({ x: text.x * pageSize.width, y: text.y * pageSize.height });
+                              setFontSize(text.fontSize || 16);
+                              setColor(text.color || '#000000');
+                            }
+                          }}
+                          className="h-6 px-2 text-xs bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-md hover:from-blue-600 hover:to-cyan-600 transition-all shadow-sm hover:shadow-md"
+                          title="編集"
+                        >
+                          <MdEdit className="inline mr-1" />
+                          編集
+                        </button>
                     <button
                       onClick={async (e) => {
                         e.stopPropagation();
@@ -3447,7 +3524,9 @@ export default function Home() {
                       <MdDelete className="inline mr-1" />
                       削除
                     </button>
-                  </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
@@ -3459,7 +3538,7 @@ export default function Home() {
               <p className="text-sm">このページには注釈がありません</p>
             </div>
           )}
-          <div className="h-8"></div> {/* スクロール用の余白 */}
+          </div>
         </div>
       )}
 
