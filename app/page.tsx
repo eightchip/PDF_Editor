@@ -1130,13 +1130,6 @@ export default function Home() {
       return;
     }
     
-    // 選択ツールでない場合のみ描画処理を実行
-    if (tool === 'select') {
-      isDrawingRef.current = false;
-      setCurrentStroke(null);
-      return;
-    }
-    
     if (!isDrawingRef.current || !docId) return;
 
     // 図形ツールの場合
