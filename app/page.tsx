@@ -875,7 +875,7 @@ export default function Home() {
         setShapeAnnotations(movedShapes);
         setTextAnnotations(movedTexts);
         
-      // 再描画（inkCanvasRefをクリアしてから再描画）
+      // 再描画（すべてのキャンバスをクリアしてから再描画）
       if (inkCanvasRef.current && pageSize) {
         const ctx = inkCanvasRef.current.getContext('2d');
         if (ctx) {
@@ -891,6 +891,8 @@ export default function Home() {
         if (ctx) {
           const devicePixelRatio = window.devicePixelRatio || 1;
           ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          // キャンバスをクリアしてから再描画（不要な描画を消すため）
+          ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
           redrawShapeAnnotations(ctx, movedShapes, pageSize.width, pageSize.height);
         }
       }
@@ -899,6 +901,8 @@ export default function Home() {
         if (ctx) {
           const devicePixelRatio = window.devicePixelRatio || 1;
           ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          // キャンバスをクリアしてから再描画（不要な描画を消すため）
+          ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
           redrawTextAnnotations(ctx, movedTexts, pageSize.width, pageSize.height);
         }
       }
@@ -2100,11 +2104,13 @@ export default function Home() {
             </div>
           </div>
         </label>
-        <div className="text-sm text-slate-600 mt-3 px-2">
-          PDFファイルまたは画像ファイル（PNG、JPEG、WebP、GIF）を選択できます。画像ファイルは自動的にPDFに変換されます。
-        </div>
-        <div className="text-xs text-slate-400 mt-1 px-2">
-          または、ファイルをここにドラッグ&ドロップしてください
+        <div className="mt-4 px-4 py-3 bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 border border-blue-200 rounded-lg shadow-sm">
+          <div className="text-sm text-slate-700 font-medium mb-1">
+            PDFファイルまたは画像ファイル（PNG、JPEG、WebP、GIF）を選択できます。
+          </div>
+          <div className="text-xs text-slate-600">
+            画像ファイルは自動的にPDFに変換されます。または、ファイルをここにドラッグ&ドロップしてください。
+          </div>
         </div>
       </div>
 
@@ -2441,8 +2447,8 @@ export default function Home() {
           </div>
 
           {/* ツールバー */}
-          <div className="mb-4 flex gap-2 md:gap-3 items-center flex-wrap transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
-            <div className="flex gap-2 flex-wrap">
+          <div className="mb-4 flex gap-3 md:gap-4 items-center flex-wrap transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
+            <div className="flex gap-3 flex-wrap">
               <button
                 onClick={() => setTool('pen')}
                 title="手書きで線を描画します"
@@ -2886,7 +2892,7 @@ export default function Home() {
           </div>
 
           {/* 操作ボタン */}
-          <div className="mb-4 flex gap-2 md:gap-3 items-center flex-wrap transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
+          <div className="mb-4 flex gap-3 md:gap-4 items-center flex-wrap transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
             <button
               onClick={handleUndo}
               disabled={undoStack.length === 0}
@@ -3400,31 +3406,48 @@ export default function Home() {
                     <MdTextFields className="inline mr-1 text-blue-600" />
                     {text.text.substring(0, 20)}{text.text.length > 20 ? '...' : ''}
                   </span>
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      if (docId && pageSize) {
-                        const newTexts = textAnnotations.filter(t => t.id !== text.id);
-                        // 状態を同期的に更新（注釈一覧の表示を即座に更新するため）
-                        setTextAnnotations(newTexts);
-                        await saveTextAnnotations(docId, currentPage, newTexts);
-                        // 再描画（キャンバスをクリアしてから再描画）
-                        if (textCanvasRef.current) {
-                          const ctx = textCanvasRef.current.getContext('2d');
-                          if (ctx) {
-                            const devicePixelRatio = window.devicePixelRatio || 1;
-                            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-                            ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
-                            redrawTextAnnotations(ctx, newTexts, pageSize.width, pageSize.height);
+                  <div className="flex gap-1">
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        setEditingTextId(text.id);
+                        setTextInputValue(text.text);
+                        setTextInputPosition({ x: text.x, y: text.y });
+                        setFontSize(text.fontSize || 16);
+                        setColor(text.color || '#000000');
+                      }}
+                      className="h-6 px-2 text-xs bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-md hover:from-blue-600 hover:to-cyan-600 transition-all shadow-sm hover:shadow-md"
+                      title="編集"
+                    >
+                      <MdEdit className="inline mr-1" />
+                      編集
+                    </button>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (docId && pageSize) {
+                          const newTexts = textAnnotations.filter(t => t.id !== text.id);
+                          // 状態を同期的に更新（注釈一覧の表示を即座に更新するため）
+                          setTextAnnotations(newTexts);
+                          await saveTextAnnotations(docId, currentPage, newTexts);
+                          // 再描画（キャンバスをクリアしてから再描画）
+                          if (textCanvasRef.current) {
+                            const ctx = textCanvasRef.current.getContext('2d');
+                            if (ctx) {
+                              const devicePixelRatio = window.devicePixelRatio || 1;
+                              ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+                              ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
+                              redrawTextAnnotations(ctx, newTexts, pageSize.width, pageSize.height);
+                            }
                           }
                         }
-                      }
-                    }}
-                    className="h-6 px-2 text-xs bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-md hover:from-red-600 hover:to-pink-600 transition-all shadow-sm hover:shadow-md"
-                  >
-                    <MdDelete className="inline mr-1" />
-                    削除
-                  </button>
+                      }}
+                      className="h-6 px-2 text-xs bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-md hover:from-red-600 hover:to-pink-600 transition-all shadow-sm hover:shadow-md"
+                    >
+                      <MdDelete className="inline mr-1" />
+                      削除
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -3525,8 +3548,8 @@ export default function Home() {
               </button>
             </div>
             <div className="flex flex-col items-center gap-4">
-              <div className="bg-white p-4 rounded-lg">
-                <QRCodeSVG value={siteUrl} size={200} />
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <QRCodeSVG value={siteUrl} size={120} />
               </div>
               <p className="text-sm text-slate-600 break-all text-center">{siteUrl}</p>
             </div>
