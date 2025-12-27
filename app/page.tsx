@@ -881,14 +881,6 @@ export default function Home() {
     
     const canvas = inkCanvasRef.current;
     
-    // 選択ツールの場合は絶対に描画しない（最終チェック）
-    if (tool === 'select') {
-      isDrawingRef.current = false;
-      setCurrentStroke(null);
-      setCurrentShape(null);
-      return;
-    }
-    
     // currentStrokeがない場合は描画しない
     if (!currentStroke) return;
 
