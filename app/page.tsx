@@ -2608,10 +2608,10 @@ export default function Home() {
             <button
               onClick={handleSave}
               disabled={isExporting || !pdfDoc || !originalFileName}
-              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
                 isExporting || !pdfDoc || !originalFileName
                   ? 'bg-slate-300 text-slate-500 border-slate-300 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white border-green-500 hover:from-green-600 hover:to-emerald-600 shadow-md'
+                  : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white border-green-500 hover:from-green-600 hover:to-emerald-600 shadow-md hover:scale-105 active:scale-95'
               }`}
               title="上書き保存（元のファイル名で保存）"
             >
@@ -2621,10 +2621,10 @@ export default function Home() {
             <button
               onClick={handleSaveAs}
               disabled={isExporting || !pdfDoc}
-              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
                 isExporting || !pdfDoc
                   ? 'bg-slate-300 text-slate-500 border-slate-300 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white border-cyan-500 hover:from-cyan-600 hover:to-blue-600 shadow-md'
+                  : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white border-cyan-500 hover:from-cyan-600 hover:to-blue-600 shadow-md hover:scale-105 active:scale-95'
               }`}
               title="名前を付けて保存"
             >
@@ -2634,10 +2634,10 @@ export default function Home() {
             <button
               onClick={handleExportJSON}
               disabled={!pdfDoc}
-              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm ${
                 !pdfDoc
                   ? 'bg-slate-300 text-slate-500 border-slate-300 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-teal-500 hover:from-teal-600 hover:to-cyan-600 shadow-md'
+                  : 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-teal-500 hover:from-teal-600 hover:to-cyan-600 shadow-md hover:scale-105 active:scale-95'
               }`}
               title="注釈データをJSON形式でエクスポートします（バックアップ用）"
             >
@@ -2646,14 +2646,14 @@ export default function Home() {
             </button>
             <button
               onClick={() => setShowKeyboardShortcuts(!showKeyboardShortcuts)}
-              className="px-3 py-1.5 border rounded-md text-sm font-medium transition-all flex items-center gap-1 shadow-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-500 hover:from-amber-600 hover:to-orange-600 shadow-md"
+              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white border-amber-500 hover:from-amber-600 hover:via-orange-600 hover:to-red-600 shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
               title="キーボードショートカット"
             >
-              <MdKeyboard className="text-base" />
+              <MdKeyboard className="text-base text-white" />
               ショートカット
             </button>
             <label
-              className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-all flex items-center gap-1 shadow-sm cursor-pointer ${
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm cursor-pointer ${
                 !pdfDoc
                   ? 'bg-slate-300 text-slate-500 border-slate-300 cursor-not-allowed'
                   : 'bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 text-white border-purple-500 hover:from-purple-600 hover:via-pink-600 hover:to-rose-600 shadow-md hover:shadow-lg hover:scale-105 active:scale-95'
