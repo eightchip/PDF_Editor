@@ -3565,6 +3565,7 @@ export default function Home() {
                   {editingTextId === text.id ? (
                     <div 
                       className="flex-1 flex flex-col gap-1" 
+                      style={{ pointerEvents: 'auto' }}
                       onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
