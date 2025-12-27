@@ -2062,6 +2062,65 @@ export default function Home() {
         </div>
       </div>
 
+      {/* 保存ボタン（画面上部中央） */}
+      {pdfDoc && (
+        <div className="mb-6 flex justify-center items-center gap-3 flex-wrap">
+          <button
+            onClick={handleSave}
+            disabled={isExporting || !pdfDoc || !originalFileName}
+            className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-green-500 hover:scale-105 active:scale-95 ${
+              isExporting || !pdfDoc || !originalFileName ? 'cursor-not-allowed' : 'shadow-md'
+            }`}
+            style={{
+              background: isExporting || !pdfDoc || !originalFileName
+                ? '#cbd5e1'
+                : 'linear-gradient(to right, #22c55e, #10b981)',
+              color: isExporting || !pdfDoc || !originalFileName ? '#64748b' : 'white',
+            }}
+            onMouseEnter={(e) => {
+              if (!isExporting && pdfDoc && originalFileName) {
+                e.currentTarget.style.background = 'linear-gradient(to right, #16a34a, #059669)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isExporting && pdfDoc && originalFileName) {
+                e.currentTarget.style.background = 'linear-gradient(to right, #22c55e, #10b981)';
+              }
+            }}
+            title="上書き保存（元のファイル名で保存）"
+          >
+            <MdSave className={`text-base ${isExporting || !pdfDoc || !originalFileName ? 'text-slate-500' : 'text-white'}`} />
+            {isExporting ? '保存中...' : '上書き保存'}
+          </button>
+          <button
+            onClick={handleSaveAs}
+            disabled={isExporting || !pdfDoc}
+            className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-cyan-500 hover:scale-105 active:scale-95 ${
+              isExporting || !pdfDoc ? 'cursor-not-allowed' : 'shadow-md'
+            }`}
+            style={{
+              background: isExporting || !pdfDoc
+                ? '#cbd5e1'
+                : 'linear-gradient(to right, #06b6d4, #3b82f6)',
+              color: isExporting || !pdfDoc ? '#64748b' : 'white',
+            }}
+            onMouseEnter={(e) => {
+              if (!isExporting && pdfDoc) {
+                e.currentTarget.style.background = 'linear-gradient(to right, #0891b2, #2563eb)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isExporting && pdfDoc) {
+                e.currentTarget.style.background = 'linear-gradient(to right, #06b6d4, #3b82f6)';
+              }
+            }}
+            title="名前を付けて保存"
+          >
+            <MdFileDownload className={`text-base ${isExporting || !pdfDoc ? 'text-slate-500' : 'text-white'}`} />
+            {isExporting ? '保存中...' : '名前を付けて保存'}
+          </button>
+        </div>
+      )}
 
       {/* キーボードショートカット一覧 */}
       {showKeyboardShortcuts && (
@@ -2867,60 +2926,6 @@ export default function Home() {
             >
               <MdDelete className="text-base" />
               Clear
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={isExporting || !pdfDoc || !originalFileName}
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-green-500 hover:scale-105 active:scale-95 ${
-                isExporting || !pdfDoc || !originalFileName ? 'cursor-not-allowed' : 'shadow-md'
-              }`}
-              style={{
-                background: isExporting || !pdfDoc || !originalFileName
-                  ? '#cbd5e1'
-                  : 'linear-gradient(to right, #22c55e, #10b981)',
-                color: isExporting || !pdfDoc || !originalFileName ? '#64748b' : 'white',
-              }}
-              onMouseEnter={(e) => {
-                if (!isExporting && pdfDoc && originalFileName) {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #16a34a, #059669)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isExporting && pdfDoc && originalFileName) {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #22c55e, #10b981)';
-                }
-              }}
-              title="上書き保存（元のファイル名で保存）"
-            >
-              <MdSave className={`text-base ${isExporting || !pdfDoc || !originalFileName ? 'text-slate-500' : 'text-white'}`} />
-              {isExporting ? '保存中...' : '上書き保存'}
-            </button>
-            <button
-              onClick={handleSaveAs}
-              disabled={isExporting || !pdfDoc}
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-cyan-500 hover:scale-105 active:scale-95 ${
-                isExporting || !pdfDoc ? 'cursor-not-allowed' : 'shadow-md'
-              }`}
-              style={{
-                background: isExporting || !pdfDoc
-                  ? '#cbd5e1'
-                  : 'linear-gradient(to right, #06b6d4, #3b82f6)',
-                color: isExporting || !pdfDoc ? '#64748b' : 'white',
-              }}
-              onMouseEnter={(e) => {
-                if (!isExporting && pdfDoc) {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #0891b2, #2563eb)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isExporting && pdfDoc) {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #06b6d4, #3b82f6)';
-                }
-              }}
-              title="名前を付けて保存"
-            >
-              <MdFileDownload className={`text-base ${isExporting || !pdfDoc ? 'text-slate-500' : 'text-white'}`} />
-              {isExporting ? '保存中...' : '名前を付けて保存'}
             </button>
             <button
               onClick={handleExportJSON}
