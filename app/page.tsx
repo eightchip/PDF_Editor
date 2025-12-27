@@ -3275,20 +3275,6 @@ export default function Home() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto overflow-x-hidden p-3" style={{ minHeight: 0 }}>
-          <div className="mb-3 font-semibold flex justify-between items-center bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-2 rounded-lg shadow-md">
-            <span className="flex items-center gap-2">
-              <MdList className="text-lg" />
-              注釈一覧（ページ {currentPage}）
-            </span>
-            <button
-              onClick={() => setShowAnnotationList(false)}
-              className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-white/20 text-white transition-colors"
-              title="閉じる"
-            >
-              <MdClose className="text-lg" />
-            </button>
-          </div>
-          
           {/* ストローク一覧 */}
           {strokes.length > 0 && (
             <div className="mb-4">
