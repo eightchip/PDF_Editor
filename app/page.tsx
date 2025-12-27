@@ -3260,8 +3260,8 @@ export default function Home() {
 
       {/* 右側注釈一覧パネル */}
       {pdfDoc && showAnnotationList && (
-        <div className="fixed right-0 top-0 bottom-0 w-64 bg-gradient-to-b from-slate-50 to-slate-100 border-l border-slate-200 p-3 z-[100] shadow-lg flex flex-col" style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: '16rem', pointerEvents: 'auto' }}>
-          <div className="flex-shrink-0 mb-3 font-semibold flex justify-between items-center bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-2 rounded-lg shadow-md">
+        <div className="fixed right-0 top-0 bottom-0 w-64 bg-gradient-to-b from-slate-50 to-slate-100 border-l border-slate-200 z-[100] shadow-lg flex flex-col" style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: '16rem', pointerEvents: 'auto', height: '100vh' }}>
+          <div className="flex-shrink-0 p-3 mb-0 font-semibold flex justify-between items-center bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md">
             <span className="flex items-center gap-2">
               <MdList className="text-lg" />
               注釈一覧（ページ {currentPage}）
@@ -3274,7 +3274,7 @@ export default function Home() {
               <MdClose className="text-lg" />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto" style={{ paddingBottom: '2rem' }}>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-3" style={{ minHeight: 0 }}>
           <div className="mb-3 font-semibold flex justify-between items-center bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-2 rounded-lg shadow-md">
             <span className="flex items-center gap-2">
               <MdList className="text-lg" />
