@@ -3504,12 +3504,24 @@ export default function Home() {
                         <button
                           onClick={async (e) => {
                             e.stopPropagation();
+                            e.preventDefault();
+                            // ドラッグ状態をリセット
+                            setDragStart(null);
+                            setIsDragging(false);
+                            // 選択を解除
+                            setSelectedAnnotationIds({
+                              strokes: [],
+                              shapes: [],
+                              texts: [],
+                            });
                             if (pageSize) {
                               setEditingTextId(text.id);
                               setTextInputValue(text.text);
                               setTextInputPosition({ x: text.x * pageSize.width, y: text.y * pageSize.height });
                               setFontSize(text.fontSize || 16);
                               setColor(text.color || '#000000');
+                              // 編集モードに入る際にテキストツールに切り替え（ドラッグを無効化）
+                              setTool('text');
                             }
                           }}
                           className="h-6 px-2 text-xs bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-md hover:from-blue-600 hover:to-cyan-600 transition-all shadow-sm hover:shadow-md"
