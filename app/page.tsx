@@ -2016,12 +2016,15 @@ export default function Home() {
   const siteUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-50 to-slate-100 relative overflow-hidden">
-      <div className="h-full max-w-[1800px] mx-auto p-4 md:p-6 lg:p-8 transition-all duration-300 overflow-y-auto" style={{ 
+    <div className="h-screen bg-gradient-to-br from-slate-50 to-slate-100 relative overflow-hidden" style={{ height: '100vh', overflow: 'hidden' }}>
+      <div className="h-full max-w-[1800px] mx-auto p-4 md:p-6 lg:p-8 transition-all duration-300" style={{ 
         position: 'relative', 
         zIndex: 1,
         marginLeft: showThumbnails ? '13rem' : 'auto',
-        marginRight: showAnnotationList ? '16.5rem' : 'auto'
+        marginRight: showAnnotationList ? '16.5rem' : 'auto',
+        height: '100%',
+        overflowY: 'auto',
+        overflowX: 'hidden'
       }}>
         <div className="relative flex items-center justify-between mb-6 md:mb-8">
           <h1 className="text-3xl md:text-4xl font-bold drop-shadow-sm relative inline-block">
@@ -3260,8 +3263,8 @@ export default function Home() {
 
       {/* 右側注釈一覧パネル */}
       {pdfDoc && showAnnotationList && (
-        <div className="fixed right-0 top-0 bottom-0 w-64 bg-gradient-to-b from-slate-50 to-slate-100 border-l border-slate-200 z-[100] shadow-lg flex flex-col" style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: '16rem', pointerEvents: 'auto', height: '100vh' }}>
-          <div className="flex-shrink-0 p-3 mb-0 font-semibold flex justify-between items-center bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md">
+        <div className="fixed right-0 top-0 bottom-0 w-64 bg-gradient-to-b from-slate-50 to-slate-100 border-l border-slate-200 z-[100] shadow-lg flex flex-col" style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: '16rem', pointerEvents: 'auto', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+          <div className="flex-shrink-0 p-3 mb-0 font-semibold flex justify-between items-center bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md" style={{ flexShrink: 0 }}>
             <span className="flex items-center gap-2">
               <MdList className="text-lg" />
               注釈一覧（ページ {currentPage}）
@@ -3274,7 +3277,7 @@ export default function Home() {
               <MdClose className="text-lg" />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto overflow-x-hidden p-3" style={{ minHeight: 0 }}>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-3" style={{ flex: '1 1 0%', minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
           {/* ストローク一覧 */}
           {strokes.length > 0 && (
             <div className="mb-4">
