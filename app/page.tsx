@@ -2079,31 +2079,34 @@ export default function Home() {
       {/* サムネイル表示 */}
       {pdfDoc && showThumbnails && (
         <div className="fixed left-0 top-0 bottom-0 w-52 bg-slate-50 border-r border-slate-200 overflow-y-auto p-3 z-[100] shadow-lg" style={{ pointerEvents: 'auto' }}>
-              <div className="mb-3 font-semibold flex justify-between items-center text-slate-700">
-                <span>ページ一覧</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowThumbnails(false)}
-                  className="h-6 w-6"
-                >
-                  ×
-                </Button>
-        </div>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                <div
-                  key={pageNum}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCurrentPage(pageNum);
-                  }}
-                  className={`mb-2 p-2 rounded-md cursor-pointer transition-all ${
-                    currentPage === pageNum
-                      ? 'bg-primary/10 border-2 border-primary'
-                      : 'bg-white border border-slate-200 hover:border-primary/50'
-                  }`}
-                  style={{ pointerEvents: 'auto' }}
-                >
+          <div className="mb-3 font-semibold flex justify-between items-center text-slate-700">
+            <span>ページ一覧</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowThumbnails(false);
+              }}
+              className="h-6 w-6"
+            >
+              ×
+            </Button>
+          </div>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+            <div
+              key={pageNum}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                setCurrentPage(pageNum);
+              }}
+              className={`mb-2 p-2 rounded-md cursor-pointer transition-all ${
+                currentPage === pageNum
+                  ? 'bg-primary/10 border-2 border-primary'
+                  : 'bg-white border border-slate-200 hover:border-primary/50'
+              }`}
+            >
                   {thumbnails[pageNum] ? (
                     <img
                       src={thumbnails[pageNum]}
@@ -2120,11 +2123,13 @@ export default function Home() {
                   </div>
                 </div>
               ))}
-            </div>
-          )}
+          </div>
+        )}
 
-          {/* ページ操作 */}
-          <div className={`mb-4 flex gap-2 md:gap-3 items-center flex-wrap transition-all duration-300 relative z-50 ${showThumbnails ? 'ml-[13rem]' : 'ml-0'}`} style={{ pointerEvents: 'auto' }}>
+        {/* ページ操作 */}
+        {pdfDoc && (
+          <>
+            <div className={`mb-4 flex gap-2 md:gap-3 items-center flex-wrap transition-all duration-300 relative z-50 ${showThumbnails ? 'ml-[13rem]' : 'ml-0'}`} style={{ pointerEvents: 'auto' }}>
             <Button
               variant={showThumbnails ? 'default' : 'secondary'}
               size={isMobile ? 'default' : 'sm'}
@@ -2733,8 +2738,8 @@ export default function Home() {
               </div>
             )}
           </div>
-        </>
-      )}
+          </>
+        )}
 
       {/* 右側注釈一覧パネル */}
       {pdfDoc && showAnnotationList && (
