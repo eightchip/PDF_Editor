@@ -1772,6 +1772,7 @@ export default function Home() {
                   // 元のPDFバイトを保存（エクスポート用）
                   const arrayBuffer = await file.arrayBuffer();
                   setOriginalPdfBytes(arrayBuffer);
+                  setOriginalFileName(file.name); // 元のファイル名を保存
                 } catch (error) {
                   console.error('ファイル読み込みエラー:', error);
                   alert('ファイルの読み込みに失敗しました: ' + (error instanceof Error ? error.message : String(error)));
