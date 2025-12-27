@@ -1373,7 +1373,7 @@ export default function Home() {
   const handleClear = async () => {
     if (!docId || !inkCanvasRef.current || !pageSize) return;
 
-    setUndoStack([...undoStack, { strokes, shapes: shapeAnnotations }]);
+    setUndoStack([...undoStack, { strokes, shapes: shapeAnnotations, texts: textAnnotations }]);
     setRedoStack([]);
     setStrokes([]);
     setTextAnnotations([]);
