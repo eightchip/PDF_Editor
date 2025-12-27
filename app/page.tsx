@@ -2077,7 +2077,7 @@ export default function Home() {
       )}
 
       {pdfDoc && (
-        <div className="relative">
+        <>
           {/* サムネイル表示 */}
           {showThumbnails && (
             <div className="fixed left-0 top-0 bottom-0 w-52 bg-slate-50 border-r border-slate-200 overflow-y-auto p-3 z-[100] shadow-lg">
@@ -2731,12 +2731,12 @@ export default function Home() {
               </div>
             )}
           </div>
-        </div>
+        </>
       )}
 
       {/* 右側注釈一覧パネル */}
       {pdfDoc && showAnnotationList && (
-        <div className="fixed right-0 top-0 bottom-0 w-64 bg-slate-50 border-l border-slate-200 overflow-y-auto p-3 z-[1000] shadow-lg">
+        <div className="fixed right-0 top-0 bottom-0 w-64 bg-slate-50 border-l border-slate-200 overflow-y-auto p-3 z-[100] shadow-lg">
           <div className="mb-3 font-semibold flex justify-between items-center text-slate-700">
             <span>注釈一覧（ページ {currentPage}）</span>
             <Button
