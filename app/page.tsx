@@ -3315,7 +3315,26 @@ export default function Home() {
               <MdClose className="text-lg" />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto overflow-x-hidden p-3" style={{ flex: '1 1 0%', minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+          <div 
+            className="flex-1 overflow-y-auto overflow-x-hidden p-3" 
+            style={{ flex: '1 1 0%', minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}
+            onClick={(e) => {
+              // 編集モード中はクリックイベントを無視
+              if (editingTextId) {
+                e.stopPropagation();
+                e.preventDefault();
+                return false;
+              }
+            }}
+            onMouseDown={(e) => {
+              // 編集モード中はマウスダウンイベントを無視
+              if (editingTextId) {
+                e.stopPropagation();
+                e.preventDefault();
+                return false;
+              }
+            }}
+          >
           {/* ストローク一覧 */}
           {strokes.length > 0 && (
             <div className="mb-4">
