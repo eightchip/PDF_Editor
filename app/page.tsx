@@ -31,6 +31,7 @@ export default function Home() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showAnnotationList, setShowAnnotationList] = useState(false);
+  const [isMobile, setIsMobile] = useState(false); // モバイルデバイスかどうか
 
 
   // 描画関連
@@ -356,6 +357,18 @@ export default function Home() {
       generateThumbnails();
     }
   }, [pdfDoc, totalPages]);
+
+  // モバイルデバイス検出
+  useEffect(() => {
+    const checkMobile = () => {
+      const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
+                            (window.innerWidth <= 768 && 'ontouchstart' in window);
+      setIsMobile(isMobileDevice);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // 自動保存機能（30秒ごと）
   useEffect(() => {
@@ -1238,41 +1251,55 @@ export default function Home() {
     if (undoStack.length === 0 || !docId) return;
 
     const previousState = undoStack[undoStack.length - 1];
+    
+    // 現在の状態をRedoスタックに追加
     setRedoStack([...redoStack, { strokes, shapes: shapeAnnotations, texts: textAnnotations }]);
-    setUndoStack(undoStack.slice(0, -1));
+    
+    // Undoスタックから最後の要素を削除
+    const newUndoStack = undoStack.slice(0, -1);
+    setUndoStack(newUndoStack);
+    
+    // 状態を更新（同期的に）
     setStrokes(previousState.strokes);
     setShapeAnnotations(previousState.shapes);
     setTextAnnotations(previousState.texts);
 
+    // 保存
     await saveAnnotations(docId, currentPage, previousState.strokes);
     await saveShapeAnnotations(docId, currentPage, previousState.shapes);
     await saveTextAnnotations(docId, currentPage, previousState.texts);
 
-    // 再描画
-    if (inkCanvasRef.current && pageSize) {
-      const ctx = inkCanvasRef.current.getContext('2d');
-      if (ctx) {
-        const devicePixelRatio = window.devicePixelRatio || 1;
-        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-        redrawStrokes(ctx, previousState.strokes, pageSize.width, pageSize.height);
+    // 再描画（状態更新後に実行）
+    // requestAnimationFrameを使用して、状態更新が完了した後に再描画
+    requestAnimationFrame(() => {
+      if (inkCanvasRef.current && pageSize) {
+        const ctx = inkCanvasRef.current.getContext('2d');
+        if (ctx) {
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+          redrawStrokes(ctx, previousState.strokes, pageSize.width, pageSize.height);
+        }
       }
-    }
-    if (shapeCanvasRef.current && pageSize) {
-      const ctx = shapeCanvasRef.current.getContext('2d');
-      if (ctx) {
-        const devicePixelRatio = window.devicePixelRatio || 1;
-        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-        redrawShapeAnnotations(ctx, previousState.shapes, pageSize.width, pageSize.height);
+      if (shapeCanvasRef.current && pageSize) {
+        const ctx = shapeCanvasRef.current.getContext('2d');
+        if (ctx) {
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
+          redrawShapeAnnotations(ctx, previousState.shapes, pageSize.width, pageSize.height);
+        }
       }
-    }
-    if (textCanvasRef.current && pageSize) {
-      const ctx = textCanvasRef.current.getContext('2d');
-      if (ctx) {
-        const devicePixelRatio = window.devicePixelRatio || 1;
-        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-        redrawTextAnnotations(ctx, previousState.texts, pageSize.width, pageSize.height);
+      if (textCanvasRef.current && pageSize) {
+        const ctx = textCanvasRef.current.getContext('2d');
+        if (ctx) {
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
+          redrawTextAnnotations(ctx, previousState.texts, pageSize.width, pageSize.height);
+        }
       }
-    }
+    });
   };
 
   // Redo
@@ -1280,41 +1307,55 @@ export default function Home() {
     if (redoStack.length === 0 || !docId) return;
 
     const nextState = redoStack[redoStack.length - 1];
+    
+    // 現在の状態をUndoスタックに追加
     setUndoStack([...undoStack, { strokes, shapes: shapeAnnotations, texts: textAnnotations }]);
-    setRedoStack(redoStack.slice(0, -1));
+    
+    // Redoスタックから最後の要素を削除
+    const newRedoStack = redoStack.slice(0, -1);
+    setRedoStack(newRedoStack);
+    
+    // 状態を更新（同期的に）
     setStrokes(nextState.strokes);
     setShapeAnnotations(nextState.shapes);
     setTextAnnotations(nextState.texts);
 
+    // 保存
     await saveAnnotations(docId, currentPage, nextState.strokes);
     await saveShapeAnnotations(docId, currentPage, nextState.shapes);
     await saveTextAnnotations(docId, currentPage, nextState.texts);
 
-    // 再描画
-    if (inkCanvasRef.current && pageSize) {
-      const ctx = inkCanvasRef.current.getContext('2d');
-      if (ctx) {
-        const devicePixelRatio = window.devicePixelRatio || 1;
-        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-        redrawStrokes(ctx, nextState.strokes, pageSize.width, pageSize.height);
+    // 再描画（状態更新後に実行）
+    // requestAnimationFrameを使用して、状態更新が完了した後に再描画
+    requestAnimationFrame(() => {
+      if (inkCanvasRef.current && pageSize) {
+        const ctx = inkCanvasRef.current.getContext('2d');
+        if (ctx) {
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+          redrawStrokes(ctx, nextState.strokes, pageSize.width, pageSize.height);
+        }
       }
-    }
-    if (shapeCanvasRef.current && pageSize) {
-      const ctx = shapeCanvasRef.current.getContext('2d');
-      if (ctx) {
-        const devicePixelRatio = window.devicePixelRatio || 1;
-        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-        redrawShapeAnnotations(ctx, nextState.shapes, pageSize.width, pageSize.height);
+      if (shapeCanvasRef.current && pageSize) {
+        const ctx = shapeCanvasRef.current.getContext('2d');
+        if (ctx) {
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
+          redrawShapeAnnotations(ctx, nextState.shapes, pageSize.width, pageSize.height);
+        }
       }
-    }
-    if (textCanvasRef.current && pageSize) {
-      const ctx = textCanvasRef.current.getContext('2d');
-      if (ctx) {
-        const devicePixelRatio = window.devicePixelRatio || 1;
-        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-        redrawTextAnnotations(ctx, nextState.texts, pageSize.width, pageSize.height);
+      if (textCanvasRef.current && pageSize) {
+        const ctx = textCanvasRef.current.getContext('2d');
+        if (ctx) {
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
+          redrawTextAnnotations(ctx, nextState.texts, pageSize.width, pageSize.height);
+        }
       }
-    }
+    });
   };
 
   // 選択した注釈を削除
@@ -2317,24 +2358,59 @@ export default function Home() {
           </div>
 
           {/* 操作ボタン */}
-          <div style={{ marginBottom: '10px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginLeft: showThumbnails ? '210px' : '0', transition: 'margin-left 0.3s' }}>
+          <div style={{ 
+            marginBottom: '10px', 
+            display: 'flex', 
+            gap: isMobile ? '8px' : '10px', 
+            flexWrap: 'wrap', 
+            alignItems: 'center', 
+            marginLeft: showThumbnails ? '210px' : '0', 
+            transition: 'margin-left 0.3s',
+            touchAction: 'manipulation',
+          }}>
             <button
               onClick={handleUndo}
               disabled={undoStack.length === 0}
-              style={{ padding: '5px 15px' }}
+              style={{ 
+                padding: isMobile ? '10px 18px' : '5px 15px',
+                fontSize: isMobile ? '16px' : '14px',
+                minHeight: isMobile ? '44px' : 'auto',
+                minWidth: isMobile ? '44px' : 'auto',
+                touchAction: 'manipulation',
+                userSelect: 'none',
+                WebkitTapHighlightColor: 'transparent',
+              }}
             >
               Undo
             </button>
             <button
               onClick={handleRedo}
               disabled={redoStack.length === 0}
-              style={{ padding: '5px 15px' }}
+              style={{ 
+                padding: isMobile ? '10px 18px' : '5px 15px',
+                fontSize: isMobile ? '16px' : '14px',
+                minHeight: isMobile ? '44px' : 'auto',
+                minWidth: isMobile ? '44px' : 'auto',
+                touchAction: 'manipulation',
+                userSelect: 'none',
+                WebkitTapHighlightColor: 'transparent',
+              }}
             >
               Redo
             </button>
             <button
               onClick={handleClear}
-              style={{ padding: '5px 15px', backgroundColor: '#ff4444', color: 'white' }}
+              style={{ 
+                padding: isMobile ? '10px 18px' : '5px 15px',
+                fontSize: isMobile ? '16px' : '14px',
+                minHeight: isMobile ? '44px' : 'auto',
+                minWidth: isMobile ? '44px' : 'auto',
+                backgroundColor: '#ff4444', 
+                color: 'white',
+                touchAction: 'manipulation',
+                userSelect: 'none',
+                WebkitTapHighlightColor: 'transparent',
+              }}
             >
               Clear
             </button>
