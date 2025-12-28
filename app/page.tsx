@@ -3622,7 +3622,7 @@ export default function Home() {
       )}
 
       {/* 手書き文字認識モーダル */}
-      {typeof window !== 'undefined' && showHandwritingModal && createPortal(
+      {showHandwritingModal && (
         <div
           data-handwriting-modal="overlay"
           style={{
