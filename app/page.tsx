@@ -57,6 +57,9 @@ export default function Home() {
   // デバッグ用: showHandwritingModalの状態変化をログに記録
   useEffect(() => {
     console.log('showHandwritingModal state changed to:', showHandwritingModal);
+    if (showHandwritingModal) {
+      console.log('Handwriting modal should now be visible');
+    }
   }, [showHandwritingModal]);
   
   // Dialog用のstate
