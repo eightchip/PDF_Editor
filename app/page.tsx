@@ -3596,7 +3596,18 @@ export default function Home() {
 
       {/* 手書き文字認識モーダル */}
       <Dialog open={showHandwritingModal} onOpenChange={setShowHandwritingModal}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent 
+          className="max-w-2xl"
+          style={{
+            position: 'fixed',
+            top: '15%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 10000,
+            maxHeight: '80vh',
+            overflowY: 'auto'
+          }}
+        >
           <DialogHeader>
             <DialogTitle>手書き文字認識入力</DialogTitle>
             <DialogDescription>
