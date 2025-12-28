@@ -39,7 +39,6 @@ export default function Home() {
   const [isExporting, setIsExporting] = useState(false);
   const [originalFileName, setOriginalFileName] = useState<string | null>(null); // 元のファイル名を保持
   const [pageRotation, setPageRotation] = useState(0); // 0, 90, 180, 270
-  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [showThumbnails, setShowThumbnails] = useState(false);
   const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -2231,38 +2230,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* キーボードショートカット一覧 */}
-      {showKeyboardShortcuts && (
-        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-6 rounded-lg shadow-2xl max-w-lg max-h-[80vh] overflow-auto border border-slate-200" style={{ zIndex: 10000 }}>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-slate-800 flex items-center gap-2">
-              <MdKeyboard className="text-2xl text-slate-600" />
-              キーボードショートカット
-            </h2>
-            <button
-              onClick={() => setShowKeyboardShortcuts(false)}
-              className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors"
-              title="閉じる"
-            >
-              <MdClose className="text-xl" />
-            </button>
-        </div>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div><strong>Ctrl+Z</strong></div>
-            <div>Undo（元に戻す）</div>
-            <div><strong>Ctrl+Y / Ctrl+Shift+Z</strong></div>
-            <div>Redo（やり直し）</div>
-            <div><strong>Ctrl+S</strong></div>
-            <div>PDFエクスポート</div>
-            <div><strong>Delete / Backspace</strong></div>
-            <div>選択した注釈を削除</div>
-            <div><strong>←</strong></div>
-            <div>前のページ</div>
-            <div><strong>→</strong></div>
-            <div>次のページ</div>
-          </div>
-        </div>
-      )}
 
       {/* サムネイル表示 */}
       {pdfDoc && showThumbnails && (
@@ -2346,7 +2313,7 @@ export default function Home() {
             <button
               onClick={goToPrevPage}
               disabled={currentPage === 1}
-              title="前のページに移動します"
+              title="前のページに移動します (←)"
               className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-cyan-500 shadow-md hover:scale-105 active:scale-95 ${
                 currentPage === 1 ? 'cursor-not-allowed' : ''
               }`}
@@ -2376,7 +2343,7 @@ export default function Home() {
             <button
               onClick={goToNextPage}
               disabled={currentPage === totalPages}
-              title="次のページに移動します"
+              title="次のページに移動します (→)"
               className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-cyan-500 shadow-md hover:scale-105 active:scale-95 ${
                 currentPage === totalPages ? 'cursor-not-allowed' : ''
               }`}
@@ -2977,7 +2944,7 @@ export default function Home() {
                   e.currentTarget.style.background = 'linear-gradient(to right, #475569, #334155)';
                 }
               }}
-              title="元に戻す"
+              title="元に戻す (Ctrl+Z)"
             >
               <MdUndo className={`text-base ${undoStack.length === 0 ? 'text-slate-400' : 'text-white'}`} />
               Undo
@@ -3062,23 +3029,6 @@ export default function Home() {
             >
               <MdFileDownload className={`text-base ${!pdfDoc ? 'text-slate-500' : 'text-white'}`} />
               JSONエクスポート
-            </button>
-            <button
-              onClick={() => setShowKeyboardShortcuts(!showKeyboardShortcuts)}
-              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm text-white border-amber-500 shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
-              style={{
-                background: 'linear-gradient(to right, #f59e0b, #f97316, #ef4444)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(to right, #d97706, #ea580c, #dc2626)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(to right, #f59e0b, #f97316, #ef4444)';
-              }}
-              title="キーボードショートカット"
-            >
-              <MdKeyboard className="text-base text-white" />
-              ショートカット
             </button>
             <label
               className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm cursor-pointer border-purple-500 hover:shadow-lg hover:scale-105 active:scale-95 ${
