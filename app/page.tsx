@@ -3526,6 +3526,12 @@ export default function Home() {
                 <div
                   key={text.id}
                   onClick={(e) => {
+                    // 編集モードに入る途中の場合はスキップ
+                    if (isEnteringEditModeRef.current) {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      return false;
+                    }
                     // 編集モード中は選択処理を完全にスキップ
                     if (editingTextId) {
                       e.stopPropagation();
