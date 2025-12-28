@@ -3624,10 +3624,21 @@ export default function Home() {
         open={showHandwritingModal} 
         onOpenChange={(open) => {
           console.log('Dialog onOpenChange called with open:', open, 'current state:', showHandwritingModal);
-          console.trace('Stack trace for onOpenChange');
-          // 通常通り状態を更新
-          setShowHandwritingModal(open);
-          console.log('setShowHandwritingModal called with:', open);
+          // モーダルを開く場合（open === true）は、状態を更新する
+          if (open) {
+            setShowHandwritingModal(true);
+            console.log('Dialog opening, setShowHandwritingModal(true)');
+          } else {
+            // モーダルを閉じる場合（open === false）は、手書きボタンがクリックされた直後の場合は無視する
+            const now = Date.now();
+            const lastClickTime = (window as any).lastHandwritingButtonClickTime || 0;
+            if (now - lastClickTime < 1000) {
+              console.log('Dialog onOpenChange: ignoring close request (button clicked within 1s)');
+              return;
+            }
+            console.log('Dialog closing, setShowHandwritingModal(false)');
+            setShowHandwritingModal(false);
+          }
         }}
         modal={true}
       >
