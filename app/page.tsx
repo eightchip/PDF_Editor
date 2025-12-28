@@ -3621,10 +3621,7 @@ export default function Home() {
         onOpenChange={(open) => {
           console.log('Dialog onOpenChange called with open:', open, 'current state:', showHandwritingModal);
           console.trace('Stack trace for onOpenChange');
-          // モーダルを閉じようとしている場合は、ユーザーの明示的な操作（オーバーレイクリック、Escキー）のみを許可
-          if (!open && showHandwritingModal) {
-            console.log('Modal is being closed, allowing close');
-          }
+          // 通常通り状態を更新
           setShowHandwritingModal(open);
           console.log('setShowHandwritingModal called with:', open);
         }}
