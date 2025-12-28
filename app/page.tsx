@@ -4028,7 +4028,6 @@ export default function Home() {
             </div>
           </DialogContent>
         </Dialog>
-      )}
 
       {/* 音声入力モーダル */}
       {showVoiceInput && (
