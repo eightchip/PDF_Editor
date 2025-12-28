@@ -3248,6 +3248,20 @@ export default function Home() {
                   >
                     キャンセル
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowHandwritingModal(true);
+                      handwritingStrokesRef.current = [];
+                      setRecognizedText('');
+                    }}
+                    className="h-7 px-2 text-xs"
+                    title="手書き文字認識入力"
+                  >
+                    <MdBrush className="text-base" />
+                    手書き
+                  </Button>
                 </div>
               </div>
             )}
