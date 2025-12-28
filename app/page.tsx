@@ -3622,8 +3622,9 @@ export default function Home() {
       )}
 
       {/* 手書き文字認識モーダル */}
-      {console.log('Rendering Dialog component, showHandwritingModal:', showHandwritingModal)}
+      {console.log('Rendering handwriting modal, showHandwritingModal:', showHandwritingModal)}
       {showHandwritingModal && (
+        console.log('Handwriting modal is being rendered'),
         <div
           style={{
             position: 'fixed',
@@ -3659,9 +3660,16 @@ export default function Home() {
               overflowY: 'auto',
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
               position: 'relative',
-              zIndex: 10001,
+              zIndex: 100000,
             }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              console.log('Handwriting modal content clicked');
+              e.stopPropagation();
+            }}
+            onMouseDown={(e) => {
+              console.log('Handwriting modal content mousedown');
+              e.stopPropagation();
+            }}
           >
             <div style={{ marginBottom: '16px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>手書き文字認識入力</h2>
