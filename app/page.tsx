@@ -3630,8 +3630,6 @@ export default function Home() {
         return null;
       })()}
       {showHandwritingModal && (
-        <>
-          {console.log('Inside showHandwritingModal conditional, rendering modal div')}
         <div
           style={{
             position: 'fixed',
