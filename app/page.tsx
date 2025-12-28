@@ -3313,12 +3313,9 @@ export default function Home() {
                       e.preventDefault();
                       e.stopPropagation();
                       e.nativeEvent.stopImmediatePropagation();
+                      // テキスト入力フィールドのフォーカスを保持するため、blurしない
                       // 既に開いている場合は何もしない
                       if (!showHandwritingModal) {
-                        // テキスト入力フィールドのフォーカスを解除
-                        if (textInputRef.current) {
-                          textInputRef.current.blur();
-                        }
                         setShowHandwritingModal(true);
                         handwritingStrokesRef.current = [];
                         setRecognizedText('');
@@ -3328,6 +3325,12 @@ export default function Home() {
                       e.preventDefault();
                       e.stopPropagation();
                       e.nativeEvent.stopImmediatePropagation();
+                      // onClickでも処理を実行（onMouseDownが発火しない場合に備える）
+                      if (!showHandwritingModal) {
+                        setShowHandwritingModal(true);
+                        handwritingStrokesRef.current = [];
+                        setRecognizedText('');
+                      }
                     }}
                     className="h-7 px-2 text-xs border border-slate-300 rounded hover:bg-slate-100 flex items-center gap-1"
                     title="手書き文字認識入力"
