@@ -3207,25 +3207,8 @@ export default function Home() {
                   onBlur={(e) => {
                     // テキストツールが選択されている場合は、onBlurで確定しない（タッチイベントでフォーカスが外れることを防ぐため）
                     if (tool === 'text') {
-                      // テキストツールが選択されている場合、ユーザーが明示的に他のツールを選択した場合のみ確定
-                      // 手書きボタンやモーダルがクリックされた場合は確定しない
-                      const relatedTarget = e.relatedTarget as HTMLElement;
-                      if (relatedTarget) {
-                        // 手書きボタンがクリックされた場合は確定しない
-                        if (relatedTarget === handwritingButtonRef.current || relatedTarget.closest('button[title="手書き文字認識入力"]')) {
-                          return;
-                        }
-                        // 手書きモーダル内の要素がクリックされた場合は確定しない
-                        if (relatedTarget.closest('[role="dialog"]')) return;
-                        // テキスト入力フィールド自体にフォーカスが戻っている場合は確定しない
-                        if (relatedTarget === textInputRef.current) return;
-                        // ツールバーのボタンがクリックされた場合は確定しない（ツール変更の場合のみ確定する）
-                        if (relatedTarget.closest('button[title*="を"]') || relatedTarget.closest('button[title*="追加"]')) {
-                          // ツールバーのボタンがクリックされた場合も、テキストツールの場合は確定しない
-                          return;
-                        }
-                      }
                       // テキストツールが選択されている場合は、onBlurでは確定しない
+                      // ユーザーが明示的に他のツールを選択したり、確定ボタンをクリックした場合のみ確定される
                       return;
                     }
                     
@@ -3236,8 +3219,6 @@ export default function Home() {
                       setTimeout(() => {
                         // 手書きモーダルが開いている場合は確定しない
                         if (showHandwritingModal) return;
-                        // テキストツールが選択されている場合は確定しない
-                        if (tool === 'text') return;
                         // 手書きボタンがフォーカスされている場合は確定しない
                         if (handwritingButtonRef.current && handwritingButtonRef.current === document.activeElement) return;
                         // テキスト入力フィールド自体にフォーカスが戻っている場合は確定しない
