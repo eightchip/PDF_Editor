@@ -3251,7 +3251,9 @@ export default function Home() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                       setShowHandwritingModal(true);
                       handwritingStrokesRef.current = [];
                       setRecognizedText('');
