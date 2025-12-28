@@ -3606,16 +3606,24 @@ export default function Home() {
       )}
 
       {/* 手書き文字認識モーダル */}
-      <Dialog open={showHandwritingModal} onOpenChange={setShowHandwritingModal}>
+      <Dialog 
+        open={showHandwritingModal} 
+        onOpenChange={(open) => {
+          console.log('Dialog onOpenChange called with open:', open);
+          setShowHandwritingModal(open);
+        }}
+      >
         <DialogContent 
           className="max-w-2xl"
           topPosition="top-[15%]"
           style={{
             top: '15%',
+            left: '50%',
             transform: 'translateX(-50%) translateY(0)',
             zIndex: 10000,
             maxHeight: '80vh',
-            overflowY: 'auto'
+            overflowY: 'auto',
+            position: 'fixed'
           }}
         >
           <DialogHeader>
