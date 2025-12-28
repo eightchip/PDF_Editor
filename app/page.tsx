@@ -3648,83 +3648,12 @@ export default function Home() {
                   ) : (
                     <>
                       <span 
-                        className={`overflow-hidden text-ellipsis whitespace-nowrap max-w-[150px] font-medium cursor-pointer ${selectedAnnotationIds.texts.includes(text.id) ? 'text-blue-800' : 'text-slate-700'}`}
-                        onDoubleClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          // 編集モードに入る途中であることをマーク
-                          isEnteringEditModeRef.current = true;
-                          // ドラッグ状態をリセット
-                          setDragStart(null);
-                          setIsDragging(false);
-                          // 選択を解除
-                          setSelectedAnnotationIds({
-                            strokes: [],
-                            shapes: [],
-                            texts: [],
-                          });
-                          if (pageSize) {
-                            setEditingTextId(text.id);
-                            setTextInputValue(text.text);
-                            setTextInputPosition({ x: text.x * pageSize.width, y: text.y * pageSize.height });
-                            setFontSize(text.fontSize || 16);
-                            setColor(text.color || '#000000');
-                            // 編集モードに入る際に選択ツールに切り替え（ドラッグを無効化）
-                            setTool('text');
-                            // 次のフレームでフラグをリセット
-                            requestAnimationFrame(() => {
-                              isEnteringEditModeRef.current = false;
-                            });
-                          }
-                        }}
-                        title="ダブルクリックで編集"
+                        className={`overflow-hidden text-ellipsis whitespace-nowrap max-w-[150px] font-medium ${selectedAnnotationIds.texts.includes(text.id) ? 'text-blue-800' : 'text-slate-700'}`}
                       >
                         <MdTextFields className="inline mr-1 text-blue-600" />
                         {text.text.substring(0, 20)}{text.text.length > 20 ? '...' : ''}
                       </span>
                       <div className="flex gap-1">
-                        <button
-                          onMouseDown={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            e.nativeEvent.stopImmediatePropagation();
-                            // 編集モードに入る途中であることをマーク
-                            isEnteringEditModeRef.current = true;
-                            // ドラッグ状態をリセット
-                            setDragStart(null);
-                            setIsDragging(false);
-                            // 選択を解除
-                            setSelectedAnnotationIds({
-                              strokes: [],
-                              shapes: [],
-                              texts: [],
-                            });
-                            if (pageSize) {
-                              // 即座に編集モードに入る
-                              setEditingTextId(text.id);
-                              setTextInputValue(text.text);
-                              setTextInputPosition({ x: text.x * pageSize.width, y: text.y * pageSize.height });
-                              setFontSize(text.fontSize || 16);
-                              setColor(text.color || '#000000');
-                              // 編集モードに入る際にテキストツールに切り替え（ドラッグを無効化）
-                              setTool('text');
-                              // 次のフレームでフラグをリセット
-                              requestAnimationFrame(() => {
-                                isEnteringEditModeRef.current = false;
-                              });
-                            }
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            e.nativeEvent.stopImmediatePropagation();
-                          }}
-                          className="h-6 px-2 text-xs bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-md hover:from-blue-600 hover:to-cyan-600 transition-all shadow-sm hover:shadow-md"
-                          title="編集"
-                        >
-                          <MdEdit className="inline mr-1" />
-                          編集
-                        </button>
                     <button
                       onClick={async (e) => {
                         e.stopPropagation();
