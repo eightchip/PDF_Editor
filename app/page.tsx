@@ -3336,16 +3336,7 @@ export default function Home() {
         >
           <div 
             className="flex-shrink-0 p-3 mb-0 font-semibold flex justify-between items-center bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md" 
-            style={{ flexShrink: 0, pointerEvents: editingTextId ? 'none' : 'auto' }}
-            onClick={(e) => {
-              // 編集モード中はクリックイベントを無視
-              if (editingTextId) {
-                e.stopPropagation();
-                e.preventDefault();
-                e.nativeEvent.stopImmediatePropagation();
-                return false;
-              }
-            }}
+            style={{ flexShrink: 0 }}
           >
             <span className="flex items-center gap-2">
               <MdList className="text-lg" />
@@ -3353,12 +3344,6 @@ export default function Home() {
             </span>
             <button
               onClick={(e) => {
-                if (editingTextId) {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  e.nativeEvent.stopImmediatePropagation();
-                  return;
-                }
                 setShowAnnotationList(false);
               }}
               className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-white/20 text-white transition-colors"
@@ -3373,26 +3358,7 @@ export default function Home() {
               flex: '1 1 0%', 
               minHeight: 0, 
               overflowY: 'auto', 
-              overflowX: 'hidden',
-              pointerEvents: editingTextId ? 'none' : 'auto'
-            }}
-            onClick={(e) => {
-              // 編集モード中はクリックイベントを無視
-              if (editingTextId) {
-                e.stopPropagation();
-                e.preventDefault();
-                e.nativeEvent.stopImmediatePropagation();
-                return false;
-              }
-            }}
-            onMouseDown={(e) => {
-              // 編集モード中はマウスダウンイベントを無視
-              if (editingTextId) {
-                e.stopPropagation();
-                e.preventDefault();
-                e.nativeEvent.stopImmediatePropagation();
-                return false;
-              }
+              overflowX: 'hidden'
             }}
           >
           {/* ストローク一覧 */}
@@ -3525,21 +3491,9 @@ export default function Home() {
                 <div
                   key={text.id}
                   onClick={(e) => {
-                    // 編集モードに入る途中の場合はスキップ
-                    if (isEnteringEditModeRef.current) {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      return false;
-                    }
-                    // 編集モード中は選択処理を完全にスキップ
-                    if (editingTextId) {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      return false;
-                    }
-                    // 編集ボタンや確定ボタンなどの子要素からのクリックは無視
+                    // ボタンなどの子要素からのクリックは無視
                     const target = e.target as HTMLElement;
-                    if (target.tagName === 'BUTTON' || target.closest('button') || target.tagName === 'INPUT') {
+                    if (target.tagName === 'BUTTON' || target.closest('button')) {
                       e.stopPropagation();
                       return false;
                     }
@@ -3550,15 +3504,9 @@ export default function Home() {
                     }));
                   }}
                   onMouseDown={(e) => {
-                    // 編集モード中はマウスダウンも無視
-                    if (editingTextId) {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      return false;
-                    }
-                    // ボタンや入力フィールドからのマウスダウンは無視
+                    // ボタンからのマウスダウンは無視
                     const target = e.target as HTMLElement;
-                    if (target.tagName === 'BUTTON' || target.closest('button') || target.tagName === 'INPUT') {
+                    if (target.tagName === 'BUTTON' || target.closest('button')) {
                       e.stopPropagation();
                       return false;
                     }
