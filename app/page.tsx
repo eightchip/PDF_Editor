@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { loadPDF, renderPage } from './lib/pdf';
 import { drawStroke, redrawStrokes, normalizePoint } from './lib/ink';
 import { saveAnnotations, loadAnnotations, deleteAnnotations, getAllAnnotations, saveTextAnnotations, loadTextAnnotations, deleteTextAnnotations, getAllTextAnnotations, saveShapeAnnotations, loadShapeAnnotations, deleteShapeAnnotations, getAllShapeAnnotations, type Stroke, type TextAnnotation, type ShapeAnnotation } from './lib/db';
@@ -47,26 +46,6 @@ export default function Home() {
   const [showAnnotationList, setShowAnnotationList] = useState(false);
   const [isMobile, setIsMobile] = useState(false); // モバイルデバイスかどうか
   const [showQRCode, setShowQRCode] = useState(false); // QRコードモーダルの表示状態
-  const [showHandwritingModal, setShowHandwritingModal] = useState(false); // 手書き文字認識モーダルの表示状態
-  
-  // デバッグ: showHandwritingModalの状態変化をログに出力
-  useEffect(() => {
-    console.log('showHandwritingModal state changed to:', showHandwritingModal);
-  }, [showHandwritingModal]);
-  const handwritingCanvasRef = useRef<HTMLCanvasElement>(null);
-  const handwritingStrokesRef = useRef<Array<{ points: Array<{ x: number; y: number }> }>>([]);
-  const isDrawingHandwritingRef = useRef(false);
-  const [recognizedText, setRecognizedText] = useState(''); // 認識されたテキスト
-  const [isRecognizing, setIsRecognizing] = useState(false); // OCR認識中かどうか
-  const handwritingButtonRef = useRef<HTMLButtonElement>(null);
-
-  // デバッグ用: showHandwritingModalの状態変化をログに記録
-  useEffect(() => {
-    console.log('showHandwritingModal state changed to:', showHandwritingModal);
-    if (showHandwritingModal) {
-      console.log('Handwriting modal should now be visible');
-    }
-  }, [showHandwritingModal]);
   
   // Dialog用のstate
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -3206,7 +3185,8 @@ export default function Home() {
                   value={textInputValue}
                   onChange={(e) => setTextInputValue(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      // Enterキーで確定（Shift+Enterは改行）
                       e.preventDefault();
                       handleTextSubmit();
                     } else if (e.key === 'Escape') {
@@ -3219,25 +3199,17 @@ export default function Home() {
                   onClick={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
                   onBlur={(e) => {
-                    console.log('Text input onBlur triggered, tool:', tool, 'showHandwritingModal:', showHandwritingModal);
-                    // テキストツールが選択されている場合、または手書きモーダルが開いている場合は、onBlurで確定しない
-                    // タッチイベントでフォーカスが外れることを防ぐため
-                    if (tool === 'text' || showHandwritingModal) {
-                      // テキストツールが選択されている場合、または手書きモーダルが開いている場合は、onBlurでは確定しない
-                      // ユーザーが明示的に他のツールを選択したり、確定ボタンをクリックした場合のみ確定される
-                      console.log('Text input onBlur: skipping submit because tool is text or handwriting modal is open');
+                    // テキストツールが選択されている場合は、onBlurで確定しない
+                    // タッチキーボードが表示されている間はフォーカスを保持するため
+                    if (tool === 'text') {
                       return;
                     }
                     
                     // テキストツール以外が選択されている場合のみ確定処理を実行
                     const relatedTarget = e.relatedTarget as HTMLElement;
                     if (!relatedTarget) {
-                      // relatedTargetがnullの場合、少し待つ
+                      // relatedTargetがnullの場合、少し待つ（タッチキーボードの表示待ち）
                       setTimeout(() => {
-                        // 手書きモーダルが開いている場合は確定しない
-                        if (showHandwritingModal) return;
-                        // 手書きボタンがフォーカスされている場合は確定しない
-                        if (handwritingButtonRef.current && handwritingButtonRef.current === document.activeElement) return;
                         // テキスト入力フィールド自体にフォーカスが戻っている場合は確定しない
                         if (textInputRef.current && textInputRef.current === document.activeElement) return;
                         // それ以外の場合のみ確定
@@ -3247,14 +3219,10 @@ export default function Home() {
                       }, 200);
                       return;
                     }
-                    // 手書きボタンがクリックされた場合は確定しない
-                    if (relatedTarget === handwritingButtonRef.current || relatedTarget.closest('button[title="手書き文字認識入力"]')) {
-                      return;
-                    }
-                    // 手書きモーダル内の要素がクリックされた場合は確定しない
-                    if (relatedTarget.closest('[role="dialog"]') || relatedTarget.closest('[data-handwriting-modal]')) return;
                     // テキスト入力フィールド自体にフォーカスが戻っている場合は確定しない
                     if (relatedTarget === textInputRef.current) return;
+                    // 確定ボタンや削除ボタンがクリックされた場合は確定しない（ボタンのonClickで処理される）
+                    if (relatedTarget.closest('button')) return;
                     if (!e.currentTarget.contains(relatedTarget)) {
                       handleTextSubmit();
                     }
@@ -3272,19 +3240,10 @@ export default function Home() {
                     backgroundColor: 'white',
                   }}
                   autoFocus
-                  placeholder="テキストを入力（Ctrl+Enterで確定、Escでキャンセル）"
+                  placeholder="テキストを入力（Enterで確定、Escでキャンセル）"
                   onFocus={(e) => {
-                    // Surfaceなどのタッチデバイスで手書き入力パネルを開くためのヒント
-                    // Windows Ink Workspaceを手動で開く必要がある場合は、ユーザーに案内
-                    // または、自動的に手書きモーダルを開く
-                    if (isMobile || window.navigator.maxTouchPoints > 0) {
-                      // タッチデバイスの場合、少し遅延してから手書きモーダルを自動的に開く
-                      setTimeout(() => {
-                        // ユーザーが手書きボタンをクリックするまで待つ
-                        // または、自動的に開く場合は以下のコメントを外す
-                        // setShowHandwritingModal(true);
-                      }, 100);
-                    }
+                    // タッチデバイスの場合、タッチキーボードが自動的に表示される
+                    // 特に何もする必要はない
                   }}
                 />
                 <div className="mt-1 flex gap-2">
@@ -3322,53 +3281,6 @@ export default function Home() {
                   >
                     キャンセル
                   </Button>
-                  <button
-                    ref={handwritingButtonRef}
-                    type="button"
-                    onMouseDown={(e) => {
-                      // onMouseDownで処理することで、onBlurの前に実行される
-                      e.preventDefault();
-                      e.stopPropagation();
-                      e.nativeEvent.stopImmediatePropagation();
-                      // クリック時間を記録（モーダルの自動的な閉じる動作を防ぐため）
-                      (window as any).lastHandwritingButtonClickTime = Date.now();
-                      console.log('Handwriting button clicked, recording click time');
-                      // テキスト入力フィールドのフォーカスを保持するため、blurしない
-                      // 既に開いている場合は何もしない
-                      if (!showHandwritingModal) {
-                        console.log('Opening handwriting modal from onMouseDown, current state:', showHandwritingModal);
-                        handwritingStrokesRef.current = [];
-                        setRecognizedText('');
-                        setShowHandwritingModal(true);
-                        console.log('setShowHandwritingModal(true) called');
-                      } else {
-                        console.log('Handwriting modal already open');
-                      }
-                    }}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      e.nativeEvent.stopImmediatePropagation();
-                      // クリック時間を記録（モーダルの自動的な閉じる動作を防ぐため）
-                      (window as any).lastHandwritingButtonClickTime = Date.now();
-                      // onClickでも処理を実行（onMouseDownが発火しない場合に備える）
-                      console.log('Handwriting button onClick, current showHandwritingModal:', showHandwritingModal);
-                      if (!showHandwritingModal) {
-                        console.log('Opening handwriting modal from onClick');
-                        handwritingStrokesRef.current = [];
-                        setRecognizedText('');
-                        setShowHandwritingModal(true);
-                        console.log('setShowHandwritingModal(true) called from onClick');
-                      } else {
-                        console.log('Handwriting modal already open (onClick)');
-                      }
-                    }}
-                    className="h-7 px-2 text-xs border border-slate-300 rounded hover:bg-slate-100 flex items-center gap-1"
-                    title="手書き文字認識入力"
-                  >
-                    <MdBrush className="text-base" />
-                    手書き
-                  </button>
                 </div>
               </div>
             )}
@@ -3622,368 +3534,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* 手書き文字認識モーダル */}
-      {showHandwritingModal && typeof window !== 'undefined' && createPortal(
-        <div
-          data-handwriting-modal="overlay"
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 999999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            pointerEvents: 'auto',
-            overflowY: 'auto',
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              const now = Date.now();
-              const lastClickTime = (window as any).lastHandwritingButtonClickTime || 0;
-              if (now - lastClickTime > 1000) {
-                setShowHandwritingModal(false);
-              }
-            }
-          }}
-        >
-          <div
-            data-handwriting-modal="content"
-            style={{
-              backgroundColor: 'white',
-              borderRadius: '8px',
-              padding: '24px',
-              maxWidth: '42rem',
-              width: '90%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-              position: 'relative',
-              zIndex: 1000000,
-              pointerEvents: 'auto',
-              margin: 'auto',
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            onMouseDown={(e) => {
-              e.stopPropagation();
-            }}
-          >
-            <div style={{ marginBottom: '16px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>手書き文字認識入力</h2>
-              <p style={{ fontSize: '14px', color: '#666' }}>下のキャンバスに手書きで文字を書いてください。認識されたテキストが表示されます。</p>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ position: 'relative', border: '2px solid #cbd5e1', borderRadius: '8px', backgroundColor: 'white', touchAction: 'none' }}>
-              <canvas
-                ref={handwritingCanvasRef}
-                width={1600}
-                height={500}
-                style={{ 
-                  display: 'block',
-                  width: '100%',
-                  height: 'auto',
-                  cursor: 'crosshair',
-                  imageRendering: 'crisp-edges',
-                  backgroundColor: '#ffffff',
-                }}
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  if (!handwritingCanvasRef.current) return;
-                  const rect = handwritingCanvasRef.current.getBoundingClientRect();
-                  const x = e.clientX - rect.left;
-                  const y = e.clientY - rect.top;
-                  isDrawingHandwritingRef.current = true;
-                  handwritingStrokesRef.current.push({ points: [{ x, y }] });
-                  const ctx = handwritingCanvasRef.current.getContext('2d');
-                  if (ctx) {
-                    // 高解像度対応
-                    const canvasRect = handwritingCanvasRef.current.getBoundingClientRect();
-                    const scaleX = handwritingCanvasRef.current.width / canvasRect.width;
-                    const scaleY = handwritingCanvasRef.current.height / canvasRect.height;
-                    const scaledX = x * scaleX;
-                    const scaledY = y * scaleY;
-                    
-                    ctx.strokeStyle = '#000000';
-                    ctx.lineWidth = 4 * Math.max(scaleX, scaleY); // 線を太くして認識しやすく
-                    ctx.lineCap = 'round';
-                    ctx.lineJoin = 'round';
-                    ctx.beginPath();
-                    ctx.moveTo(scaledX, scaledY);
-                  }
-                  handwritingCanvasRef.current.setPointerCapture(e.pointerId);
-                }}
-                onPointerMove={(e) => {
-                  if (!isDrawingHandwritingRef.current || !handwritingCanvasRef.current) return;
-                  e.preventDefault();
-                  const rect = handwritingCanvasRef.current.getBoundingClientRect();
-                  const x = e.clientX - rect.left;
-                  const y = e.clientY - rect.top;
-                  const lastStroke = handwritingStrokesRef.current[handwritingStrokesRef.current.length - 1];
-                  if (lastStroke) {
-                    lastStroke.points.push({ x, y });
-                  }
-                  const ctx = handwritingCanvasRef.current.getContext('2d');
-                  if (ctx) {
-                    // 高解像度対応
-                    const canvasRect = handwritingCanvasRef.current.getBoundingClientRect();
-                    const scaleX = handwritingCanvasRef.current.width / canvasRect.width;
-                    const scaleY = handwritingCanvasRef.current.height / canvasRect.height;
-                    const scaledX = x * scaleX;
-                    const scaledY = y * scaleY;
-                    
-                    ctx.lineTo(scaledX, scaledY);
-                    ctx.stroke();
-                  }
-                }}
-                onPointerUp={(e) => {
-                  if (!handwritingCanvasRef.current) return;
-                  e.preventDefault();
-                  isDrawingHandwritingRef.current = false;
-                  handwritingCanvasRef.current.releasePointerCapture(e.pointerId);
-                }}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                onClick={() => {
-                  if (!handwritingCanvasRef.current) return;
-                  const ctx = handwritingCanvasRef.current?.getContext('2d');
-                  if (ctx) {
-                    ctx.clearRect(0, 0, handwritingCanvasRef.current.width, handwritingCanvasRef.current.height);
-                  }
-                  handwritingStrokesRef.current = [];
-                  setRecognizedText('');
-                }}
-                style={{
-                  padding: '8px 16px',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '4px',
-                  backgroundColor: 'white',
-                  cursor: 'pointer',
-                }}
-              >
-                <MdClear style={{ marginRight: '8px', display: 'inline' }} />
-                クリア
-              </button>
-              <button
-                onClick={async () => {
-                  if (!handwritingCanvasRef.current || handwritingStrokesRef.current.length === 0) return;
-                  
-                  setIsRecognizing(true);
-                  try {
-                    const canvas = handwritingCanvasRef.current;
-                    const ctx = canvas.getContext('2d');
-                    if (!ctx) return;
-                    
-                    // 高解像度で画像を拡大（OCR精度向上のため）
-                    const scaleFactor = 3; // 3倍に拡大
-                    const processedCanvas = document.createElement('canvas');
-                    processedCanvas.width = canvas.width * scaleFactor;
-                    processedCanvas.height = canvas.height * scaleFactor;
-                    const processedCtx = processedCanvas.getContext('2d');
-                    if (!processedCtx) return;
-                    
-                    // 元の画像を拡大して描画（滑らかに）
-                    processedCtx.imageSmoothingEnabled = true;
-                    processedCtx.imageSmoothingQuality = 'high';
-                    processedCtx.drawImage(canvas, 0, 0, processedCanvas.width, processedCanvas.height);
-                    
-                    // 画像の前処理：高品質な二値化とコントラスト強化
-                    const imageData = processedCtx.getImageData(0, 0, processedCanvas.width, processedCanvas.height);
-                    const data = imageData.data;
-                    
-                    // グレースケール変換
-                    for (let i = 0; i < data.length; i += 4) {
-                      const r = data[i];
-                      const g = data[i + 1];
-                      const b = data[i + 2];
-                      const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
-                      data[i] = gray;
-                      data[i + 1] = gray;
-                      data[i + 2] = gray;
-                    }
-                    
-                    // 適応的二値化（Otsu's methodの簡易版）
-                    // まず平均値を計算
-                    let sum = 0;
-                    for (let i = 0; i < data.length; i += 4) {
-                      sum += data[i];
-                    }
-                    const mean = sum / (data.length / 4);
-                    const threshold = mean * 0.7; // 平均値の70%を閾値として使用
-                    
-                    // 二値化とコントラスト強化
-                    for (let i = 0; i < data.length; i += 4) {
-                      const gray = data[i];
-                      // 二値化（黒=0、白=255）
-                      const binary = gray < threshold ? 0 : 255;
-                      // コントラスト強化（黒をより黒く、白をより白く）
-                      const enhanced = binary === 0 ? 0 : 255;
-                      data[i] = enhanced;
-                      data[i + 1] = enhanced;
-                      data[i + 2] = enhanced;
-                      data[i + 3] = 255; // アルファチャンネル
-                    }
-                    
-                    processedCtx.putImageData(imageData, 0, 0);
-                    
-                    // 処理済み画像データを取得（高品質PNG）
-                    const processedImageData = processedCanvas.toDataURL('image/png', 1.0);
-                    
-                    // Tesseract.jsを動的にインポート
-                    const Tesseract = (await import('tesseract.js')).default;
-                    
-                    // OCR実行（日本語+英語を認識、手書き文字に最適化）
-                    const worker = await Tesseract.createWorker('jpn+eng', 1, {
-                      logger: (m) => {
-                        if (m.status === 'recognizing text') {
-                          console.log(`OCR進捗: ${Math.round(m.progress * 100)}%`);
-                        }
-                      },
-                    });
-                    
-                    // 手書き文字に適したPSMモード
-                    // PSM_SINGLE_WORD = 8（単語として認識）
-                    // PSM_SINGLE_LINE = 7（1行として認識）
-                    // PSM_SINGLE_BLOCK = 6（ブロックとして認識）
-                    // 手書き文字にはSINGLE_WORDまたはSINGLE_LINEが適している
-                    await (worker as any).setParameters({
-                      tessedit_pageseg_mode: '7', // PSM_SINGLE_LINE（1行として認識）
-                    });
-                    
-                    const { data: { text } } = await worker.recognize(processedImageData);
-                    await worker.terminate();
-                    
-                    // 認識されたテキストをクリーンアップ
-                    let cleanedText = text.trim();
-                    // 不要な改行や空白を整理
-                    cleanedText = cleanedText.replace(/\s+/g, ' ').replace(/\n+/g, ' ');
-                    // よくある誤認識パターンを修正
-                    cleanedText = cleanedText
-                      .replace(/¥n/g, '')
-                      .replace(/te p=/g, '')
-                      .replace(/=/g, '')
-                      .replace(/[|]/g, '')
-                      .replace(/[`'"]/g, '')
-                      .replace(/[{}]/g, '');
-                    
-                    // 空の場合は元のテキストをそのまま使用
-                    if (!cleanedText || cleanedText.length === 0) {
-                      toast({
-                        title: "警告",
-                        description: "文字が認識できませんでした。もう一度大きくはっきりと書いてください。",
-                        variant: "default",
-                      });
-                    }
-                    
-                    setRecognizedText(cleanedText);
-                  } catch (error) {
-                    console.error('OCRエラー:', error);
-                    toast({
-                      title: "エラー",
-                      description: "文字認識に失敗しました。手動で入力してください。",
-                      variant: "destructive",
-                    });
-                  } finally {
-                    setIsRecognizing(false);
-                  }
-                }}
-                disabled={handwritingStrokesRef.current.length === 0 || isRecognizing}
-                style={{
-                  padding: '8px 16px',
-                  border: 'none',
-                  borderRadius: '4px',
-                  backgroundColor: (handwritingStrokesRef.current.length === 0 || isRecognizing) ? '#f3f4f6' : '#3b82f6',
-                  color: 'white',
-                  cursor: (handwritingStrokesRef.current.length === 0 || isRecognizing) ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {isRecognizing ? '認識中...' : '文字認識'}
-              </button>
-            </div>
-            <div style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '12px', backgroundColor: '#f8fafc', minHeight: '60px' }}>
-              <label style={{ fontSize: '14px', fontWeight: '500', color: '#334155', marginBottom: '8px', display: 'block' }}>認識されたテキスト（手動で編集可能）:</label>
-              <textarea
-                value={recognizedText}
-                onChange={(e) => setRecognizedText(e.target.value)}
-                onKeyDown={(e) => {
-                  // Enterキーでテキスト入力フィールドに追加してモーダルを閉じる
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    if (recognizedText) {
-                      setTextInputValue(prev => prev + recognizedText);
-                      setRecognizedText('');
-                      if (handwritingCanvasRef.current) {
-                        const ctx = handwritingCanvasRef.current?.getContext('2d');
-                        if (ctx) {
-                          ctx.clearRect(0, 0, handwritingCanvasRef.current.width, handwritingCanvasRef.current.height);
-                        }
-                      }
-                      handwritingStrokesRef.current = [];
-                      setShowHandwritingModal(false);
-                    }
-                  }
-                }}
-                style={{
-                  width: '100%',
-                  padding: '8px',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '4px',
-                  fontSize: '16px',
-                }}
-                rows={3}
-                placeholder="「文字認識」ボタンをクリックして認識されたテキストを表示します。Enterキーで確定します。"
-              />
-            </div>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
-              <button
-                onClick={() => {
-                  setShowHandwritingModal(false);
-                  handwritingStrokesRef.current = [];
-                  setRecognizedText('');
-                }}
-                style={{
-                  padding: '8px 16px',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '4px',
-                  backgroundColor: 'white',
-                  cursor: 'pointer',
-                }}
-              >
-                キャンセル
-              </button>
-              <button
-                onClick={() => {
-                  if (recognizedText) {
-                    setTextInputValue(prev => prev + recognizedText);
-                  }
-                  setShowHandwritingModal(false);
-                  handwritingStrokesRef.current = [];
-                  setRecognizedText('');
-                }}
-                style={{
-                  padding: '8px 16px',
-                  border: 'none',
-                  borderRadius: '4px',
-                  backgroundColor: '#3b82f6',
-                  color: 'white',
-                  cursor: 'pointer',
-                }}
-              >
-                確定して閉じる（Enterキーでも確定できます）
-              </button>
-            </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
