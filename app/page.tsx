@@ -3194,7 +3194,12 @@ export default function Home() {
                   onPointerDown={(e) => e.stopPropagation()}
                   onBlur={(e) => {
                     // フォーカスが別の要素に移った場合のみ確定
-                    if (!e.relatedTarget || !e.currentTarget.contains(e.relatedTarget as Node)) {
+                    // 手書きボタンやモーダルがクリックされた場合は確定しない
+                    const relatedTarget = e.relatedTarget as HTMLElement;
+                    if (!relatedTarget) return;
+                    // 手書きボタンがクリックされた場合は確定しない
+                    if (relatedTarget.closest('button[title="手書き文字認識入力"]')) return;
+                    if (!e.currentTarget.contains(relatedTarget)) {
                       handleTextSubmit();
                     }
                   }}
