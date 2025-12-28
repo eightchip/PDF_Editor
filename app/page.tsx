@@ -51,6 +51,8 @@ export default function Home() {
   const handwritingStrokesRef = useRef<Array<{ points: Array<{ x: number; y: number }> }>>([]);
   const isDrawingHandwritingRef = useRef(false);
   const [recognizedText, setRecognizedText] = useState(''); // 認識されたテキスト
+  const [isRecognizing, setIsRecognizing] = useState(false); // OCR認識中かどうか
+  const handwritingButtonRef = useRef<HTMLButtonElement>(null);
   
   // Dialog用のstate
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -3200,9 +3202,26 @@ export default function Home() {
                     // フォーカスが別の要素に移った場合のみ確定
                     // 手書きボタンやモーダルがクリックされた場合は確定しない
                     const relatedTarget = e.relatedTarget as HTMLElement;
-                    if (!relatedTarget) return;
+                    if (!relatedTarget) {
+                      // relatedTargetがnullの場合、手書きボタンがクリックされた可能性があるので、少し待つ
+                      setTimeout(() => {
+                        // 手書きモーダルが開いている場合は確定しない
+                        if (showHandwritingModal) return;
+                        // 手書きボタンがフォーカスされている場合は確定しない
+                        if (handwritingButtonRef.current && handwritingButtonRef.current === document.activeElement) return;
+                        // それ以外の場合のみ確定
+                        if (textInputPosition) {
+                          handleTextSubmit();
+                        }
+                      }, 150);
+                      return;
+                    }
                     // 手書きボタンがクリックされた場合は確定しない
-                    if (relatedTarget.closest('button[title="手書き文字認識入力"]')) return;
+                    if (relatedTarget === handwritingButtonRef.current || relatedTarget.closest('button[title="手書き文字認識入力"]')) {
+                      return;
+                    }
+                    // 手書きモーダル内の要素がクリックされた場合は確定しない
+                    if (relatedTarget.closest('[role="dialog"]')) return;
                     if (!e.currentTarget.contains(relatedTarget)) {
                       handleTextSubmit();
                     }
