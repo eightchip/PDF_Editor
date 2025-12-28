@@ -3251,7 +3251,7 @@ export default function Home() {
                       return;
                     }
                     // 手書きモーダル内の要素がクリックされた場合は確定しない
-                    if (relatedTarget.closest('[role="dialog"]')) return;
+                    if (relatedTarget.closest('[role="dialog"]') || relatedTarget.closest('[data-handwriting-modal]')) return;
                     // テキスト入力フィールド自体にフォーカスが戻っている場合は確定しない
                     if (relatedTarget === textInputRef.current) return;
                     if (!e.currentTarget.contains(relatedTarget)) {
