@@ -477,8 +477,9 @@ export default function Home() {
 
   // 画像ファイルが追加されたときにモーダルを開く
   useEffect(() => {
-    console.log('useEffect: imageFiles changed, length:', imageFiles.length, 'files:', imageFiles.map(f => f.name));
-    if (imageFiles.length > 0) {
+    const length = imageFiles.length;
+    console.log('useEffect: imageFiles changed, length:', length);
+    if (length > 0) {
       console.log('画像管理モーダルを開きます - showImageManagerをtrueに設定します');
       // 少し遅延させてからモーダルを開く（状態更新を確実にするため）
       const timer = setTimeout(() => {
@@ -487,7 +488,7 @@ export default function Home() {
         console.log('setShowImageManager(true)を実行しました');
         toast({
           title: "成功",
-          description: `画像をコレクションに追加しました（合計: ${imageFiles.length}枚）`,
+          description: `画像をコレクションに追加しました（合計: ${length}枚）`,
         });
       }, 100);
       return () => clearTimeout(timer);
@@ -495,7 +496,17 @@ export default function Home() {
       // 画像が0枚になったらモーダルを閉じる
       setShowImageManager(false);
     }
-  }, [imageFiles.length, imageFiles]); // imageFilesが変更されたとき実行
+  }, [imageFiles.length]); // imageFiles.lengthが変更されたときのみ実行
+
+  // showImageManagerの状態を監視
+  useEffect(() => {
+    console.log('showImageManager changed:', showImageManager);
+  }, [showImageManager]);
+
+  // showVoiceInputの状態を監視
+  useEffect(() => {
+    console.log('showVoiceInput changed:', showVoiceInput);
+  }, [showVoiceInput]);
 
   // 音声入力モーダルが開いたときに自動的に起動（オプション）
   useEffect(() => {
@@ -3968,18 +3979,26 @@ export default function Home() {
       )}
 
       {/* 画像管理モーダル */}
-      <Dialog open={showImageManager} onOpenChange={(open) => {
-        console.log('画像管理モーダルのonOpenChange:', open);
-        setShowImageManager(open);
-      }}>
-          <DialogContent 
-            className="max-w-3xl max-h-[80vh] overflow-y-auto"
-            style={{ zIndex: 10001 }}
+      {showImageManager && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10001] p-4"
+          onClick={() => setShowImageManager(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl p-6 max-w-3xl w-full max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
           >
-            <DialogHeader>
-              <DialogTitle>画像管理 ({imageFiles.length}枚)</DialogTitle>
-              <DialogDescription>画像の順番を変更したり、削除できます</DialogDescription>
-            </DialogHeader>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-slate-800">画像管理 ({imageFiles.length}枚)</h2>
+              <button
+                onClick={() => setShowImageManager(false)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                title="閉じる"
+              >
+                <MdClose className="text-xl text-slate-600" />
+              </button>
+            </div>
+            <p className="text-sm text-slate-600 mb-4">画像の順番を変更したり、削除できます</p>
             <div className="space-y-4">
               {imageFiles.length === 0 ? (
                 <div className="text-center py-8 text-slate-400">
@@ -4036,35 +4055,49 @@ export default function Home() {
                 </div>
               )}
               <div className="flex gap-2 justify-end pt-4 border-t">
-                <Button
-                  variant="outline"
+                <button
                   onClick={() => {
                     setImageFiles([]);
                     setShowImageManager(false);
                   }}
+                  className="px-4 py-2 border border-slate-300 rounded hover:bg-slate-100"
                 >
                   クリア
-                </Button>
-                <Button
+                </button>
+                <button
                   onClick={loadCombinedImages}
                   disabled={imageFiles.length === 0}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   PDFに結合して読み込む
-                </Button>
+                </button>
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
+          </div>
+        </div>
+      )}
 
       {/* 音声入力モーダル */}
       {showVoiceInput && (
-        <Dialog open={showVoiceInput} onOpenChange={setShowVoiceInput}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>音声入力</DialogTitle>
-              <DialogDescription>マイクに向かって話してください</DialogDescription>
-            </DialogHeader>
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10002] p-4"
+          onClick={() => setShowVoiceInput(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl p-6 max-w-lg w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-slate-800">音声入力</h2>
+              <button
+                onClick={() => setShowVoiceInput(false)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                title="閉じる"
+              >
+                <MdClose className="text-xl text-slate-600" />
+              </button>
+            </div>
+            <p className="text-sm text-slate-600 mb-4">マイクに向かって話してください</p>
             <div className="space-y-4">
               <div className="flex items-center justify-center py-8">
                 {isListening ? (
@@ -4159,8 +4192,8 @@ export default function Home() {
                 </div>
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
+          </div>
+        </div>
       )}
 
       {/* Dialog */}
