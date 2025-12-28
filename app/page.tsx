@@ -53,6 +53,11 @@ export default function Home() {
   const [recognizedText, setRecognizedText] = useState(''); // 認識されたテキスト
   const [isRecognizing, setIsRecognizing] = useState(false); // OCR認識中かどうか
   const handwritingButtonRef = useRef<HTMLButtonElement>(null);
+
+  // デバッグ用: showHandwritingModalの状態変化をログに記録
+  useEffect(() => {
+    console.log('showHandwritingModal state changed to:', showHandwritingModal);
+  }, [showHandwritingModal]);
   
   // Dialog用のstate
   const [dialogOpen, setDialogOpen] = useState(false);
