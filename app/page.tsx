@@ -177,28 +177,9 @@ export default function Home() {
     }
   }, [tool, strokes, pageSize]);
 
-  // テキスト入力フィールドが開いたときに手書きモーダルを自動的に開く（Surfaceなどのタッチデバイス用）
-  useEffect(() => {
-    // 手書きモーダルが既に開いている場合は何もしない（無限ループを防ぐ）
-    if (showHandwritingModal) return;
-    
-    if (textInputPosition && textInputRef.current) {
-      // タッチデバイスまたはSurfaceデバイスの場合、自動的に手書きモーダルを開く
-      const isTouchDevice = isMobile || window.navigator.maxTouchPoints > 0;
-      if (isTouchDevice) {
-        // 少し遅延してから手書きモーダルを開く（テキスト入力フィールドのフォーカス後に）
-        const timer = setTimeout(() => {
-          // 再度チェック（手書きモーダルが開いていない場合のみ）
-          if (!showHandwritingModal) {
-            setShowHandwritingModal(true);
-            handwritingStrokesRef.current = [];
-            setRecognizedText('');
-          }
-        }, 300);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [textInputPosition, isMobile, showHandwritingModal]);
+  // 自動オープン機能は無効化（手書きボタンのクリックでのみモーダルを開く）
+  // テキスト入力フィールドにフォーカスしたときに自動的に手書きモーダルを開く機能は、
+  // 無限ループの問題があるため削除
 
   // 画像ファイル選択時の処理（PDF変換後に回転するため、プレビューは不要）
   const handleImageFileSelect = (file: File) => {
