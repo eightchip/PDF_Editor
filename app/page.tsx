@@ -479,10 +479,12 @@ export default function Home() {
   useEffect(() => {
     console.log('useEffect: imageFiles changed, length:', imageFiles.length, 'files:', imageFiles.map(f => f.name));
     if (imageFiles.length > 0) {
-      console.log('画像管理モーダルを開きます');
+      console.log('画像管理モーダルを開きます - showImageManagerをtrueに設定します');
       // 少し遅延させてからモーダルを開く（状態更新を確実にするため）
       const timer = setTimeout(() => {
+        console.log('setShowImageManager(true)を実行します');
         setShowImageManager(true);
+        console.log('setShowImageManager(true)を実行しました');
         toast({
           title: "成功",
           description: `画像をコレクションに追加しました（合計: ${imageFiles.length}枚）`,
@@ -3628,7 +3630,27 @@ export default function Home() {
                     キャンセル
                   </Button>
                   <button
-                    onClick={() => setShowVoiceInput(true)}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log('音声ボタン（テキスト入力横）がマウスダウンされました');
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (e.nativeEvent) {
+                        (e.nativeEvent as any).stopImmediatePropagation?.();
+                      }
+                      console.log('音声ボタン（テキスト入力横）がクリックされました');
+                      console.log('setShowVoiceInput(true)を実行します');
+                      setShowVoiceInput(true);
+                    }}
+                    style={{
+                      position: 'relative',
+                      zIndex: 1000,
+                      pointerEvents: 'auto',
+                    }}
                     className="h-7 px-2 text-xs border border-slate-300 rounded hover:bg-slate-100 flex items-center gap-1"
                     title="音声入力（日本語・英語）"
                   >
