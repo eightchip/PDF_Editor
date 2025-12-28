@@ -33,7 +33,6 @@ const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { topPosition?: string }
 >(({ className, children, topPosition, style, ...props }, ref) => {
-  console.log('DialogContent rendering with topPosition:', topPosition, 'style:', style);
   return (
     <DialogPortal>
       <DialogOverlay />

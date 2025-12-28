@@ -205,10 +205,22 @@ export default function Home() {
 
   // 画像ファイル選択時の処理（PDF変換後に回転するため、プレビューは不要）
   const handleImageFileSelect = (file: File, addToCollection: boolean = false) => {
+    console.log('handleImageFileSelect called:', file.name, 'addToCollection:', addToCollection);
     if (addToCollection) {
       // 画像をコレクションに追加
-      setImageFiles(prev => [...prev, file]);
-      setShowImageManager(true);
+      setImageFiles(prev => {
+        const newFiles = [...prev, file];
+        console.log('画像をコレクションに追加:', file.name, '合計:', newFiles.length);
+        return newFiles;
+      });
+      // 状態更新を待ってからモーダルを開く
+      setTimeout(() => {
+        setShowImageManager(true);
+        toast({
+          title: "成功",
+          description: `画像をコレクションに追加しました`,
+        });
+      }, 0);
       return;
     }
 
@@ -423,6 +435,15 @@ export default function Home() {
     setIsListening(false);
     setShowVoiceInput(false);
   };
+
+  // 音声入力モーダルが開いたときに自動的に起動（オプション）
+  useEffect(() => {
+    // 自動起動はしない（ユーザーがボタンをクリックしてから起動）
+    // 必要に応じて以下のコメントを外す
+    // if (showVoiceInput && !isListening && !recognitionRef.current) {
+    //   startVoiceInput();
+    // }
+  }, [showVoiceInput]);
 
   // カメラモーダルが開かれたときにカメラを起動
   useEffect(() => {
