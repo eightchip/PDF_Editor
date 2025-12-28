@@ -3625,11 +3625,13 @@ export default function Home() {
       {(() => {
         console.log('Rendering handwriting modal, showHandwritingModal:', showHandwritingModal);
         if (showHandwritingModal) {
-          console.log('Handwriting modal is being rendered');
+          console.log('Handwriting modal is being rendered - should be visible now');
         }
         return null;
       })()}
       {showHandwritingModal && (
+        <>
+          {console.log('Inside showHandwritingModal conditional, rendering modal div')}
         <div
           style={{
             position: 'fixed',
