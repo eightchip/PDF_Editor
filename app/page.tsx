@@ -3631,6 +3631,7 @@ export default function Home() {
       })()}
       {showHandwritingModal && (
         <div
+          data-handwriting-modal="overlay"
           style={{
             position: 'fixed',
             top: 0,
@@ -3656,6 +3657,7 @@ export default function Home() {
           }}
         >
           <div
+            data-handwriting-modal="content"
             style={{
               backgroundColor: 'white',
               borderRadius: '8px',
@@ -3842,7 +3844,6 @@ export default function Home() {
                 placeholder="「文字認識」ボタンをクリックして認識されたテキストを表示します。Enterキーで確定します。"
               />
             </div>
-          </div>
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
               <button
                 onClick={() => {
