@@ -3620,9 +3620,15 @@ export default function Home() {
         open={showHandwritingModal} 
         onOpenChange={(open) => {
           console.log('Dialog onOpenChange called with open:', open, 'current state:', showHandwritingModal);
+          console.trace('Stack trace for onOpenChange');
+          // モーダルを閉じようとしている場合は、ユーザーの明示的な操作（オーバーレイクリック、Escキー）のみを許可
+          if (!open && showHandwritingModal) {
+            console.log('Modal is being closed, allowing close');
+          }
           setShowHandwritingModal(open);
           console.log('setShowHandwritingModal called with:', open);
         }}
+        modal={true}
       >
         <DialogContent 
           className="max-w-2xl"
