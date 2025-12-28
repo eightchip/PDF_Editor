@@ -3946,8 +3946,14 @@ export default function Home() {
       )}
 
       {/* 画像管理モーダル */}
-      <Dialog open={showImageManager} onOpenChange={setShowImageManager}>
-          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+      <Dialog open={showImageManager} onOpenChange={(open) => {
+        console.log('画像管理モーダルのonOpenChange:', open);
+        setShowImageManager(open);
+      }}>
+          <DialogContent 
+            className="max-w-3xl max-h-[80vh] overflow-y-auto"
+            style={{ zIndex: 10001 }}
+          >
             <DialogHeader>
               <DialogTitle>画像管理 ({imageFiles.length}枚)</DialogTitle>
               <DialogDescription>画像の順番を変更したり、削除できます</DialogDescription>
