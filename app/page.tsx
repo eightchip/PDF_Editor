@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button"; // Dialog内でのみ使用
-import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode } from 'react-icons/md';
+import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff } from 'react-icons/md';
 import { QRCodeSVG } from 'qrcode.react';
 // PDF.jsの型は動的インポートで取得
 
@@ -46,6 +46,15 @@ export default function Home() {
   const [showAnnotationList, setShowAnnotationList] = useState(false);
   const [isMobile, setIsMobile] = useState(false); // モバイルデバイスかどうか
   const [showQRCode, setShowQRCode] = useState(false); // QRコードモーダルの表示状態
+  const [showCameraModal, setShowCameraModal] = useState(false); // カメラモーダルの表示状態
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const cameraCanvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [isRecording, setIsRecording] = useState(false); // カメラが起動中かどうか
+  const [showVoiceInput, setShowVoiceInput] = useState(false); // 音声入力モーダルの表示状態
+  const [isListening, setIsListening] = useState(false); // 音声認識中かどうか
+  const [voiceLanguage, setVoiceLanguage] = useState<'ja-JP' | 'en-US'>('ja-JP'); // 音声認識の言語
+  const recognitionRef = useRef<any>(null); // Web Speech APIの認識エンジン
   
   // Dialog用のstate
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -215,6 +224,134 @@ export default function Home() {
     convertAndLoad();
   };
 
+  // カメラで写真を撮影
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } // 背面カメラを優先
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        setIsRecording(true);
+      }
+    } catch (error) {
+      console.error('カメラ起動エラー:', error);
+      toast({
+        title: "エラー",
+        description: 'カメラへのアクセスに失敗しました。カメラの権限を確認してください。',
+        variant: "destructive",
+      });
+    }
+  };
+
+  // カメラを停止
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsRecording(false);
+  };
+
+  // 写真を撮影
+  const capturePhoto = () => {
+    if (!videoRef.current || !cameraCanvasRef.current) return;
+    
+    const video = videoRef.current;
+    const canvas = cameraCanvasRef.current;
+    const context = canvas.getContext('2d');
+    
+    if (!context) return;
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0);
+    
+    // CanvasからBlobに変換
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      
+      const file = new File([blob], `camera_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      handleImageFileSelect(file);
+      stopCamera();
+      setShowCameraModal(false);
+    }, 'image/jpeg', 0.95);
+  };
+
+  // 音声入力の開始
+  const startVoiceInput = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      toast({
+        title: "エラー",
+        description: 'お使いのブラウザは音声認識に対応していません。',
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = voiceLanguage; // 選択された言語を使用
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      if (textInputPosition) {
+        setTextInputValue(prev => prev + transcript);
+      }
+      setIsListening(false);
+      setShowVoiceInput(false);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('音声認識エラー:', event.error);
+      toast({
+        title: "エラー",
+        description: '音声認識に失敗しました: ' + event.error,
+        variant: "destructive",
+      });
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  // 音声入力の停止
+  const stopVoiceInput = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+    setShowVoiceInput(false);
+  };
+
+  // カメラモーダルが開かれたときにカメラを起動
+  useEffect(() => {
+    if (showCameraModal) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+    
+    return () => {
+      stopCamera();
+    };
+  }, [showCameraModal]);
 
   // ファイル選択（PDFまたは画像）
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3281,6 +3418,14 @@ export default function Home() {
                   >
                     キャンセル
                   </Button>
+                  <button
+                    onClick={() => setShowVoiceInput(true)}
+                    className="h-7 px-2 text-xs border border-slate-300 rounded hover:bg-slate-100 flex items-center gap-1"
+                    title="音声入力（日本語・英語）"
+                  >
+                    {isListening ? <MdMicOff className="text-base text-red-600" /> : <MdMic className="text-base text-blue-600" />}
+                    音声
+                  </button>
                 </div>
               </div>
             )}
@@ -3534,6 +3679,118 @@ export default function Home() {
         </div>
       )}
 
+
+      {/* カメラモーダル */}
+      {showCameraModal && (
+        <Dialog open={showCameraModal} onOpenChange={setShowCameraModal}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>カメラで写真を撮影</DialogTitle>
+              <DialogDescription>板書や資料を撮影してPDFに変換できます</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="relative bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '4/3' }}>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-contain"
+                />
+                <canvas ref={cameraCanvasRef} className="hidden" />
+              </div>
+              <div className="flex gap-2 justify-center">
+                <Button
+                  onClick={capturePhoto}
+                  disabled={!isRecording}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <MdCamera className="mr-2" />
+                  写真を撮る
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    stopCamera();
+                    setShowCameraModal(false);
+                  }}
+                >
+                  キャンセル
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* 音声入力モーダル */}
+      {showVoiceInput && (
+        <Dialog open={showVoiceInput} onOpenChange={setShowVoiceInput}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>音声入力</DialogTitle>
+              <DialogDescription>マイクに向かって話してください</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="flex items-center justify-center py-8">
+                {isListening ? (
+                  <div className="text-center">
+                    <MdMic className="text-6xl text-red-600 animate-pulse mx-auto mb-4" />
+                    <p className="text-lg font-semibold">音声を認識中...</p>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <MdMic className="text-6xl text-blue-600 mx-auto mb-4" />
+                    <p className="text-lg">準備完了</p>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium">言語:</label>
+                  <select
+                    value={voiceLanguage}
+                    onChange={(e) => setVoiceLanguage(e.target.value as 'ja-JP' | 'en-US')}
+                    disabled={isListening}
+                    className="px-3 py-1 border border-slate-300 rounded text-sm"
+                  >
+                    <option value="ja-JP">日本語</option>
+                    <option value="en-US">English</option>
+                  </select>
+                </div>
+                <div className="flex gap-2 justify-center">
+                  <Button
+                    onClick={startVoiceInput}
+                    disabled={isListening}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <MdMic className="mr-2" />
+                    {isListening ? '認識中...' : '音声認識を開始'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={stopVoiceInput}
+                    disabled={!isListening}
+                  >
+                    停止
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      stopVoiceInput();
+                      setShowVoiceInput(false);
+                    }}
+                  >
+                    キャンセル
+                  </Button>
+                </div>
+                <div className="text-xs text-slate-500 text-center">
+                  <p>※ブラウザによっては音声認識に対応していない場合があります</p>
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
