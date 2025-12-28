@@ -3314,24 +3314,6 @@ export default function Home() {
             display: 'flex', 
             flexDirection: 'column' 
           }}
-          onClick={(e) => {
-            // 編集モード中はすべてのクリックイベントを無視
-            if (editingTextId) {
-              e.stopPropagation();
-              e.preventDefault();
-              e.nativeEvent.stopImmediatePropagation();
-              return false;
-            }
-          }}
-          onMouseDown={(e) => {
-            // 編集モード中はすべてのマウスダウンイベントを無視
-            if (editingTextId) {
-              e.stopPropagation();
-              e.preventDefault();
-              e.nativeEvent.stopImmediatePropagation();
-              return false;
-            }
-          }}
         >
           <div 
             className="flex-shrink-0 p-3 mb-0 font-semibold flex justify-between items-center bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md" 
