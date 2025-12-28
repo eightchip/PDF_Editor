@@ -3290,19 +3290,25 @@ export default function Home() {
                     キャンセル
                   </Button>
                   <button
+                    ref={handwritingButtonRef}
                     type="button"
-                    onClick={(e) => {
+                    onMouseDown={(e) => {
+                      // onMouseDownで処理することで、onBlurの前に実行される
                       e.preventDefault();
                       e.stopPropagation();
                       e.nativeEvent.stopImmediatePropagation();
                       // 既に開いている場合は何もしない
                       if (!showHandwritingModal) {
+                        // テキスト入力フィールドのフォーカスを解除
+                        if (textInputRef.current) {
+                          textInputRef.current.blur();
+                        }
                         setShowHandwritingModal(true);
                         handwritingStrokesRef.current = [];
                         setRecognizedText('');
                       }
                     }}
-                    onMouseDown={(e) => {
+                    onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                       e.nativeEvent.stopImmediatePropagation();
