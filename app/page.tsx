@@ -3623,10 +3623,9 @@ export default function Home() {
             top: '15%',
             left: '50%',
             transform: 'translateX(-50%) translateY(0)',
-            zIndex: 10000,
+            zIndex: 10002,
             maxHeight: '80vh',
-            overflowY: 'auto',
-            position: 'fixed'
+            overflowY: 'auto'
           }}
         >
           <DialogHeader>
