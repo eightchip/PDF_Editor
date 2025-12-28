@@ -3316,6 +3316,7 @@ export default function Home() {
                       // テキスト入力フィールドのフォーカスを保持するため、blurしない
                       // 既に開いている場合は何もしない
                       if (!showHandwritingModal) {
+                        console.log('Opening handwriting modal from onMouseDown');
                         setShowHandwritingModal(true);
                         handwritingStrokesRef.current = [];
                         setRecognizedText('');
@@ -3327,6 +3328,7 @@ export default function Home() {
                       e.nativeEvent.stopImmediatePropagation();
                       // onClickでも処理を実行（onMouseDownが発火しない場合に備える）
                       if (!showHandwritingModal) {
+                        console.log('Opening handwriting modal from onClick');
                         setShowHandwritingModal(true);
                         handwritingStrokesRef.current = [];
                         setRecognizedText('');
