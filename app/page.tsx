@@ -3203,17 +3203,19 @@ export default function Home() {
                     // 手書きボタンやモーダルがクリックされた場合は確定しない
                     const relatedTarget = e.relatedTarget as HTMLElement;
                     if (!relatedTarget) {
-                      // relatedTargetがnullの場合、手書きボタンがクリックされた可能性があるので、少し待つ
+                      // relatedTargetがnullの場合、タッチイベントや手書きボタンがクリックされた可能性があるので、少し待つ
                       setTimeout(() => {
                         // 手書きモーダルが開いている場合は確定しない
                         if (showHandwritingModal) return;
                         // 手書きボタンがフォーカスされている場合は確定しない
                         if (handwritingButtonRef.current && handwritingButtonRef.current === document.activeElement) return;
+                        // テキスト入力フィールド自体にフォーカスが戻っている場合は確定しない（タッチイベントの場合）
+                        if (textInputRef.current && textInputRef.current === document.activeElement) return;
                         // それ以外の場合のみ確定
                         if (textInputPosition) {
                           handleTextSubmit();
                         }
-                      }, 150);
+                      }, 200);
                       return;
                     }
                     // 手書きボタンがクリックされた場合は確定しない
@@ -3222,6 +3224,8 @@ export default function Home() {
                     }
                     // 手書きモーダル内の要素がクリックされた場合は確定しない
                     if (relatedTarget.closest('[role="dialog"]')) return;
+                    // テキスト入力フィールド自体にフォーカスが戻っている場合は確定しない
+                    if (relatedTarget === textInputRef.current) return;
                     if (!e.currentTarget.contains(relatedTarget)) {
                       handleTextSubmit();
                     }
