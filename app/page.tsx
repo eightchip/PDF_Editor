@@ -3623,28 +3623,46 @@ export default function Home() {
 
       {/* 手書き文字認識モーダル */}
       {console.log('Rendering Dialog component, showHandwritingModal:', showHandwritingModal)}
-      <Dialog 
-        open={showHandwritingModal} 
-        onOpenChange={(open) => {
-          console.log('Dialog onOpenChange called with open:', open, 'current state:', showHandwritingModal);
-          // モーダルを開く場合（open === true）は、状態を更新する
-          if (open) {
-            setShowHandwritingModal(true);
-            console.log('Dialog opening, setShowHandwritingModal(true)');
-          } else {
-            // モーダルを閉じる場合（open === false）は、手書きボタンがクリックされた直後の場合は無視する
-            const now = Date.now();
-            const lastClickTime = (window as any).lastHandwritingButtonClickTime || 0;
-            if (now - lastClickTime < 1000) {
-              console.log('Dialog onOpenChange: ignoring close request (button clicked within 1s)');
-              return;
+      {showHandwritingModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            paddingTop: '15%',
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              const now = Date.now();
+              const lastClickTime = (window as any).lastHandwritingButtonClickTime || 0;
+              if (now - lastClickTime > 1000) {
+                setShowHandwritingModal(false);
+              }
             }
-            console.log('Dialog closing, setShowHandwritingModal(false)');
-            setShowHandwritingModal(false);
-          }
-        }}
-        modal={true}
-      >
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              padding: '24px',
+              maxWidth: '42rem',
+              width: '90%',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              position: 'relative',
+              zIndex: 10001,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
         <DialogContent 
           className="max-w-2xl"
           topPosition="top-[15%]"
