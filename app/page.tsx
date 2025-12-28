@@ -3644,24 +3644,44 @@ export default function Home() {
               </Button>
               <Button
                 onClick={async () => {
-                  // TODO: 実際のOCR処理を実装
-                  // 現在は簡易的な実装として、認識されたテキストを手動で入力できるようにする
-                  // 将来的にTesseract.jsやAPIを使用してOCR処理を追加
-                  if (recognizedText) {
-                    setTextInputValue(prev => prev + recognizedText);
-                    setRecognizedText('');
-                    if (handwritingCanvasRef.current) {
-                      const ctx = handwritingCanvasRef.current.getContext('2d');
-                      if (ctx) {
-                        ctx.clearRect(0, 0, handwritingCanvasRef.current.width, handwritingCanvasRef.current.height);
+                  if (!handwritingCanvasRef.current || handwritingStrokesRef.current.length === 0) return;
+                  
+                  setIsRecognizing(true);
+                  try {
+                    // キャンバスの画像データを取得
+                    const canvas = handwritingCanvasRef.current;
+                    const imageData = canvas.toDataURL('image/png');
+                    
+                    // Tesseract.jsを動的にインポート
+                    const Tesseract = (await import('tesseract.js')).default;
+                    
+                    // OCR実行（日本語+英語を認識）
+                    const { data: { text } } = await Tesseract.recognize(imageData, 'jpn+eng', {
+                      logger: (m) => {
+                        // 進捗ログを表示（必要に応じて）
+                        if (m.status === 'recognizing text') {
+                          console.log(`OCR進捗: ${Math.round(m.progress * 100)}%`);
+                        }
                       }
-                    }
-                    handwritingStrokesRef.current = [];
+                    });
+                    
+                    // 認識されたテキストを設定
+                    const cleanedText = text.trim().replace(/\s+/g, ' ');
+                    setRecognizedText(cleanedText);
+                  } catch (error) {
+                    console.error('OCRエラー:', error);
+                    toast({
+                      title: "エラー",
+                      description: "文字認識に失敗しました。手動で入力してください。",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setIsRecognizing(false);
                   }
                 }}
-                disabled={!recognizedText}
+                disabled={handwritingStrokesRef.current.length === 0 || isRecognizing}
               >
-                テキストに追加
+                {isRecognizing ? '認識中...' : '文字認識'}
               </Button>
             </div>
             <div className="border border-slate-300 rounded-lg p-3 bg-slate-50 min-h-[60px]">
@@ -3669,9 +3689,27 @@ export default function Home() {
               <textarea
                 value={recognizedText}
                 onChange={(e) => setRecognizedText(e.target.value)}
+                onKeyDown={(e) => {
+                  // Enterキーでテキスト入力フィールドに追加してモーダルを閉じる
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (recognizedText) {
+                      setTextInputValue(prev => prev + recognizedText);
+                      setRecognizedText('');
+                      if (handwritingCanvasRef.current) {
+                        const ctx = handwritingCanvasRef.current.getContext('2d');
+                        if (ctx) {
+                          ctx.clearRect(0, 0, handwritingCanvasRef.current.width, handwritingCanvasRef.current.height);
+                        }
+                      }
+                      handwritingStrokesRef.current = [];
+                      setShowHandwritingModal(false);
+                    }
+                  }
+                }}
                 className="w-full p-2 border border-slate-300 rounded text-base"
                 rows={3}
-                placeholder="手書き文字を認識してここに表示されます。手動で編集することもできます。"
+                placeholder="「文字認識」ボタンをクリックして認識されたテキストを表示します。Enterキーで確定します。"
               />
             </div>
           </div>
@@ -3696,7 +3734,7 @@ export default function Home() {
                 setRecognizedText('');
               }}
             >
-              確定して閉じる
+              確定して閉じる（Enterキーでも確定できます）
             </Button>
           </DialogFooter>
         </DialogContent>
