@@ -3295,9 +3295,12 @@ export default function Home() {
                       e.preventDefault();
                       e.stopPropagation();
                       e.nativeEvent.stopImmediatePropagation();
-                      setShowHandwritingModal(true);
-                      handwritingStrokesRef.current = [];
-                      setRecognizedText('');
+                      // 既に開いている場合は何もしない
+                      if (!showHandwritingModal) {
+                        setShowHandwritingModal(true);
+                        handwritingStrokesRef.current = [];
+                        setRecognizedText('');
+                      }
                     }}
                     onMouseDown={(e) => {
                       e.preventDefault();
