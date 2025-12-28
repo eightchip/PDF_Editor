@@ -3217,6 +3217,19 @@ export default function Home() {
                   }}
                   autoFocus
                   placeholder="テキストを入力（Ctrl+Enterで確定、Escでキャンセル）"
+                  onFocus={(e) => {
+                    // Surfaceなどのタッチデバイスで手書き入力パネルを開くためのヒント
+                    // Windows Ink Workspaceを手動で開く必要がある場合は、ユーザーに案内
+                    // または、自動的に手書きモーダルを開く
+                    if (isMobile || window.navigator.maxTouchPoints > 0) {
+                      // タッチデバイスの場合、少し遅延してから手書きモーダルを自動的に開く
+                      setTimeout(() => {
+                        // ユーザーが手書きボタンをクリックするまで待つ
+                        // または、自動的に開く場合は以下のコメントを外す
+                        // setShowHandwritingModal(true);
+                      }, 100);
+                    }
+                  }}
                 />
                 <div className="mt-1 flex gap-2">
                   <Button
