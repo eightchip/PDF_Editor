@@ -2976,7 +2976,7 @@ export default function Home() {
                   e.currentTarget.style.background = 'linear-gradient(to right, #475569, #334155)';
                 }
               }}
-              title="やり直し"
+              title="やり直し (Ctrl+Y / Ctrl+Shift+Z)"
             >
               <MdRedo className={`text-base ${redoStack.length === 0 ? 'text-slate-400' : 'text-white'}`} />
               Redo
