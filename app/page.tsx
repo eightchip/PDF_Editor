@@ -3682,14 +3682,15 @@ export default function Home() {
             <div style={{ position: 'relative', border: '2px solid #cbd5e1', borderRadius: '8px', backgroundColor: 'white', touchAction: 'none' }}>
               <canvas
                 ref={handwritingCanvasRef}
-                width={1200}
-                height={400}
+                width={1600}
+                height={500}
                 style={{ 
                   display: 'block',
                   width: '100%',
                   height: 'auto',
                   cursor: 'crosshair',
                   imageRendering: 'crisp-edges',
+                  backgroundColor: '#ffffff',
                 }}
                 onPointerDown={(e) => {
                   e.preventDefault();
@@ -3709,7 +3710,7 @@ export default function Home() {
                     const scaledY = y * scaleY;
                     
                     ctx.strokeStyle = '#000000';
-                    ctx.lineWidth = 3 * Math.max(scaleX, scaleY);
+                    ctx.lineWidth = 4 * Math.max(scaleX, scaleY); // 線を太くして認識しやすく
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
                     ctx.beginPath();
@@ -3780,30 +3781,60 @@ export default function Home() {
                     const ctx = canvas.getContext('2d');
                     if (!ctx) return;
                     
-                    // 画像の前処理：コントラストと明度を調整
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    // 高解像度で画像を拡大（OCR精度向上のため）
+                    const scaleFactor = 3; // 3倍に拡大
+                    const processedCanvas = document.createElement('canvas');
+                    processedCanvas.width = canvas.width * scaleFactor;
+                    processedCanvas.height = canvas.height * scaleFactor;
+                    const processedCtx = processedCanvas.getContext('2d');
+                    if (!processedCtx) return;
+                    
+                    // 元の画像を拡大して描画（滑らかに）
+                    processedCtx.imageSmoothingEnabled = true;
+                    processedCtx.imageSmoothingQuality = 'high';
+                    processedCtx.drawImage(canvas, 0, 0, processedCanvas.width, processedCanvas.height);
+                    
+                    // 画像の前処理：高品質な二値化とコントラスト強化
+                    const imageData = processedCtx.getImageData(0, 0, processedCanvas.width, processedCanvas.height);
                     const data = imageData.data;
                     
-                    // グレースケール変換とコントラスト強化
+                    // グレースケール変換
                     for (let i = 0; i < data.length; i += 4) {
                       const r = data[i];
                       const g = data[i + 1];
                       const b = data[i + 2];
                       const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
-                      
-                      // 二値化（閾値128）
-                      const threshold = 128;
-                      const binary = gray < threshold ? 0 : 255;
-                      
-                      data[i] = binary;
-                      data[i + 1] = binary;
-                      data[i + 2] = binary;
+                      data[i] = gray;
+                      data[i + 1] = gray;
+                      data[i + 2] = gray;
                     }
                     
-                    ctx.putImageData(imageData, 0, 0);
+                    // 適応的二値化（Otsu's methodの簡易版）
+                    // まず平均値を計算
+                    let sum = 0;
+                    for (let i = 0; i < data.length; i += 4) {
+                      sum += data[i];
+                    }
+                    const mean = sum / (data.length / 4);
+                    const threshold = mean * 0.7; // 平均値の70%を閾値として使用
                     
-                    // 処理済み画像データを取得
-                    const processedImageData = canvas.toDataURL('image/png');
+                    // 二値化とコントラスト強化
+                    for (let i = 0; i < data.length; i += 4) {
+                      const gray = data[i];
+                      // 二値化（黒=0、白=255）
+                      const binary = gray < threshold ? 0 : 255;
+                      // コントラスト強化（黒をより黒く、白をより白く）
+                      const enhanced = binary === 0 ? 0 : 255;
+                      data[i] = enhanced;
+                      data[i + 1] = enhanced;
+                      data[i + 2] = enhanced;
+                      data[i + 3] = 255; // アルファチャンネル
+                    }
+                    
+                    processedCtx.putImageData(imageData, 0, 0);
+                    
+                    // 処理済み画像データを取得（高品質PNG）
+                    const processedImageData = processedCanvas.toDataURL('image/png', 1.0);
                     
                     // Tesseract.jsを動的にインポート
                     const Tesseract = (await import('tesseract.js')).default;
@@ -3817,17 +3848,40 @@ export default function Home() {
                       },
                     });
                     
-                    // 手書き文字に適したPSMモード（単一のテキストブロックとして認識）
-                    // PSM_SINGLE_BLOCK = 6
+                    // 手書き文字に適したPSMモード
+                    // PSM_SINGLE_WORD = 8（単語として認識）
+                    // PSM_SINGLE_LINE = 7（1行として認識）
+                    // PSM_SINGLE_BLOCK = 6（ブロックとして認識）
+                    // 手書き文字にはSINGLE_WORDまたはSINGLE_LINEが適している
                     await (worker as any).setParameters({
-                      tessedit_pageseg_mode: '6',
+                      tessedit_pageseg_mode: '7', // PSM_SINGLE_LINE（1行として認識）
                     });
                     
                     const { data: { text } } = await worker.recognize(processedImageData);
                     await worker.terminate();
                     
-                    // 認識されたテキストを設定
-                    const cleanedText = text.trim().replace(/\s+/g, ' ').replace(/\n+/g, ' ');
+                    // 認識されたテキストをクリーンアップ
+                    let cleanedText = text.trim();
+                    // 不要な改行や空白を整理
+                    cleanedText = cleanedText.replace(/\s+/g, ' ').replace(/\n+/g, ' ');
+                    // よくある誤認識パターンを修正
+                    cleanedText = cleanedText
+                      .replace(/¥n/g, '')
+                      .replace(/te p=/g, '')
+                      .replace(/=/g, '')
+                      .replace(/[|]/g, '')
+                      .replace(/[`'"]/g, '')
+                      .replace(/[{}]/g, '');
+                    
+                    // 空の場合は元のテキストをそのまま使用
+                    if (!cleanedText || cleanedText.length === 0) {
+                      toast({
+                        title: "警告",
+                        description: "文字が認識できませんでした。もう一度大きくはっきりと書いてください。",
+                        variant: "default",
+                      });
+                    }
+                    
                     setRecognizedText(cleanedText);
                   } catch (error) {
                     console.error('OCRエラー:', error);
