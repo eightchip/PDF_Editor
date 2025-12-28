@@ -3875,6 +3875,7 @@ export default function Home() {
                 確定して閉じる（Enterキーでも確定できます）
               </button>
             </div>
+            </div>
           </div>
         </div>
       )}
