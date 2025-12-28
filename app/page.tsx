@@ -3253,22 +3253,27 @@ export default function Home() {
                   >
                     キャンセル
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
+                  <button
+                    type="button"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
+                      e.nativeEvent.stopImmediatePropagation();
                       setShowHandwritingModal(true);
                       handwritingStrokesRef.current = [];
                       setRecognizedText('');
                     }}
-                    className="h-7 px-2 text-xs"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.nativeEvent.stopImmediatePropagation();
+                    }}
+                    className="h-7 px-2 text-xs border border-slate-300 rounded hover:bg-slate-100 flex items-center gap-1"
                     title="手書き文字認識入力"
                   >
                     <MdBrush className="text-base" />
                     手書き
-                  </Button>
+                  </button>
                 </div>
               </div>
             )}
