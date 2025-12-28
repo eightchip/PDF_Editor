@@ -3622,9 +3622,14 @@ export default function Home() {
       )}
 
       {/* 手書き文字認識モーダル */}
-      {console.log('Rendering handwriting modal, showHandwritingModal:', showHandwritingModal)}
+      {(() => {
+        console.log('Rendering handwriting modal, showHandwritingModal:', showHandwritingModal);
+        if (showHandwritingModal) {
+          console.log('Handwriting modal is being rendered');
+        }
+        return null;
+      })()}
       {showHandwritingModal && (
-        console.log('Handwriting modal is being rendered'),
         <div
           style={{
             position: 'fixed',
