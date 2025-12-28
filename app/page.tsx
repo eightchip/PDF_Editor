@@ -3637,12 +3637,13 @@ export default function Home() {
             left: 0,
             right: 0,
             bottom: 0,
-            zIndex: 10000,
+            zIndex: 999999,
             display: 'flex',
             alignItems: 'flex-start',
             justifyContent: 'center',
             paddingTop: '15%',
             backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            pointerEvents: 'auto',
           }}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
@@ -3665,7 +3666,8 @@ export default function Home() {
               overflowY: 'auto',
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
               position: 'relative',
-              zIndex: 100000,
+              zIndex: 1000000,
+              pointerEvents: 'auto',
             }}
             onClick={(e) => {
               console.log('Handwriting modal content clicked');
