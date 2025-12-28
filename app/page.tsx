@@ -3622,14 +3622,7 @@ export default function Home() {
       )}
 
       {/* 手書き文字認識モーダル */}
-      {(() => {
-        console.log('Rendering handwriting modal, showHandwritingModal:', showHandwritingModal);
-        if (showHandwritingModal) {
-          console.log('Handwriting modal is being rendered - should be visible now');
-        }
-        return null;
-      })()}
-      {showHandwritingModal && (
+      {typeof window !== 'undefined' && showHandwritingModal && createPortal(
         <div
           data-handwriting-modal="overlay"
           style={{
