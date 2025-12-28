@@ -650,6 +650,12 @@ export default function Home() {
 
     // テキストツールの場合はテキスト入力フィールドを表示
     if (tool === 'text') {
+      // 既にテキスト入力フィールドが開いている場合は何もしない（タッチイベントで閉じないようにする）
+      if (textInputPosition) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       const target = e.currentTarget;
       const rect = target.getBoundingClientRect();
       const x = e.clientX - rect.left;
