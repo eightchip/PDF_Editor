@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button"; // Dialog内でのみ使用
-import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff } from 'react-icons/md';
+import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections } from 'react-icons/md';
 import { QRCodeSVG } from 'qrcode.react';
 // PDF.jsの型は動的インポートで取得
 
@@ -55,6 +55,8 @@ export default function Home() {
   const [isListening, setIsListening] = useState(false); // 音声認識中かどうか
   const [voiceLanguage, setVoiceLanguage] = useState<'ja-JP' | 'en-US'>('ja-JP'); // 音声認識の言語
   const recognitionRef = useRef<any>(null); // Web Speech APIの認識エンジン
+  const [imageFiles, setImageFiles] = useState<File[]>([]); // 複数画像を保持
+  const [showImageManager, setShowImageManager] = useState(false); // 画像管理モーダルの表示状態
   
   // Dialog用のstate
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -185,9 +187,32 @@ export default function Home() {
   // テキスト入力フィールドにフォーカスしたときに自動的に手書きモーダルを開く機能は、
   // 無限ループの問題があるため削除
 
+  // 複数画像を1つのPDFに結合
+  const combineImagesToPDF = async (files: File[]): Promise<ArrayBuffer> => {
+    const { PDFDocument } = await import('pdf-lib');
+    const pdfDoc = await PDFDocument.create();
+    
+    for (const file of files) {
+      const imagePdfBytes = await convertImageToPDF(file, 0);
+      const imagePdf = await PDFDocument.load(imagePdfBytes);
+      const [imagePage] = await pdfDoc.copyPages(imagePdf, [0]);
+      pdfDoc.addPage(imagePage);
+    }
+    
+    const pdfBytes = await pdfDoc.save();
+    return pdfBytes.buffer as ArrayBuffer;
+  };
+
   // 画像ファイル選択時の処理（PDF変換後に回転するため、プレビューは不要）
-  const handleImageFileSelect = (file: File) => {
-    // 画像を直接PDFに変換（回転はPDF表示後にpageRotationで行う）
+  const handleImageFileSelect = (file: File, addToCollection: boolean = false) => {
+    if (addToCollection) {
+      // 画像をコレクションに追加
+      setImageFiles(prev => [...prev, file]);
+      setShowImageManager(true);
+      return;
+    }
+
+    // 既存の動作：単一画像を直接PDFに変換して読み込む
     const convertAndLoad = async () => {
       try {
         const arrayBuffer = await convertImageToPDF(file, 0);
@@ -224,6 +249,65 @@ export default function Home() {
     convertAndLoad();
   };
 
+  // 複数画像をPDFに結合して読み込む
+  const loadCombinedImages = async () => {
+    if (imageFiles.length === 0) return;
+    
+    try {
+      const arrayBuffer = await combineImagesToPDF(imageFiles);
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const pdfFile = new File([blob], `combined_${Date.now()}.pdf`, { type: 'application/pdf' });
+
+      const id = await generateDocId(pdfFile);
+      setDocId(id);
+      
+      setOriginalPdfBytes(arrayBuffer);
+      setOriginalFileName(pdfFile.name);
+      
+      const doc = await loadPDF(pdfFile);
+      setPdfDoc(doc);
+      setTotalPages(doc.numPages);
+      setCurrentPage(1);
+      setScale(1.0);
+      setPageRotation(0);
+      setStrokes([]);
+      setUndoStack([]);
+      setRedoStack([]);
+      setPageSizes({});
+      setTextItems([]);
+      setImageFiles([]);
+      setShowImageManager(false);
+      
+      toast({
+        title: "成功",
+        description: `${imageFiles.length}枚の画像を結合しました`,
+      });
+    } catch (error) {
+      console.error('画像結合エラー:', error);
+      toast({
+        title: "エラー",
+        description: '画像の結合に失敗しました: ' + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive",
+      });
+    }
+  };
+
+  // 画像の順番を変更
+  const moveImage = (index: number, direction: 'up' | 'down') => {
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === imageFiles.length - 1) return;
+    
+    const newFiles = [...imageFiles];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    [newFiles[index], newFiles[targetIndex]] = [newFiles[targetIndex], newFiles[index]];
+    setImageFiles(newFiles);
+  };
+
+  // 画像を削除
+  const removeImage = (index: number) => {
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   // カメラで写真を撮影
   const startCamera = async () => {
     try {
@@ -258,7 +342,7 @@ export default function Home() {
   };
 
   // 写真を撮影
-  const capturePhoto = () => {
+  const capturePhoto = (addToCollection: boolean = false) => {
     if (!videoRef.current || !cameraCanvasRef.current) return;
     
     const video = videoRef.current;
@@ -276,7 +360,7 @@ export default function Home() {
       if (!blob) return;
       
       const file = new File([blob], `camera_${Date.now()}.jpg`, { type: 'image/jpeg' });
-      handleImageFileSelect(file);
+      handleImageFileSelect(file, addToCollection);
       stopCamera();
       setShowCameraModal(false);
     }, 'image/jpeg', 0.95);
@@ -354,13 +438,29 @@ export default function Home() {
   }, [showCameraModal]);
 
   // ファイル選択（PDFまたは画像）
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, addToCollection: boolean = false) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    // 複数ファイルが選択された場合、すべてをコレクションに追加
+    if (files.length > 1) {
+      const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+      if (imageFiles.length > 0) {
+        setImageFiles(prev => [...prev, ...imageFiles]);
+        setShowImageManager(true);
+        // inputをリセット
+        e.target.value = '';
+        return;
+      }
+    }
+
+    const file = files[0];
 
     // 画像ファイルの場合は回転UIを表示
     if (file.type.startsWith('image/')) {
-      handleImageFileSelect(file);
+      handleImageFileSelect(file, addToCollection);
+      // inputをリセット
+      e.target.value = '';
       return;
     }
 
@@ -2244,11 +2344,21 @@ export default function Home() {
           e.stopPropagation();
           const files = e.dataTransfer.files;
           if (files.length > 0) {
+            // 複数ファイルがドロップされた場合、画像ファイルをコレクションに追加
+            if (files.length > 1) {
+              const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+              if (imageFiles.length > 0) {
+                setImageFiles(prev => [...prev, ...imageFiles]);
+                setShowImageManager(true);
+                return;
+              }
+            }
+
             const file = files[0];
             if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
               // handleFileSelectと同じ処理を実行
               if (file.type.startsWith('image/')) {
-                handleImageFileSelect(file);
+                handleImageFileSelect(file, false);
               } else {
                 // PDFファイルの場合
                 try {
@@ -2289,22 +2399,41 @@ export default function Home() {
           }
         }}
       >
-        <label className="inline-block">
-          <input
-            type="file"
-            accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp,image/gif"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-          <div className="px-6 py-4 border-2 border-dashed rounded-xl bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 hover:from-blue-100 hover:via-purple-100 hover:to-pink-100 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-lg border-blue-300 hover:border-purple-400">
-            <div className="flex items-center justify-center gap-3">
-              <MdInsertDriveFile className="text-3xl text-blue-600" />
-              <span className="text-base font-semibold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                ファイルを選択
-              </span>
+        <div className="flex gap-2">
+          <label className="inline-block flex-1">
+            <input
+              type="file"
+              accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp,image/gif"
+              onChange={(e) => handleFileSelect(e, false)}
+              className="hidden"
+            />
+            <div className="px-6 py-4 border-2 border-dashed rounded-xl bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 hover:from-blue-100 hover:via-purple-100 hover:to-pink-100 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-lg border-blue-300 hover:border-purple-400">
+              <div className="flex items-center justify-center gap-3">
+                <MdInsertDriveFile className="text-3xl text-blue-600" />
+                <span className="text-base font-semibold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                  ファイルを選択
+                </span>
+              </div>
             </div>
-          </div>
-        </label>
+          </label>
+          <label className="inline-block">
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+              onChange={(e) => handleFileSelect(e, true)}
+              className="hidden"
+              multiple
+            />
+            <div className="px-6 py-4 border-2 border-dashed rounded-xl bg-gradient-to-br from-purple-50 via-pink-50 to-rose-50 hover:from-purple-100 hover:via-pink-100 hover:to-rose-100 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-lg border-purple-300 hover:border-pink-400">
+              <div className="flex items-center justify-center gap-3">
+                <MdCollections className="text-3xl text-purple-600" />
+                <span className="text-base font-semibold bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 bg-clip-text text-transparent">
+                  コレクションに追加
+                </span>
+              </div>
+            </div>
+          </label>
+        </div>
         <div className="mt-4 px-5 py-4 bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 border-3 border-blue-600 rounded-xl shadow-lg" style={{ borderWidth: '3px', borderStyle: 'solid', borderColor: '#2563eb' }}>
           <div className="text-sm text-slate-800 font-bold mb-2.5 flex items-center gap-2">
             <MdInsertDriveFile className="text-blue-600 text-lg" />
@@ -3698,23 +3827,123 @@ export default function Home() {
                 />
                 <canvas ref={cameraCanvasRef} className="hidden" />
               </div>
-              <div className="flex gap-2 justify-center">
-                <Button
-                  onClick={capturePhoto}
-                  disabled={!isRecording}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  <MdCamera className="mr-2" />
-                  写真を撮る
-                </Button>
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2 justify-center">
+                  <Button
+                    onClick={() => capturePhoto(false)}
+                    disabled={!isRecording}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <MdCamera className="mr-2" />
+                    写真を撮る
+                  </Button>
+                  <Button
+                    onClick={() => capturePhoto(true)}
+                    disabled={!isRecording}
+                    variant="outline"
+                    className="border-purple-500 text-purple-600 hover:bg-purple-50"
+                  >
+                    <MdCollections className="mr-2" />
+                    コレクションに追加
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      stopCamera();
+                      setShowCameraModal(false);
+                    }}
+                  >
+                    キャンセル
+                  </Button>
+                </div>
+                <p className="text-xs text-slate-500 text-center">
+                  「コレクションに追加」を選択すると、複数画像をまとめてPDFに結合できます
+          </p>
+        </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* 画像管理モーダル */}
+      {showImageManager && (
+        <Dialog open={showImageManager} onOpenChange={setShowImageManager}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>画像管理 ({imageFiles.length}枚)</DialogTitle>
+              <DialogDescription>画像の順番を変更したり、削除できます</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {imageFiles.length === 0 ? (
+                <div className="text-center py-8 text-slate-400">
+                  <MdImage className="text-4xl mx-auto mb-2 text-slate-300" />
+                  <p className="text-sm">画像がありません</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {imageFiles.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50"
+                    >
+                      <div className="flex-shrink-0 w-20 h-20 bg-slate-100 rounded overflow-hidden">
+                        <img
+                          src={URL.createObjectURL(file)}
+                          alt={`画像 ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-800 truncate">{file.name}</p>
+                        <p className="text-xs text-slate-500">
+                          {(file.size / 1024).toFixed(1)} KB
+                        </p>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => moveImage(index, 'up')}
+                          disabled={index === 0}
+                          className="p-2 rounded hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="上に移動"
+                        >
+                          <MdArrowUpward className="text-lg text-slate-600" />
+                        </button>
+                        <button
+                          onClick={() => moveImage(index, 'down')}
+                          disabled={index === imageFiles.length - 1}
+                          className="p-2 rounded hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="下に移動"
+                        >
+                          <MdArrowDownward className="text-lg text-slate-600" />
+                        </button>
+                        <button
+                          onClick={() => removeImage(index)}
+                          className="p-2 rounded hover:bg-red-100"
+                          title="削除"
+                        >
+                          <MdDelete className="text-lg text-red-600" />
+                        </button>
+        </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2 justify-end pt-4 border-t">
                 <Button
                   variant="outline"
                   onClick={() => {
-                    stopCamera();
-                    setShowCameraModal(false);
+                    setImageFiles([]);
+                    setShowImageManager(false);
                   }}
                 >
-                  キャンセル
+                  クリア
+                </Button>
+                <Button
+                  onClick={loadCombinedImages}
+                  disabled={imageFiles.length === 0}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  PDFに結合して読み込む
                 </Button>
               </div>
             </div>
