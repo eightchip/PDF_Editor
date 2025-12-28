@@ -211,16 +211,10 @@ export default function Home() {
       setImageFiles(prev => {
         const newFiles = [...prev, file];
         console.log('画像をコレクションに追加:', file.name, '合計:', newFiles.length);
-        // 状態更新後にモーダルを開く
-        setTimeout(() => {
-          setShowImageManager(true);
-          toast({
-            title: "成功",
-            description: `画像をコレクションに追加しました（合計: ${newFiles.length}枚）`,
-          });
-        }, 100);
+        console.log('新しいファイル配列:', newFiles.map(f => f.name));
         return newFiles;
       });
+      // 状態更新後にモーダルを開く（useEffectで監視するため、ここでは開かない）
       return;
     }
 
@@ -480,6 +474,19 @@ export default function Home() {
     setIsListening(false);
     setShowVoiceInput(false);
   };
+
+  // 画像ファイルが追加されたときにモーダルを開く
+  useEffect(() => {
+    if (imageFiles.length > 0) {
+      console.log('imageFilesが更新されました:', imageFiles.length, '枚');
+      console.log('ファイル名:', imageFiles.map(f => f.name));
+      setShowImageManager(true);
+      toast({
+        title: "成功",
+        description: `画像をコレクションに追加しました（合計: ${imageFiles.length}枚）`,
+      });
+    }
+  }, [imageFiles.length]); // imageFiles.lengthが変更されたときのみ実行
 
   // 音声入力モーダルが開いたときに自動的に起動（オプション）
   useEffect(() => {
@@ -4054,7 +4061,12 @@ export default function Home() {
                 </div>
                 <div className="flex gap-2 justify-center">
                   <Button
-                    onClick={startVoiceInput}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log('音声入力ボタンがクリックされました');
+                      startVoiceInput();
+                    }}
                     disabled={isListening}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
