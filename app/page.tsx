@@ -3317,10 +3317,13 @@ export default function Home() {
                       // テキスト入力フィールドのフォーカスを保持するため、blurしない
                       // 既に開いている場合は何もしない
                       if (!showHandwritingModal) {
-                        console.log('Opening handwriting modal from onMouseDown');
+                        console.log('Opening handwriting modal from onMouseDown, current state:', showHandwritingModal);
                         setShowHandwritingModal(true);
                         handwritingStrokesRef.current = [];
                         setRecognizedText('');
+                        console.log('setShowHandwritingModal(true) called');
+                      } else {
+                        console.log('Handwriting modal already open');
                       }
                     }}
                     onClick={(e) => {
@@ -3329,10 +3332,13 @@ export default function Home() {
                       e.nativeEvent.stopImmediatePropagation();
                       // onClickでも処理を実行（onMouseDownが発火しない場合に備える）
                       if (!showHandwritingModal) {
-                        console.log('Opening handwriting modal from onClick');
+                        console.log('Opening handwriting modal from onClick, current state:', showHandwritingModal);
                         setShowHandwritingModal(true);
                         handwritingStrokesRef.current = [];
                         setRecognizedText('');
+                        console.log('setShowHandwritingModal(true) called from onClick');
+                      } else {
+                        console.log('Handwriting modal already open (onClick)');
                       }
                     }}
                     className="h-7 px-2 text-xs border border-slate-300 rounded hover:bg-slate-100 flex items-center gap-1"
