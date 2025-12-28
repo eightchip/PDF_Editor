@@ -43,7 +43,7 @@ const DialogContent = React.forwardRef<
         className
       )}
       style={{
-        ...(topPosition ? { top: undefined, transform: 'translateX(-50%) translateY(0)' } : {}),
+        ...(topPosition ? { transform: 'translateX(-50%) translateY(0)' } : {}),
         ...style,
       }}
       {...props}
