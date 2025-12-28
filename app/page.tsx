@@ -3946,8 +3946,7 @@ export default function Home() {
       )}
 
       {/* 画像管理モーダル */}
-      {showImageManager && (
-        <Dialog open={showImageManager} onOpenChange={setShowImageManager}>
+      <Dialog open={showImageManager} onOpenChange={setShowImageManager}>
           <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>画像管理 ({imageFiles.length}枚)</DialogTitle>
@@ -4069,13 +4068,41 @@ export default function Home() {
                 <div className="flex gap-2 justify-center">
                   <button
                     type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log('音声入力ボタンがマウスダウンされました');
+                    }}
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
+                      if (e.nativeEvent) {
+                        (e.nativeEvent as any).stopImmediatePropagation?.();
+                      }
                       console.log('音声入力ボタンがクリックされました');
-                      startVoiceInput();
+                      console.log('startVoiceInputを呼び出します');
+                      try {
+                        startVoiceInput();
+                      } catch (error) {
+                        console.error('startVoiceInputエラー:', error);
+                      }
+                    }}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log('音声入力ボタンがタッチされました');
+                      try {
+                        startVoiceInput();
+                      } catch (error) {
+                        console.error('startVoiceInputエラー:', error);
+                      }
                     }}
                     disabled={isListening}
+                    style={{
+                      position: 'relative',
+                      zIndex: 1000,
+                      pointerEvents: 'auto',
+                    }}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     <MdMic className="text-base" />
