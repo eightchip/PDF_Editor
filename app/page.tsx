@@ -177,6 +177,23 @@ export default function Home() {
     }
   }, [tool, strokes, pageSize]);
 
+  // テキスト入力フィールドが開いたときに手書きモーダルを自動的に開く（Surfaceなどのタッチデバイス用）
+  useEffect(() => {
+    if (textInputPosition && textInputRef.current) {
+      // タッチデバイスまたはSurfaceデバイスの場合、自動的に手書きモーダルを開く
+      const isTouchDevice = isMobile || window.navigator.maxTouchPoints > 0;
+      if (isTouchDevice) {
+        // 少し遅延してから手書きモーダルを開く（テキスト入力フィールドのフォーカス後に）
+        const timer = setTimeout(() => {
+          setShowHandwritingModal(true);
+          handwritingStrokesRef.current = [];
+          setRecognizedText('');
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [textInputPosition, isMobile]);
+
   // 画像ファイル選択時の処理（PDF変換後に回転するため、プレビューは不要）
   const handleImageFileSelect = (file: File) => {
     // 画像を直接PDFに変換（回転はPDF表示後にpageRotationで行う）
