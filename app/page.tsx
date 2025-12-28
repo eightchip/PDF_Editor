@@ -3205,9 +3205,10 @@ export default function Home() {
                   onClick={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
                   onBlur={(e) => {
-                    // テキストツールが選択されている場合は、onBlurで確定しない（タッチイベントでフォーカスが外れることを防ぐため）
-                    if (tool === 'text') {
-                      // テキストツールが選択されている場合は、onBlurでは確定しない
+                    // テキストツールが選択されている場合、または手書きモーダルが開いている場合は、onBlurで確定しない
+                    // タッチイベントでフォーカスが外れることを防ぐため
+                    if (tool === 'text' || showHandwritingModal) {
+                      // テキストツールが選択されている場合、または手書きモーダルが開いている場合は、onBlurでは確定しない
                       // ユーザーが明示的に他のツールを選択したり、確定ボタンをクリックした場合のみ確定される
                       return;
                     }
