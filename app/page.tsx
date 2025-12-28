@@ -3684,10 +3684,12 @@ export default function Home() {
                       </span>
                       <div className="flex gap-1">
                         <button
-                          onClick={(e) => {
+                          onMouseDown={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
                             e.nativeEvent.stopImmediatePropagation();
+                            // 編集モードに入る途中であることをマーク
+                            isEnteringEditModeRef.current = true;
                             // ドラッグ状態をリセット
                             setDragStart(null);
                             setIsDragging(false);
@@ -3698,19 +3700,21 @@ export default function Home() {
                               texts: [],
                             });
                             if (pageSize) {
-                              // requestAnimationFrameを使って次のフレームで実行し、親要素のイベントハンドラーが実行された後に状態を更新
+                              // 即座に編集モードに入る
+                              setEditingTextId(text.id);
+                              setTextInputValue(text.text);
+                              setTextInputPosition({ x: text.x * pageSize.width, y: text.y * pageSize.height });
+                              setFontSize(text.fontSize || 16);
+                              setColor(text.color || '#000000');
+                              // 編集モードに入る際にテキストツールに切り替え（ドラッグを無効化）
+                              setTool('text');
+                              // 次のフレームでフラグをリセット
                               requestAnimationFrame(() => {
-                                setEditingTextId(text.id);
-                                setTextInputValue(text.text);
-                                setTextInputPosition({ x: text.x * pageSize.width, y: text.y * pageSize.height });
-                                setFontSize(text.fontSize || 16);
-                                setColor(text.color || '#000000');
-                                // 編集モードに入る際にテキストツールに切り替え（ドラッグを無効化）
-                                setTool('text');
+                                isEnteringEditModeRef.current = false;
                               });
                             }
                           }}
-                          onMouseDown={(e) => {
+                          onClick={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
                             e.nativeEvent.stopImmediatePropagation();
