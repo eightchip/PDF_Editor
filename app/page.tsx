@@ -211,16 +211,16 @@ export default function Home() {
       setImageFiles(prev => {
         const newFiles = [...prev, file];
         console.log('画像をコレクションに追加:', file.name, '合計:', newFiles.length);
+        // 状態更新後にモーダルを開く
+        setTimeout(() => {
+          setShowImageManager(true);
+          toast({
+            title: "成功",
+            description: `画像をコレクションに追加しました（合計: ${newFiles.length}枚）`,
+          });
+        }, 100);
         return newFiles;
       });
-      // 状態更新を待ってからモーダルを開く
-      setTimeout(() => {
-        setShowImageManager(true);
-        toast({
-          title: "成功",
-          description: `画像をコレクションに追加しました`,
-        });
-      }, 0);
       return;
     }
 
@@ -380,50 +380,95 @@ export default function Home() {
 
   // 音声入力の開始
   const startVoiceInput = () => {
+    console.log('startVoiceInput called');
+    console.log('SpeechRecognition available:', 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
+    
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      console.error('音声認識APIが利用できません');
       toast({
         title: "エラー",
-        description: 'お使いのブラウザは音声認識に対応していません。',
+        description: 'お使いのブラウザは音声認識に対応していません。ChromeまたはEdgeをご使用ください。',
         variant: "destructive",
       });
       return;
     }
 
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = voiceLanguage; // 選択された言語を使用
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    recognition.onstart = () => {
-      setIsListening(true);
-    };
-
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      if (textInputPosition) {
-        setTextInputValue(prev => prev + transcript);
+    try {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      console.log('SpeechRecognition class:', SpeechRecognition);
+      
+      if (!SpeechRecognition) {
+        console.error('SpeechRecognition class not found');
+        toast({
+          title: "エラー",
+          description: '音声認識APIが利用できません。',
+          variant: "destructive",
+        });
+        return;
       }
-      setIsListening(false);
-      setShowVoiceInput(false);
-    };
 
-    recognition.onerror = (event: any) => {
-      console.error('音声認識エラー:', event.error);
+      console.log('Creating SpeechRecognition instance...');
+      const recognition = new SpeechRecognition();
+      recognition.lang = voiceLanguage; // 選択された言語を使用
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        console.log('音声認識を開始しました');
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        console.log('音声認識結果:', transcript);
+        if (textInputPosition) {
+          setTextInputValue(prev => prev + transcript);
+        }
+        setIsListening(false);
+        setShowVoiceInput(false);
+        toast({
+          title: "成功",
+          description: `音声を認識しました: ${transcript}`,
+        });
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('音声認識エラー:', event.error);
+        let errorMessage = '音声認識に失敗しました';
+        if (event.error === 'no-speech') {
+          errorMessage = '音声が検出されませんでした。もう一度お試しください。';
+        } else if (event.error === 'not-allowed') {
+          errorMessage = 'マイクへのアクセスが許可されていません。ブラウザの設定を確認してください。';
+        } else if (event.error === 'network') {
+          errorMessage = 'ネットワークエラーが発生しました。';
+        } else {
+          errorMessage = `音声認識に失敗しました: ${event.error}`;
+        }
+        toast({
+          title: "エラー",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        console.log('音声認識が終了しました');
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      console.log('Starting recognition...');
+      recognition.start();
+      console.log('Recognition started');
+    } catch (error) {
+      console.error('音声認識の初期化エラー:', error);
       toast({
         title: "エラー",
-        description: '音声認識に失敗しました: ' + event.error,
+        description: '音声認識の初期化に失敗しました: ' + (error instanceof Error ? error.message : String(error)),
         variant: "destructive",
       });
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognitionRef.current = recognition;
-    recognition.start();
+    }
   };
 
   // 音声入力の停止
