@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { loadPDF, renderPage } from './lib/pdf';
 import { drawStroke, redrawStrokes, normalizePoint } from './lib/ink';
 import { saveAnnotations, loadAnnotations, deleteAnnotations, getAllAnnotations, saveTextAnnotations, loadTextAnnotations, deleteTextAnnotations, getAllTextAnnotations, saveShapeAnnotations, loadShapeAnnotations, deleteShapeAnnotations, getAllShapeAnnotations, type Stroke, type TextAnnotation, type ShapeAnnotation } from './lib/db';
@@ -3622,7 +3623,7 @@ export default function Home() {
       )}
 
       {/* 手書き文字認識モーダル */}
-      {showHandwritingModal && (
+      {showHandwritingModal && typeof window !== 'undefined' && createPortal(
         <div
           data-handwriting-modal="overlay"
           style={{
@@ -3665,11 +3666,9 @@ export default function Home() {
               pointerEvents: 'auto',
             }}
             onClick={(e) => {
-              console.log('Handwriting modal content clicked');
               e.stopPropagation();
             }}
             onMouseDown={(e) => {
-              console.log('Handwriting modal content mousedown');
               e.stopPropagation();
             }}
           >
@@ -3877,7 +3876,8 @@ export default function Home() {
             </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Dialog */}
