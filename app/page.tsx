@@ -3218,11 +3218,13 @@ export default function Home() {
                   onClick={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
                   onBlur={(e) => {
+                    console.log('Text input onBlur triggered, tool:', tool, 'showHandwritingModal:', showHandwritingModal);
                     // テキストツールが選択されている場合、または手書きモーダルが開いている場合は、onBlurで確定しない
                     // タッチイベントでフォーカスが外れることを防ぐため
                     if (tool === 'text' || showHandwritingModal) {
                       // テキストツールが選択されている場合、または手書きモーダルが開いている場合は、onBlurでは確定しない
                       // ユーザーが明示的に他のツールを選択したり、確定ボタンをクリックした場合のみ確定される
+                      console.log('Text input onBlur: skipping submit because tool is text or handwriting modal is open');
                       return;
                     }
                     
@@ -3343,6 +3345,8 @@ export default function Home() {
                       e.preventDefault();
                       e.stopPropagation();
                       e.nativeEvent.stopImmediatePropagation();
+                      // クリック時間を記録（モーダルの自動的な閉じる動作を防ぐため）
+                      (window as any).lastHandwritingButtonClickTime = Date.now();
                       // onClickでも処理を実行（onMouseDownが発火しない場合に備える）
                       console.log('Handwriting button onClick, current showHandwritingModal:', showHandwritingModal);
                       if (!showHandwritingModal) {
