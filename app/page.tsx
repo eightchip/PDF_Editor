@@ -187,14 +187,14 @@ export default function Home() {
   // テキスト入力フィールドにフォーカスしたときに自動的に手書きモーダルを開く機能は、
   // 無限ループの問題があるため削除
 
-  // 複数画像を1つのPDFに結合（既存のPDFがある場合はそれに追加）
+  // 複数ファイル（画像またはPDF）を1つのPDFに結合（既存のPDFがある場合はそれに追加）
   const combineImagesToPDF = async (files: File[], existingPdfBytes: ArrayBuffer | null = null): Promise<ArrayBuffer> => {
     const { PDFDocument } = await import('pdf-lib');
     
     let pdfDoc: any;
     let existingPageCount = 0;
     if (existingPdfBytes) {
-      // 既存のPDFがある場合は、それに画像を追加
+      // 既存のPDFがある場合は、それにファイルを追加
       pdfDoc = await PDFDocument.load(existingPdfBytes);
       existingPageCount = pdfDoc.getPageCount();
       console.log('combineImagesToPDF: 既存のPDFを読み込み', {
@@ -217,50 +217,58 @@ export default function Home() {
       console.log('combineImagesToPDF: 新しいPDFを作成');
     }
     
-    // 画像を追加する前のページ数を記録
+    // ファイルを追加する前のページ数を記録
     const beforeAddCount = pdfDoc.getPageCount();
-    console.log('combineImagesToPDF: 画像追加前のページ数', beforeAddCount);
+    console.log('combineImagesToPDF: ファイル追加前のページ数', beforeAddCount);
     
     for (const file of files) {
-      const imagePdfBytes = await convertImageToPDF(file, 0);
-      const imagePdf = await PDFDocument.load(imagePdfBytes);
-      const [imagePage] = await pdfDoc.copyPages(imagePdf, [0]);
-      pdfDoc.addPage(imagePage);
-      console.log('combineImagesToPDF: 画像を追加', {
-        fileName: file.name,
-        currentPageCount: pdfDoc.getPageCount()
-      });
+      if (file.type === 'application/pdf') {
+        // PDFファイルの場合は、すべてのページをコピー
+        const pdfBytes = await file.arrayBuffer();
+        const sourcePdf = await PDFDocument.load(pdfBytes);
+        const pageCount = sourcePdf.getPageCount();
+        const copiedPages = await pdfDoc.copyPages(sourcePdf, Array.from({ length: pageCount }, (_, i) => i));
+        copiedPages.forEach((page: any) => pdfDoc.addPage(page));
+        console.log('combineImagesToPDF: PDFファイルを追加', {
+          fileName: file.name,
+          pageCount: pageCount,
+          currentTotalPages: pdfDoc.getPageCount()
+        });
+      } else if (file.type.startsWith('image/')) {
+        // 画像ファイルの場合は、PDFに変換してから追加
+        const imagePdfBytes = await convertImageToPDF(file, 0);
+        const imagePdf = await PDFDocument.load(imagePdfBytes);
+        const [imagePage] = await pdfDoc.copyPages(imagePdf, [0]);
+        pdfDoc.addPage(imagePage);
+        console.log('combineImagesToPDF: 画像を追加', {
+          fileName: file.name,
+          currentPageCount: pdfDoc.getPageCount()
+        });
+      } else {
+        console.warn('combineImagesToPDF: サポートされていないファイルタイプ:', file.type, file.name);
+      }
     }
     
     const finalPageCount = pdfDoc.getPageCount();
-    console.log('combineImagesToPDF: 画像追加完了', {
+    console.log('combineImagesToPDF: ファイル追加完了', {
       existingPageCount,
       beforeAddCount,
-      addedImages: files.length,
-      finalPageCount,
-      expectedCount: existingPageCount + files.length
+      addedFiles: files.length,
+      finalPageCount
     });
-    
-    // ページ数が期待通りか確認
-    if (existingPdfBytes && finalPageCount !== existingPageCount + files.length) {
-      console.error('combineImagesToPDF: エラー - ページ数が期待と異なります！', {
-        expected: existingPageCount + files.length,
-        actual: finalPageCount
-      });
-    }
     
     const pdfBytes = await pdfDoc.save();
     return pdfBytes.buffer as ArrayBuffer;
   };
 
-  // 画像ファイル選択時の処理（PDF変換後に回転するため、プレビューは不要）
+  // ファイル選択時の処理（画像またはPDF、PDF変換後に回転するため、プレビューは不要）
   const handleImageFileSelect = (file: File, addToCollection: boolean = false) => {
-    console.log('handleImageFileSelect called:', file.name, 'addToCollection:', addToCollection);
+    console.log('handleImageFileSelect called:', file.name, 'addToCollection:', addToCollection, 'type:', file.type);
     if (addToCollection) {
-      // 画像をコレクションに追加
+      // 画像またはPDFをコレクションに追加
       setImageFiles(prev => {
         const newFiles = [...prev, file];
-        console.log('画像をコレクションに追加:', file.name, '合計:', newFiles.length);
+        console.log('ファイルをコレクションに追加:', file.name, '合計:', newFiles.length);
         console.log('新しいファイル配列:', newFiles.map(f => f.name));
         console.log('setImageFiles呼び出し: prev.length =', prev.length, 'newFiles.length =', newFiles.length);
         return newFiles;
@@ -630,25 +638,27 @@ export default function Home() {
     setShowVoiceInput(false);
   };
 
-  // 画像ファイルが追加されたときにモーダルを開く
+  // ファイル（画像またはPDF）が追加されたときにモーダルを開く
   useEffect(() => {
     const length = imageFiles.length;
     console.log('useEffect: imageFiles changed, length:', length, 'imageFiles:', imageFiles.map(f => f.name));
     if (length > 0) {
-      console.log('画像管理モーダルを開きます - showImageManagerをtrueに設定します');
+      console.log('ファイル管理モーダルを開きます - showImageManagerをtrueに設定します');
       // 少し遅延させてからモーダルを開く（状態更新を確実にするため）
       const timer = setTimeout(() => {
         console.log('setShowImageManager(true)を実行します');
         setShowImageManager(true);
         console.log('setShowImageManager(true)を実行しました');
+        const imageCount = imageFiles.filter(f => f.type.startsWith('image/')).length;
+        const pdfCount = imageFiles.filter(f => f.type === 'application/pdf').length;
         toast({
           title: "成功",
-          description: `画像をコレクションに追加しました（合計: ${length}枚）`,
+          description: `ファイルをコレクションに追加しました（画像: ${imageCount}枚、PDF: ${pdfCount}件、合計: ${length}件）`,
         });
       }, 100);
       return () => clearTimeout(timer);
     } else {
-      // 画像が0枚になったらモーダルを閉じる（ただし、loadCombinedImages実行中は閉じない）
+      // ファイルが0件になったらモーダルを閉じる
       console.log('useEffect: imageFiles.lengthが0になったため、モーダルを閉じます');
       setShowImageManager(false);
     }
@@ -693,9 +703,11 @@ export default function Home() {
 
     // 複数ファイルが選択された場合、すべてをコレクションに追加
     if (files.length > 1) {
-      const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
-      if (imageFiles.length > 0) {
-        setImageFiles(prev => [...prev, ...imageFiles]);
+      const validFiles = Array.from(files).filter(f => 
+        f.type.startsWith('image/') || f.type === 'application/pdf'
+      );
+      if (validFiles.length > 0) {
+        setImageFiles(prev => [...prev, ...validFiles]);
         setShowImageManager(true);
         // inputをリセット
         e.target.value = '';
@@ -705,42 +717,46 @@ export default function Home() {
 
     const file = files[0];
 
-    // 画像ファイルの場合は回転UIを表示
-    if (file.type.startsWith('image/')) {
-      handleImageFileSelect(file, addToCollection);
+    // 画像ファイルまたはPDFファイルの場合
+    if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+      if (addToCollection) {
+        // コレクションに追加
+        handleImageFileSelect(file, true);
+      } else if (file.type.startsWith('image/')) {
+        // 画像ファイルの場合は既存の処理
+        handleImageFileSelect(file, false);
+      } else {
+        // PDFファイルの場合は直接読み込む
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const id = await generateDocId(file);
+          setDocId(id);
+          
+          setOriginalPdfBytes(arrayBuffer);
+          setOriginalFileName(file.name); // 元のファイル名を保存
+          
+          const doc = await loadPDF(file);
+          setPdfDoc(doc);
+          setTotalPages(doc.numPages);
+          setCurrentPage(1);
+          setScale(1.0);
+          setStrokes([]);
+          setUndoStack([]);
+          setRedoStack([]);
+          setPageSizes({});
+          setTextItems([]);
+        } catch (error) {
+          console.error('ファイル読み込みエラー:', error);
+          toast({
+            title: "エラー",
+            description: 'ファイルの読み込みに失敗しました: ' + (error instanceof Error ? error.message : String(error)),
+            variant: "destructive",
+          });
+        }
+      }
       // inputをリセット
       e.target.value = '';
       return;
-    }
-
-    // PDFファイルの場合は直接読み込む
-    if (file.type === 'application/pdf') {
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const id = await generateDocId(file);
-        setDocId(id);
-        
-        setOriginalPdfBytes(arrayBuffer);
-        setOriginalFileName(file.name); // 元のファイル名を保存
-        
-        const doc = await loadPDF(file);
-        setPdfDoc(doc);
-        setTotalPages(doc.numPages);
-        setCurrentPage(1);
-        setScale(1.0);
-        setStrokes([]);
-        setUndoStack([]);
-        setRedoStack([]);
-        setPageSizes({});
-        setTextItems([]);
-      } catch (error) {
-        console.error('ファイル読み込みエラー:', error);
-        toast({
-          title: "エラー",
-          description: 'ファイルの読み込みに失敗しました: ' + (error instanceof Error ? error.message : String(error)),
-          variant: "destructive",
-        });
-      }
     } else {
       toast({
         title: "通知",
@@ -2593,11 +2609,13 @@ export default function Home() {
           e.stopPropagation();
           const files = e.dataTransfer.files;
           if (files.length > 0) {
-            // 複数ファイルがドロップされた場合、画像ファイルをコレクションに追加
+            // 複数ファイルがドロップされた場合、画像ファイルとPDFファイルをコレクションに追加
             if (files.length > 1) {
-              const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
-              if (imageFiles.length > 0) {
-                setImageFiles(prev => [...prev, ...imageFiles]);
+              const validFiles = Array.from(files).filter(f => 
+                f.type.startsWith('image/') || f.type === 'application/pdf'
+              );
+              if (validFiles.length > 0) {
+                setImageFiles(prev => [...prev, ...validFiles]);
                 setShowImageManager(true);
                 return;
               }
@@ -2668,7 +2686,7 @@ export default function Home() {
           <label className="inline-block">
             <input
               type="file"
-              accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+              accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp,image/gif"
               onChange={(e) => handleFileSelect(e, true)}
               className="hidden"
               multiple
@@ -4155,7 +4173,7 @@ export default function Home() {
             }}
           >
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-slate-800">画像管理 ({imageFiles.length}枚)</h2>
+              <h2 className="text-xl font-bold text-slate-800">ファイル管理 ({imageFiles.length}件)</h2>
               <button
                 onClick={() => setShowImageManager(false)}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -4164,12 +4182,12 @@ export default function Home() {
                 <MdClose className="text-xl text-slate-600" />
               </button>
             </div>
-            <p className="text-sm text-slate-600 mb-4">画像の順番を変更したり、削除できます</p>
+            <p className="text-sm text-slate-600 mb-4">画像やPDFの順番を変更したり、削除できます</p>
             <div className="space-y-4">
               {imageFiles.length === 0 ? (
                 <div className="text-center py-8 text-slate-400">
                   <MdImage className="text-4xl mx-auto mb-2 text-slate-300" />
-                  <p className="text-sm">画像がありません</p>
+                  <p className="text-sm">ファイルがありません</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -4178,17 +4196,21 @@ export default function Home() {
                       key={index}
                       className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50"
                     >
-                      <div className="flex-shrink-0 w-20 h-20 bg-slate-100 rounded overflow-hidden">
-                        <img
-                          src={URL.createObjectURL(file)}
-                          alt={`画像 ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
+                      <div className="flex-shrink-0 w-20 h-20 bg-slate-100 rounded overflow-hidden flex items-center justify-center">
+                        {file.type === 'application/pdf' ? (
+                          <MdInsertDriveFile className="text-4xl text-red-600" />
+                        ) : (
+                          <img
+                            src={URL.createObjectURL(file)}
+                            alt={`画像 ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-800 truncate">{file.name}</p>
                         <p className="text-xs text-slate-500">
-                          {(file.size / 1024).toFixed(1)} KB
+                          {file.type === 'application/pdf' ? 'PDF' : '画像'} • {(file.size / 1024).toFixed(1)} KB
                         </p>
                       </div>
                       <div className="flex gap-1">
