@@ -3649,12 +3649,16 @@ export default function Home() {
           className="max-w-2xl"
           topPosition="top-[15%]"
           style={{
-            top: '15%',
-            left: '50%',
-            transform: 'translateX(-50%) translateY(0)',
-            zIndex: 10002,
+            top: '15% !important' as any,
+            left: '50% !important' as any,
+            transform: 'translateX(-50%) translateY(0) !important' as any,
+            zIndex: '10002 !important' as any,
             maxHeight: '80vh',
-            overflowY: 'auto'
+            overflowY: 'auto',
+            position: 'fixed !important' as any,
+            display: 'block !important' as any,
+            visibility: 'visible !important' as any,
+            opacity: '1 !important' as any
           }}
         >
           <DialogHeader>
