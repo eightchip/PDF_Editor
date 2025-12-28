@@ -3598,11 +3598,10 @@ export default function Home() {
       <Dialog open={showHandwritingModal} onOpenChange={setShowHandwritingModal}>
         <DialogContent 
           className="max-w-2xl"
+          topPosition="top-[15%]"
           style={{
-            position: 'fixed',
             top: '15%',
-            left: '50%',
-            transform: 'translateX(-50%)',
+            transform: 'translateX(-50%) translateY(0)',
             zIndex: 10000,
             maxHeight: '80vh',
             overflowY: 'auto'
