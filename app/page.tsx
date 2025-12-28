@@ -477,16 +477,23 @@ export default function Home() {
 
   // 画像ファイルが追加されたときにモーダルを開く
   useEffect(() => {
+    console.log('useEffect: imageFiles changed, length:', imageFiles.length, 'files:', imageFiles.map(f => f.name));
     if (imageFiles.length > 0) {
-      console.log('imageFilesが更新されました:', imageFiles.length, '枚');
-      console.log('ファイル名:', imageFiles.map(f => f.name));
-      setShowImageManager(true);
-      toast({
-        title: "成功",
-        description: `画像をコレクションに追加しました（合計: ${imageFiles.length}枚）`,
-      });
+      console.log('画像管理モーダルを開きます');
+      // 少し遅延させてからモーダルを開く（状態更新を確実にするため）
+      const timer = setTimeout(() => {
+        setShowImageManager(true);
+        toast({
+          title: "成功",
+          description: `画像をコレクションに追加しました（合計: ${imageFiles.length}枚）`,
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    } else {
+      // 画像が0枚になったらモーダルを閉じる
+      setShowImageManager(false);
     }
-  }, [imageFiles.length]); // imageFiles.lengthが変更されたときのみ実行
+  }, [imageFiles.length, imageFiles]); // imageFilesが変更されたとき実行
 
   // 音声入力モーダルが開いたときに自動的に起動（オプション）
   useEffect(() => {
@@ -4060,7 +4067,8 @@ export default function Home() {
                   </select>
                 </div>
                 <div className="flex gap-2 justify-center">
-                  <Button
+                  <button
+                    type="button"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -4068,27 +4076,29 @@ export default function Home() {
                       startVoiceInput();
                     }}
                     disabled={isListening}
-                    className="bg-blue-600 hover:bg-blue-700"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
-                    <MdMic className="mr-2" />
+                    <MdMic className="text-base" />
                     {isListening ? '認識中...' : '音声認識を開始'}
-                  </Button>
-                  <Button
-                    variant="outline"
+                  </button>
+                  <button
+                    type="button"
                     onClick={stopVoiceInput}
                     disabled={!isListening}
+                    className="px-4 py-2 border border-slate-300 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     停止
-                  </Button>
-                  <Button
-                    variant="outline"
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => {
                       stopVoiceInput();
                       setShowVoiceInput(false);
                     }}
+                    className="px-4 py-2 border border-slate-300 rounded hover:bg-slate-100"
                   >
                     キャンセル
-                  </Button>
+                  </button>
                 </div>
                 <div className="text-xs text-slate-500 text-center">
                   <p>※ブラウザによっては音声認識に対応していない場合があります</p>
