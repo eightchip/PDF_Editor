@@ -262,9 +262,11 @@ export default function Home() {
         const newFiles = [...prev, file];
         console.log('画像をコレクションに追加:', file.name, '合計:', newFiles.length);
         console.log('新しいファイル配列:', newFiles.map(f => f.name));
+        console.log('setImageFiles呼び出し: prev.length =', prev.length, 'newFiles.length =', newFiles.length);
         return newFiles;
       });
       // 状態更新後にモーダルを開く（useEffectで監視するため、ここでは開かない）
+      console.log('handleImageFileSelect: addToCollection=trueのため、returnします');
       return;
     }
 
