@@ -3663,37 +3663,21 @@ export default function Home() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-        <DialogContent 
-          className="max-w-2xl"
-          topPosition="top-[15%]"
-          style={{
-            top: '15%',
-            left: '50%',
-            transform: 'translateX(-50%) translateY(0)',
-            zIndex: 10002,
-            maxHeight: '80vh',
-            overflowY: 'auto',
-            position: 'fixed',
-            backgroundColor: 'white',
-            border: '1px solid #e2e8f0',
-            borderRadius: '8px',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>手書き文字認識入力</DialogTitle>
-            <DialogDescription>
-              下のキャンバスに手書きで文字を書いてください。認識されたテキストが表示されます。
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="relative border-2 border-slate-300 rounded-lg bg-white" style={{ touchAction: 'none' }}>
+            <div style={{ marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>手書き文字認識入力</h2>
+              <p style={{ fontSize: '14px', color: '#666' }}>下のキャンバスに手書きで文字を書いてください。認識されたテキストが表示されます。</p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ position: 'relative', border: '2px solid #cbd5e1', borderRadius: '8px', backgroundColor: 'white', touchAction: 'none' }}>
               <canvas
                 ref={handwritingCanvasRef}
                 width={800}
                 height={300}
-                className="w-full cursor-crosshair"
-                style={{ display: 'block' }}
+                style={{ 
+                  display: 'block',
+                  width: '100%',
+                  cursor: 'crosshair'
+                }}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   if (!handwritingCanvasRef.current) return;
@@ -3737,23 +3721,29 @@ export default function Home() {
                 }}
               />
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
                 onClick={() => {
                   if (!handwritingCanvasRef.current) return;
-                  const ctx = handwritingCanvasRef.current.getContext('2d');
+                  const ctx = handwritingCanvasRef.current?.getContext('2d');
                   if (ctx) {
                     ctx.clearRect(0, 0, handwritingCanvasRef.current.width, handwritingCanvasRef.current.height);
                   }
                   handwritingStrokesRef.current = [];
                   setRecognizedText('');
                 }}
+                style={{
+                  padding: '8px 16px',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '4px',
+                  backgroundColor: 'white',
+                  cursor: 'pointer',
+                }}
               >
-                <MdClear className="mr-2" />
+                <MdClear style={{ marginRight: '8px', display: 'inline' }} />
                 クリア
-              </Button>
-              <Button
+              </button>
+              <button
                 onClick={async () => {
                   if (!handwritingCanvasRef.current || handwritingStrokesRef.current.length === 0) return;
                   
@@ -3791,12 +3781,20 @@ export default function Home() {
                   }
                 }}
                 disabled={handwritingStrokesRef.current.length === 0 || isRecognizing}
+                style={{
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderRadius: '4px',
+                  backgroundColor: (handwritingStrokesRef.current.length === 0 || isRecognizing) ? '#f3f4f6' : '#3b82f6',
+                  color: 'white',
+                  cursor: (handwritingStrokesRef.current.length === 0 || isRecognizing) ? 'not-allowed' : 'pointer',
+                }}
               >
                 {isRecognizing ? '認識中...' : '文字認識'}
-              </Button>
+              </button>
             </div>
-            <div className="border border-slate-300 rounded-lg p-3 bg-slate-50 min-h-[60px]">
-              <label className="text-sm font-medium text-slate-700 mb-2 block">認識されたテキスト（手動で編集可能）:</label>
+            <div style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '12px', backgroundColor: '#f8fafc', minHeight: '60px' }}>
+              <label style={{ fontSize: '14px', fontWeight: '500', color: '#334155', marginBottom: '8px', display: 'block' }}>認識されたテキスト（手動で編集可能）:</label>
               <textarea
                 value={recognizedText}
                 onChange={(e) => setRecognizedText(e.target.value)}
@@ -3808,7 +3806,7 @@ export default function Home() {
                       setTextInputValue(prev => prev + recognizedText);
                       setRecognizedText('');
                       if (handwritingCanvasRef.current) {
-                        const ctx = handwritingCanvasRef.current.getContext('2d');
+                        const ctx = handwritingCanvasRef.current?.getContext('2d');
                         if (ctx) {
                           ctx.clearRect(0, 0, handwritingCanvasRef.current.width, handwritingCanvasRef.current.height);
                         }
@@ -3818,38 +3816,59 @@ export default function Home() {
                     }
                   }
                 }}
-                className="w-full p-2 border border-slate-300 rounded text-base"
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '4px',
+                  fontSize: '16px',
+                }}
                 rows={3}
                 placeholder="「文字認識」ボタンをクリックして認識されたテキストを表示します。Enterキーで確定します。"
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowHandwritingModal(false);
-                handwritingStrokesRef.current = [];
-                setRecognizedText('');
-              }}
-            >
-              キャンセル
-            </Button>
-            <Button
-              onClick={() => {
-                if (recognizedText) {
-                  setTextInputValue(prev => prev + recognizedText);
-                }
-                setShowHandwritingModal(false);
-                handwritingStrokesRef.current = [];
-                setRecognizedText('');
-              }}
-            >
-              確定して閉じる（Enterキーでも確定できます）
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+              <button
+                onClick={() => {
+                  setShowHandwritingModal(false);
+                  handwritingStrokesRef.current = [];
+                  setRecognizedText('');
+                }}
+                style={{
+                  padding: '8px 16px',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '4px',
+                  backgroundColor: 'white',
+                  cursor: 'pointer',
+                }}
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={() => {
+                  if (recognizedText) {
+                    setTextInputValue(prev => prev + recognizedText);
+                  }
+                  setShowHandwritingModal(false);
+                  handwritingStrokesRef.current = [];
+                  setRecognizedText('');
+                }}
+                style={{
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderRadius: '4px',
+                  backgroundColor: '#3b82f6',
+                  color: 'white',
+                  cursor: 'pointer',
+                }}
+              >
+                確定して閉じる（Enterキーでも確定できます）
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
