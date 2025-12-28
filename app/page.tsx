@@ -3634,11 +3634,12 @@ export default function Home() {
             bottom: 0,
             zIndex: 999999,
             display: 'flex',
-            alignItems: 'flex-start',
+            alignItems: 'center',
             justifyContent: 'center',
-            paddingTop: '15%',
+            padding: '20px',
             backgroundColor: 'rgba(0, 0, 0, 0.8)',
             pointerEvents: 'auto',
+            overflowY: 'auto',
           }}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
@@ -3658,12 +3659,13 @@ export default function Home() {
               padding: '24px',
               maxWidth: '42rem',
               width: '90%',
-              maxHeight: '80vh',
+              maxHeight: '90vh',
               overflowY: 'auto',
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
               position: 'relative',
               zIndex: 1000000,
               pointerEvents: 'auto',
+              margin: 'auto',
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -3680,12 +3682,14 @@ export default function Home() {
             <div style={{ position: 'relative', border: '2px solid #cbd5e1', borderRadius: '8px', backgroundColor: 'white', touchAction: 'none' }}>
               <canvas
                 ref={handwritingCanvasRef}
-                width={800}
-                height={300}
+                width={1200}
+                height={400}
                 style={{ 
                   display: 'block',
                   width: '100%',
-                  cursor: 'crosshair'
+                  height: 'auto',
+                  cursor: 'crosshair',
+                  imageRendering: 'crisp-edges',
                 }}
                 onPointerDown={(e) => {
                   e.preventDefault();
@@ -3697,12 +3701,19 @@ export default function Home() {
                   handwritingStrokesRef.current.push({ points: [{ x, y }] });
                   const ctx = handwritingCanvasRef.current.getContext('2d');
                   if (ctx) {
+                    // 高解像度対応
+                    const canvasRect = handwritingCanvasRef.current.getBoundingClientRect();
+                    const scaleX = handwritingCanvasRef.current.width / canvasRect.width;
+                    const scaleY = handwritingCanvasRef.current.height / canvasRect.height;
+                    const scaledX = x * scaleX;
+                    const scaledY = y * scaleY;
+                    
                     ctx.strokeStyle = '#000000';
-                    ctx.lineWidth = 2;
+                    ctx.lineWidth = 3 * Math.max(scaleX, scaleY);
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
                     ctx.beginPath();
-                    ctx.moveTo(x, y);
+                    ctx.moveTo(scaledX, scaledY);
                   }
                   handwritingCanvasRef.current.setPointerCapture(e.pointerId);
                 }}
@@ -3718,7 +3729,14 @@ export default function Home() {
                   }
                   const ctx = handwritingCanvasRef.current.getContext('2d');
                   if (ctx) {
-                    ctx.lineTo(x, y);
+                    // 高解像度対応
+                    const canvasRect = handwritingCanvasRef.current.getBoundingClientRect();
+                    const scaleX = handwritingCanvasRef.current.width / canvasRect.width;
+                    const scaleY = handwritingCanvasRef.current.height / canvasRect.height;
+                    const scaledX = x * scaleX;
+                    const scaledY = y * scaleY;
+                    
+                    ctx.lineTo(scaledX, scaledY);
                     ctx.stroke();
                   }
                 }}
@@ -3758,25 +3776,58 @@ export default function Home() {
                   
                   setIsRecognizing(true);
                   try {
-                    // キャンバスの画像データを取得
                     const canvas = handwritingCanvasRef.current;
-                    const imageData = canvas.toDataURL('image/png');
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) return;
+                    
+                    // 画像の前処理：コントラストと明度を調整
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
+                    
+                    // グレースケール変換とコントラスト強化
+                    for (let i = 0; i < data.length; i += 4) {
+                      const r = data[i];
+                      const g = data[i + 1];
+                      const b = data[i + 2];
+                      const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+                      
+                      // 二値化（閾値128）
+                      const threshold = 128;
+                      const binary = gray < threshold ? 0 : 255;
+                      
+                      data[i] = binary;
+                      data[i + 1] = binary;
+                      data[i + 2] = binary;
+                    }
+                    
+                    ctx.putImageData(imageData, 0, 0);
+                    
+                    // 処理済み画像データを取得
+                    const processedImageData = canvas.toDataURL('image/png');
                     
                     // Tesseract.jsを動的にインポート
                     const Tesseract = (await import('tesseract.js')).default;
                     
-                    // OCR実行（日本語+英語を認識）
-                    const { data: { text } } = await Tesseract.recognize(imageData, 'jpn+eng', {
+                    // OCR実行（日本語+英語を認識、手書き文字に最適化）
+                    const worker = await Tesseract.createWorker('jpn+eng', 1, {
                       logger: (m) => {
-                        // 進捗ログを表示（必要に応じて）
                         if (m.status === 'recognizing text') {
                           console.log(`OCR進捗: ${Math.round(m.progress * 100)}%`);
                         }
-                      }
+                      },
                     });
                     
+                    // 手書き文字に適したPSMモード（単一のテキストブロックとして認識）
+                    // PSM_SINGLE_BLOCK = 6
+                    await (worker as any).setParameters({
+                      tessedit_pageseg_mode: '6',
+                    });
+                    
+                    const { data: { text } } = await worker.recognize(processedImageData);
+                    await worker.terminate();
+                    
                     // 認識されたテキストを設定
-                    const cleanedText = text.trim().replace(/\s+/g, ' ');
+                    const cleanedText = text.trim().replace(/\s+/g, ' ').replace(/\n+/g, ' ');
                     setRecognizedText(cleanedText);
                   } catch (error) {
                     console.error('OCRエラー:', error);
