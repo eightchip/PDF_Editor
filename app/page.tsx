@@ -2695,7 +2695,7 @@ export default function Home() {
                   setCurrentShape(null);
                   setShapeStartPoint(null);
                 }}
-                title="選択ツール: 注釈をクリックで選択、Ctrl+クリックで複数選択、Deleteキーで削除、ドラッグで移動"
+                title="選択ツール: 注釈をクリックで選択、Ctrl+クリックで複数選択、Delete/Backspaceキーで削除、ドラッグで移動"
                 className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-slate-600 ${
                   tool === 'select' ? 'shadow-md' : ''
                 }`}
