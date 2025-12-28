@@ -3310,7 +3310,6 @@ export default function Home() {
             top: 0, 
             bottom: 0, 
             width: '16rem', 
-            pointerEvents: editingTextId ? 'none' : 'auto', 
             height: '100vh', 
             display: 'flex', 
             flexDirection: 'column' 
