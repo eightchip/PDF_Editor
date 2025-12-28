@@ -3615,11 +3615,13 @@ export default function Home() {
       )}
 
       {/* 手書き文字認識モーダル */}
+      {console.log('Rendering Dialog component, showHandwritingModal:', showHandwritingModal)}
       <Dialog 
         open={showHandwritingModal} 
         onOpenChange={(open) => {
-          console.log('Dialog onOpenChange called with open:', open);
+          console.log('Dialog onOpenChange called with open:', open, 'current state:', showHandwritingModal);
           setShowHandwritingModal(open);
+          console.log('setShowHandwritingModal called with:', open);
         }}
       >
         <DialogContent 
