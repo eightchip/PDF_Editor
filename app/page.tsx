@@ -126,7 +126,6 @@ export default function Home() {
   // テキスト注釈関連
   const [textAnnotations, setTextAnnotations] = useState<TextAnnotation[]>([]);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
-  const isEnteringEditModeRef = useRef(false); // 編集モードに入る途中かどうかを追跡
   const editingTextIdRef = useRef<string | null>(null);
   const [textInputValue, setTextInputValue] = useState('');
   const [textInputPosition, setTextInputPosition] = useState<{ x: number; y: number } | null>(null);
@@ -3570,90 +3569,13 @@ export default function Home() {
                       : 'bg-white border border-blue-200 hover:border-blue-400 hover:shadow-md hover:bg-gradient-to-r hover:from-blue-50 hover:to-cyan-50'
                   }`}
                 >
-                  {editingTextId === text.id ? (
-                    <div 
-                      className="flex-1 flex flex-col gap-1" 
-                      style={{ pointerEvents: 'auto' }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        e.nativeEvent.stopImmediatePropagation();
-                      }}
-                      onMouseDown={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        e.nativeEvent.stopImmediatePropagation();
-                      }}
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        e.nativeEvent.stopImmediatePropagation();
-                      }}
-                    >
-                      <input
-                        type="text"
-                        value={textInputValue}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          setTextInputValue(e.target.value);
-                        }}
-                        onKeyDown={(e) => {
-                          e.stopPropagation();
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleTextSubmit();
-                          } else if (e.key === 'Escape') {
-                            e.preventDefault();
-                            setEditingTextId(null);
-                            setTextInputValue('');
-                            setTextInputPosition(null);
-                          }
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        onFocus={(e) => e.stopPropagation()}
-                        onBlur={(e) => {
-                          // フォーカスが外れたときに編集を確定しない（確定ボタンで確定）
-                          e.stopPropagation();
-                        }}
-                        className="text-xs px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        autoFocus
-                      />
-                      <div className="flex gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            handleTextSubmit();
-                          }}
-                          className="h-5 px-2 text-xs bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded hover:from-green-600 hover:to-emerald-600 transition-all"
-                          title="確定"
-                        >
-                          確定
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            setEditingTextId(null);
-                            setTextInputValue('');
-                            setTextInputPosition(null);
-                          }}
-                          className="h-5 px-2 text-xs bg-gradient-to-r from-gray-500 to-slate-500 text-white rounded hover:from-gray-600 hover:to-slate-600 transition-all"
-                          title="キャンセル"
-                        >
-                          キャンセル
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <span 
-                        className={`overflow-hidden text-ellipsis whitespace-nowrap max-w-[150px] font-medium ${selectedAnnotationIds.texts.includes(text.id) ? 'text-blue-800' : 'text-slate-700'}`}
-                      >
-                        <MdTextFields className="inline mr-1 text-blue-600" />
-                        {text.text.substring(0, 20)}{text.text.length > 20 ? '...' : ''}
-                      </span>
-                      <div className="flex gap-1">
+                  <span 
+                    className={`overflow-hidden text-ellipsis whitespace-nowrap max-w-[150px] font-medium ${selectedAnnotationIds.texts.includes(text.id) ? 'text-blue-800' : 'text-slate-700'}`}
+                  >
+                    <MdTextFields className="inline mr-1 text-blue-600" />
+                    {text.text.substring(0, 20)}{text.text.length > 20 ? '...' : ''}
+                  </span>
+                  <div className="flex gap-1">
                     <button
                       onClick={async (e) => {
                         e.stopPropagation();
@@ -3679,9 +3601,7 @@ export default function Home() {
                       <MdDelete className="inline mr-1" />
                       削除
                     </button>
-                      </div>
-                    </>
-                  )}
+                  </div>
                 </div>
               ))}
             </div>
