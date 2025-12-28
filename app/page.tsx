@@ -126,6 +126,8 @@ export default function Home() {
   // テキスト注釈関連
   const [textAnnotations, setTextAnnotations] = useState<TextAnnotation[]>([]);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const isEnteringEditModeRef = useRef(false); // 編集モードに入る途中かどうかを追跡
+  const editingTextIdRef = useRef<string | null>(null);
   const [textInputValue, setTextInputValue] = useState('');
   const [textInputPosition, setTextInputPosition] = useState<{ x: number; y: number } | null>(null);
 
@@ -3644,6 +3646,8 @@ export default function Home() {
                         onDoubleClick={(e) => {
                           e.stopPropagation();
                           e.preventDefault();
+                          // 編集モードに入る途中であることをマーク
+                          isEnteringEditModeRef.current = true;
                           // ドラッグ状態をリセット
                           setDragStart(null);
                           setIsDragging(false);
@@ -3661,6 +3665,10 @@ export default function Home() {
                             setColor(text.color || '#000000');
                             // 編集モードに入る際に選択ツールに切り替え（ドラッグを無効化）
                             setTool('text');
+                            // 次のフレームでフラグをリセット
+                            requestAnimationFrame(() => {
+                              isEnteringEditModeRef.current = false;
+                            });
                           }
                         }}
                         title="ダブルクリックで編集"
