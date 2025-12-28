@@ -187,16 +187,66 @@ export default function Home() {
   // テキスト入力フィールドにフォーカスしたときに自動的に手書きモーダルを開く機能は、
   // 無限ループの問題があるため削除
 
-  // 複数画像を1つのPDFに結合
-  const combineImagesToPDF = async (files: File[]): Promise<ArrayBuffer> => {
+  // 複数画像を1つのPDFに結合（既存のPDFがある場合はそれに追加）
+  const combineImagesToPDF = async (files: File[], existingPdfBytes: ArrayBuffer | null = null): Promise<ArrayBuffer> => {
     const { PDFDocument } = await import('pdf-lib');
-    const pdfDoc = await PDFDocument.create();
+    
+    let pdfDoc: any;
+    let existingPageCount = 0;
+    if (existingPdfBytes) {
+      // 既存のPDFがある場合は、それに画像を追加
+      pdfDoc = await PDFDocument.load(existingPdfBytes);
+      existingPageCount = pdfDoc.getPageCount();
+      console.log('combineImagesToPDF: 既存のPDFを読み込み', {
+        existingPageCount,
+        existingPdfSize: existingPdfBytes.byteLength
+      });
+      
+      // 既存のページが保持されているか確認
+      if (existingPageCount === 0) {
+        console.error('combineImagesToPDF: 警告 - 既存のPDFにページがありません！');
+      } else {
+        console.log('combineImagesToPDF: 既存のページを確認', {
+          pageCount: existingPageCount,
+          firstPageSize: pdfDoc.getPage(0).then ? '取得可能' : '取得不可'
+        });
+      }
+    } else {
+      // 既存のPDFがない場合は、新しいPDFを作成
+      pdfDoc = await PDFDocument.create();
+      console.log('combineImagesToPDF: 新しいPDFを作成');
+    }
+    
+    // 画像を追加する前のページ数を記録
+    const beforeAddCount = pdfDoc.getPageCount();
+    console.log('combineImagesToPDF: 画像追加前のページ数', beforeAddCount);
     
     for (const file of files) {
       const imagePdfBytes = await convertImageToPDF(file, 0);
       const imagePdf = await PDFDocument.load(imagePdfBytes);
       const [imagePage] = await pdfDoc.copyPages(imagePdf, [0]);
       pdfDoc.addPage(imagePage);
+      console.log('combineImagesToPDF: 画像を追加', {
+        fileName: file.name,
+        currentPageCount: pdfDoc.getPageCount()
+      });
+    }
+    
+    const finalPageCount = pdfDoc.getPageCount();
+    console.log('combineImagesToPDF: 画像追加完了', {
+      existingPageCount,
+      beforeAddCount,
+      addedImages: files.length,
+      finalPageCount,
+      expectedCount: existingPageCount + files.length
+    });
+    
+    // ページ数が期待通りか確認
+    if (existingPdfBytes && finalPageCount !== existingPageCount + files.length) {
+      console.error('combineImagesToPDF: エラー - ページ数が期待と異なります！', {
+        expected: existingPageCount + files.length,
+        actual: finalPageCount
+      });
     }
     
     const pdfBytes = await pdfDoc.save();
@@ -255,38 +305,141 @@ export default function Home() {
     convertAndLoad();
   };
 
-  // 複数画像をPDFに結合して読み込む
+  // 複数画像をPDFに結合して読み込む（既存のPDFがある場合はそれに追加）
   const loadCombinedImages = async () => {
-    if (imageFiles.length === 0) return;
+    console.log('loadCombinedImages: 関数が呼ばれました', {
+      imageFilesCount: imageFiles.length,
+      hasOriginalPdf: !!originalPdfBytes,
+      currentDocId: docId,
+      currentTotalPages: totalPages,
+      currentPage: currentPage
+    });
+    
+    if (imageFiles.length === 0) {
+      console.log('loadCombinedImages: 画像ファイルがありません');
+      return;
+    }
     
     try {
-      const arrayBuffer = await combineImagesToPDF(imageFiles);
+      // 既存のPDFがある場合はそれに追加、ない場合は新しいPDFを作成
+      const existingPdfBytes = originalPdfBytes;
+      const existingDocId = docId; // 既存のdocIdを保持
+      const existingTotalPages = totalPages; // 既存のページ数を保持
+      const existingCurrentPage = currentPage; // 既存の現在のページを保持
+      
+      console.log('loadCombinedImages: 既存のPDF情報', {
+        hasExistingPdf: !!existingPdfBytes,
+        existingDocId,
+        existingTotalPages,
+        existingCurrentPage,
+        imageFilesCount: imageFiles.length
+      });
+      
+      // 既存の注釈データを保存（既存のPDFがある場合）
+      let existingAnnotations: Record<number, Stroke[]> = {};
+      let existingTextAnnotations: Record<number, TextAnnotation[]> = {};
+      let existingShapeAnnotations: Record<number, ShapeAnnotation[]> = {};
+      
+      if (existingPdfBytes && existingDocId) {
+        existingAnnotations = await getAllAnnotations(existingDocId, existingTotalPages);
+        existingTextAnnotations = await getAllTextAnnotations(existingDocId, existingTotalPages);
+        existingShapeAnnotations = await getAllShapeAnnotations(existingDocId, existingTotalPages);
+      }
+      
+      const arrayBuffer = await combineImagesToPDF(imageFiles, existingPdfBytes);
+      console.log('loadCombinedImages: PDF結合完了', {
+        hasExistingPdf: !!existingPdfBytes,
+        combinedSize: arrayBuffer.byteLength
+      });
+      
       const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
-      const pdfFile = new File([blob], `combined_${Date.now()}.pdf`, { type: 'application/pdf' });
+      
+      // ファイル名を決定（既存のPDFがある場合は元のファイル名を使用、ない場合は新しい名前）
+      const fileName = originalFileName 
+        ? originalFileName.replace(/\.pdf$/i, '') + '_with_images.pdf'
+        : `combined_${Date.now()}.pdf`;
+      const pdfFile = new File([blob], fileName, { type: 'application/pdf' });
+      
+      console.log('loadCombinedImages: PDFファイル作成完了', {
+        fileName,
+        fileSize: pdfFile.size
+      });
 
-      const id = await generateDocId(pdfFile);
-      setDocId(id);
+      // 既存のPDFがある場合はdocIdを保持、ない場合は新しいIDを生成
+      // 注意: 既存のPDFに画像を追加するとファイル内容が変わるため、
+      // generateDocIdは新しいIDを生成するが、既存のdocIdを保持する必要がある
+      const finalDocId = existingDocId || await generateDocId(pdfFile);
+      if (existingDocId) {
+        // 既存のPDFがある場合は、docIdを変更しない（注釈データを保持するため）
+        // setDocIdは呼ばない（既存のdocIdを保持）
+      } else {
+        // 新しいPDFの場合は新しいIDを設定
+        setDocId(finalDocId);
+      }
       
       setOriginalPdfBytes(arrayBuffer);
       setOriginalFileName(pdfFile.name);
       
       const doc = await loadPDF(pdfFile);
+      const newTotalPages = doc.numPages;
+      
+      console.log('loadCombinedImages: PDF読み込み完了', {
+        hasExistingPdf: !!existingPdfBytes,
+        existingTotalPages,
+        newTotalPages,
+        existingCurrentPage
+      });
+      
+      // 既存のPDFがある場合は現在のページを維持、ない場合は1ページ目に
+      if (!existingPdfBytes) {
+        setCurrentPage(1);
+      }
+      // 既存のPDFがある場合は、currentPageは変更しない（現在のページを維持）
+      
+      // 状態を一度に更新（Reactのバッチ更新を考慮）
       setPdfDoc(doc);
-      setTotalPages(doc.numPages);
-      setCurrentPage(1);
-      setScale(1.0);
-      setPageRotation(0);
-      setStrokes([]);
-      setUndoStack([]);
-      setRedoStack([]);
-      setPageSizes({});
-      setTextItems([]);
+      setTotalPages(newTotalPages);
+      
+      // 既存のPDFがある場合は、既存のdocIdを使用して注釈データを保持
+      // 注釈データは既にIndexedDBに保存されているため、追加の処理は不要
+      // ページ番号は変わらないため、既存の注釈データはそのまま有効
+      
+      setPageSizes({}); // ページサイズは再計算が必要
+      setTextItems([]); // テキスト検出は再実行が必要
       setImageFiles([]);
       setShowImageManager(false);
       
+      // 現在のページの注釈を再読み込み
+      if (existingPdfBytes && existingDocId) {
+        // 既存のPDFがある場合は、既存のdocIdを使用して注釈を読み込み
+        const currentPageNum = existingCurrentPage;
+        const savedStrokes = await loadAnnotations(existingDocId, currentPageNum);
+        const strokesWithIds = savedStrokes.map(stroke => ({
+          ...stroke,
+          id: stroke.id || `stroke-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        }));
+        setStrokes(strokesWithIds);
+        
+        const savedTexts = await loadTextAnnotations(existingDocId, currentPageNum);
+        setTextAnnotations(savedTexts);
+        
+        const savedShapes = await loadShapeAnnotations(existingDocId, currentPageNum);
+        setShapeAnnotations(savedShapes);
+      } else {
+        // 新しいPDFの場合は注釈をクリア
+        setStrokes([]);
+        setTextAnnotations([]);
+        setShapeAnnotations([]);
+      }
+      
+      setUndoStack([]);
+      setRedoStack([]);
+      
       toast({
         title: "成功",
-        description: `${imageFiles.length}枚の画像を結合しました`,
+        description: existingPdfBytes 
+          ? `元のPDFに${imageFiles.length}枚の画像を追加しました`
+          : `${imageFiles.length}枚の画像を結合しました`,
       });
     } catch (error) {
       console.error('画像結合エラー:', error);
@@ -478,7 +631,7 @@ export default function Home() {
   // 画像ファイルが追加されたときにモーダルを開く
   useEffect(() => {
     const length = imageFiles.length;
-    console.log('useEffect: imageFiles changed, length:', length);
+    console.log('useEffect: imageFiles changed, length:', length, 'imageFiles:', imageFiles.map(f => f.name));
     if (length > 0) {
       console.log('画像管理モーダルを開きます - showImageManagerをtrueに設定します');
       // 少し遅延させてからモーダルを開く（状態更新を確実にするため）
@@ -493,7 +646,8 @@ export default function Home() {
       }, 100);
       return () => clearTimeout(timer);
     } else {
-      // 画像が0枚になったらモーダルを閉じる
+      // 画像が0枚になったらモーダルを閉じる（ただし、loadCombinedImages実行中は閉じない）
+      console.log('useEffect: imageFiles.lengthが0になったため、モーダルを閉じます');
       setShowImageManager(false);
     }
   }, [imageFiles.length]); // imageFiles.lengthが変更されたときのみ実行
@@ -3982,11 +4136,21 @@ export default function Home() {
       {showImageManager && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10001] p-4"
-          onClick={() => setShowImageManager(false)}
+          onClick={(e) => {
+            console.log('モーダルオーバーレイがクリックされました');
+            setShowImageManager(false);
+          }}
         >
           <div 
             className="bg-white rounded-2xl shadow-2xl p-6 max-w-3xl w-full max-h-[80vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              console.log('モーダルコンテンツがクリックされました', e.target);
+              e.stopPropagation();
+            }}
+            onMouseDown={(e) => {
+              console.log('モーダルコンテンツがマウスダウンされました', e.target);
+              e.stopPropagation();
+            }}
           >
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-slate-800">画像管理 ({imageFiles.length}枚)</h2>
@@ -4056,7 +4220,11 @@ export default function Home() {
               )}
               <div className="flex gap-2 justify-end pt-4 border-t">
                 <button
-                  onClick={() => {
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('クリアボタンがクリックされました');
                     setImageFiles([]);
                     setShowImageManager(false);
                   }}
@@ -4064,13 +4232,34 @@ export default function Home() {
                 >
                   クリア
                 </button>
-                <button
-                  onClick={loadCombinedImages}
-                  disabled={imageFiles.length === 0}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                <div
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('PDFに結合して読み込むボタン（div）がクリックされました', {
+                      imageFilesCount: imageFiles.length,
+                      disabled: imageFiles.length === 0
+                    });
+                    if (imageFiles.length > 0) {
+                      console.log('loadCombinedImagesを呼び出します');
+                      loadCombinedImages();
+                    } else {
+                      console.warn('画像ファイルがありません');
+                    }
+                  }}
+                  style={{
+                    position: 'relative',
+                    zIndex: 10000,
+                    pointerEvents: 'auto',
+                    cursor: imageFiles.length === 0 ? 'not-allowed' : 'pointer',
+                  }}
+                  className={imageFiles.length === 0 
+                    ? "px-4 py-2 bg-blue-600 opacity-50 cursor-not-allowed text-white rounded inline-block"
+                    : "px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded inline-block cursor-pointer"
+                  }
                 >
                   PDFに結合して読み込む
-                </button>
+                </div>
               </div>
             </div>
           </div>
