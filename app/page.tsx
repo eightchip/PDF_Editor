@@ -47,6 +47,11 @@ export default function Home() {
   const [isMobile, setIsMobile] = useState(false); // モバイルデバイスかどうか
   const [showQRCode, setShowQRCode] = useState(false); // QRコードモーダルの表示状態
   const [showHandwritingModal, setShowHandwritingModal] = useState(false); // 手書き文字認識モーダルの表示状態
+  
+  // デバッグ: showHandwritingModalの状態変化をログに出力
+  useEffect(() => {
+    console.log('showHandwritingModal state changed to:', showHandwritingModal);
+  }, [showHandwritingModal]);
   const handwritingCanvasRef = useRef<HTMLCanvasElement>(null);
   const handwritingStrokesRef = useRef<Array<{ points: Array<{ x: number; y: number }> }>>([]);
   const isDrawingHandwritingRef = useRef(false);
@@ -3339,11 +3344,12 @@ export default function Home() {
                       e.stopPropagation();
                       e.nativeEvent.stopImmediatePropagation();
                       // onClickでも処理を実行（onMouseDownが発火しない場合に備える）
+                      console.log('Handwriting button onClick, current showHandwritingModal:', showHandwritingModal);
                       if (!showHandwritingModal) {
-                        console.log('Opening handwriting modal from onClick, current state:', showHandwritingModal);
-                        setShowHandwritingModal(true);
+                        console.log('Opening handwriting modal from onClick');
                         handwritingStrokesRef.current = [];
                         setRecognizedText('');
+                        setShowHandwritingModal(true);
                         console.log('setShowHandwritingModal(true) called from onClick');
                       } else {
                         console.log('Handwriting modal already open (onClick)');
