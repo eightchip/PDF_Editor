@@ -3329,13 +3329,16 @@ export default function Home() {
                       e.preventDefault();
                       e.stopPropagation();
                       e.nativeEvent.stopImmediatePropagation();
+                      // クリック時間を記録（モーダルの自動的な閉じる動作を防ぐため）
+                      (window as any).lastHandwritingButtonClickTime = Date.now();
+                      console.log('Handwriting button clicked, recording click time');
                       // テキスト入力フィールドのフォーカスを保持するため、blurしない
                       // 既に開いている場合は何もしない
                       if (!showHandwritingModal) {
                         console.log('Opening handwriting modal from onMouseDown, current state:', showHandwritingModal);
-                        setShowHandwritingModal(true);
                         handwritingStrokesRef.current = [];
                         setRecognizedText('');
+                        setShowHandwritingModal(true);
                         console.log('setShowHandwritingModal(true) called');
                       } else {
                         console.log('Handwriting modal already open');
