@@ -46,6 +46,11 @@ export default function Home() {
   const [showAnnotationList, setShowAnnotationList] = useState(false);
   const [isMobile, setIsMobile] = useState(false); // モバイルデバイスかどうか
   const [showQRCode, setShowQRCode] = useState(false); // QRコードモーダルの表示状態
+  const [showHandwritingModal, setShowHandwritingModal] = useState(false); // 手書き文字認識モーダルの表示状態
+  const handwritingCanvasRef = useRef<HTMLCanvasElement>(null);
+  const handwritingStrokesRef = useRef<Array<{ points: Array<{ x: number; y: number }> }>>([]);
+  const isDrawingHandwritingRef = useRef(false);
+  const [recognizedText, setRecognizedText] = useState(''); // 認識されたテキスト
   
   // Dialog用のstate
   const [dialogOpen, setDialogOpen] = useState(false);
