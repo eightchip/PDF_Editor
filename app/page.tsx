@@ -2435,10 +2435,14 @@ export default function Home() {
       if (inkCanvasRef.current && pageSize) {
         const ctx = inkCanvasRef.current.getContext('2d');
         if (ctx) {
+          // キャンバスを完全にクリア（devicePixelRatioを考慮）
           const devicePixelRatio = window.devicePixelRatio || 1;
-          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+          ctx.restore();
           // 空のストローク配列で再描画（念のため）
+          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
           redrawStrokes(ctx, [], pageSize.width, pageSize.height);
         }
       }
@@ -2446,8 +2450,11 @@ export default function Home() {
         const textCtx = textCanvasRef.current.getContext('2d');
         if (textCtx) {
           const devicePixelRatio = window.devicePixelRatio || 1;
-          textCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          textCtx.save();
+          textCtx.setTransform(1, 0, 0, 1, 0, 0);
           textCtx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
+          textCtx.restore();
+          textCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
           redrawTextAnnotations(textCtx, [], pageSize.width, pageSize.height);
         }
       }
@@ -2455,8 +2462,11 @@ export default function Home() {
         const shapeCtx = shapeCanvasRef.current.getContext('2d');
         if (shapeCtx) {
           const devicePixelRatio = window.devicePixelRatio || 1;
-          shapeCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          shapeCtx.save();
+          shapeCtx.setTransform(1, 0, 0, 1, 0, 0);
           shapeCtx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
+          shapeCtx.restore();
+          shapeCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
           redrawShapeAnnotations(shapeCtx, [], pageSize.width, pageSize.height);
         }
       }

@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
       let qpdfPath: string | null = null;
       const possiblePaths: string[] = [];
       
-      // 環境変数で指定されたパスを最初に試す
+      // 環境変数で指定されたパスを最初に試す（優先度最高）
       if (qpdfPathFromEnv) {
         possiblePaths.push(qpdfPathFromEnv);
       }
@@ -131,7 +131,31 @@ export async function POST(request: NextRequest) {
       
       for (const testPath of possiblePaths) {
         try {
-          if (testPath === 'qpdf') {
+          // 環境変数で指定されたパスの場合、直接試す
+          if (qpdfPathFromEnv && testPath === qpdfPathFromEnv) {
+            // 環境変数で指定されたパスを直接使用
+            if (testPath === 'qpdf') {
+              // 'qpdf'が指定されている場合、PATHから検索
+              execSync('qpdf --version', { stdio: 'ignore', timeout: 5000 });
+              qpdfPath = 'qpdf';
+              break;
+            } else if (fs.existsSync(testPath)) {
+              // 直接パスが指定されている場合
+              execSync(`"${testPath}" --version`, { stdio: 'ignore', timeout: 5000 });
+              qpdfPath = testPath;
+              break;
+            } else {
+              // パスが存在しない場合でも、コマンドとして試す
+              try {
+                execSync(`"${testPath}" --version`, { stdio: 'ignore', timeout: 5000 });
+                qpdfPath = testPath;
+                break;
+              } catch (e) {
+                // 次のパスを試す
+                continue;
+              }
+            }
+          } else if (testPath === 'qpdf') {
             // PATHから検索
             execSync('qpdf --version', { stdio: 'ignore', timeout: 5000 });
             qpdfPath = 'qpdf';
