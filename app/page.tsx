@@ -873,6 +873,7 @@ export default function Home() {
         // pageOrderが設定されている場合は、表示順序から実際のページ番号に変換
         const actualPageNum = getActualPageNum(currentPage);
         const savedStrokes = await loadAnnotations(docId, actualPageNum);
+        console.log('renderCurrentPage: データベースから読み込み', { actualPageNum, savedStrokesCount: savedStrokes.length });
         // 既存のストロークにIDがない場合は生成
         const strokesWithIds = savedStrokes.map(stroke => ({
           ...stroke,
@@ -2431,18 +2432,31 @@ export default function Home() {
   const handleClear = async () => {
     if (!docId || !inkCanvasRef.current || !pageSize) return;
 
+    console.log('handleClear: 開始', { docId, currentPage, pageSize });
+
     setUndoStack([...undoStack, { strokes, shapes: shapeAnnotations, texts: textAnnotations }]);
     setRedoStack([]);
     
     const actualPageNum = getActualPageNum(currentPage);
+    console.log('handleClear: データベースから削除開始', { actualPageNum });
+    
+    // データベースから削除（完了を待つ）
     await deleteAnnotations(docId, actualPageNum);
     await deleteTextAnnotations(docId, actualPageNum);
     await deleteShapeAnnotations(docId, actualPageNum);
+    
+    console.log('handleClear: データベース削除完了');
+    
+    // データベースが空であることを確認
+    const verifyStrokes = await loadAnnotations(docId, actualPageNum);
+    console.log('handleClear: 削除確認', { verifyStrokes: verifyStrokes.length });
     
     // 状態をクリア（データベース削除後に実行）
     setStrokes([]);
     setTextAnnotations([]);
     setShapeAnnotations([]);
+
+    console.log('handleClear: 状態をクリア完了');
 
     // キャンバスを即座にクリア（状態更新を待たない）
     if (inkCanvasRef.current && pageSize) {
@@ -2456,6 +2470,7 @@ export default function Home() {
         ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
         // 空の配列で再描画
         redrawStrokes(ctx, [], pageSize.width, pageSize.height);
+        console.log('handleClear: inkCanvasをクリア');
       }
     }
     if (textCanvasRef.current && pageSize) {
@@ -2468,6 +2483,7 @@ export default function Home() {
         textCtx.restore();
         textCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
         redrawTextAnnotations(textCtx, [], pageSize.width, pageSize.height);
+        console.log('handleClear: textCanvasをクリア');
       }
     }
     if (shapeCanvasRef.current && pageSize) {
@@ -2480,8 +2496,11 @@ export default function Home() {
         shapeCtx.restore();
         shapeCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
         redrawShapeAnnotations(shapeCtx, [], pageSize.width, pageSize.height);
+        console.log('handleClear: shapeCanvasをクリア');
       }
     }
+    
+    console.log('handleClear: 完了');
     
     // renderCurrentPageを再実行しない（データベースから読み込むと古いデータが復元される可能性がある）
     // 代わりに、状態が既に空の配列に設定されているので、useEffectが再描画を実行する
@@ -2967,6 +2986,13 @@ export default function Home() {
               const errorData = await response.json().catch(() => ({ error: response.statusText }));
               const errorMessage = errorData.error || response.statusText;
               console.error('パスワード保護APIエラー:', errorMessage);
+              console.error('エラー詳細:', errorData);
+              
+              // qpdfが見つからない場合は、より明確なエラーメッセージを表示
+              if (errorData.qpdfNotFound) {
+                throw new Error(`qpdfが見つかりません。\n\n${errorMessage}\n\n保護なしでエクスポートを続行しますか？`);
+              }
+              
               throw new Error(`パスワード保護APIエラー: ${errorMessage}`);
             }
 
@@ -2983,12 +3009,19 @@ export default function Home() {
           }
         } catch (apiError) {
           console.error('パスワード保護APIエラー:', apiError);
+          const errorMessage = apiError instanceof Error ? apiError.message : String(apiError);
+          
           // APIエラーの場合、保護なしでエクスポート
           toast({
             title: "警告",
-            description: 'パスワード保護に失敗しました。保護なしでエクスポートします。',
+            description: errorMessage.includes('qpdfが見つかりません') 
+              ? 'qpdfが見つかりません。保護なしでエクスポートします。'
+              : 'パスワード保護に失敗しました。保護なしでエクスポートします。',
             variant: "destructive",
           });
+          
+          // qpdfが見つからない場合は、エクスポートを続行（保護なし）
+          // それ以外のエラーの場合も、エクスポートを続行
         }
       }
 
