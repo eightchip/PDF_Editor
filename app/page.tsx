@@ -2483,10 +2483,8 @@ export default function Home() {
       }
     }
     
-    // renderCurrentPageを再実行して、データベースから空の配列を読み込む（念のため）
-    setTimeout(() => {
-      renderCurrentPage();
-    }, 100);
+    // renderCurrentPageを再実行しない（データベースから読み込むと古いデータが復元される可能性がある）
+    // 代わりに、状態が既に空の配列に設定されているので、useEffectが再描画を実行する
   };
 
   // テキスト入力確定
@@ -2931,15 +2929,19 @@ export default function Home() {
     setShowPasswordDialog(false);
     
     try {
+      console.log('エクスポート開始');
       const pdfBytes = await generateAnnotatedPDF();
       if (!pdfBytes) {
+        console.error('PDF生成失敗');
         setIsExporting(false);
         return;
       }
+      console.log('PDF生成成功:', pdfBytes.length, 'bytes');
 
       // パスワード保護が必要な場合、APIを呼び出す
       let finalPdfBytes = pdfBytes;
       if (exportPassword && exportPassword.trim() !== '') {
+        console.log('パスワード保護APIを呼び出し');
         try {
           // FormDataを作成
           const formData = new FormData();
@@ -2948,21 +2950,37 @@ export default function Home() {
           formData.append('password', exportPassword);
           formData.append('permissions', JSON.stringify(exportPermissions));
 
-          // APIを呼び出し
-          const response = await fetch('/api/protect-pdf', {
-            method: 'POST',
-            body: formData,
-          });
+          // APIを呼び出し（タイムアウトを設定）
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒でタイムアウト
+          
+          try {
+            const response = await fetch('/api/protect-pdf', {
+              method: 'POST',
+              body: formData,
+              signal: controller.signal,
+            });
+            
+            clearTimeout(timeoutId);
 
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ error: response.statusText }));
-            const errorMessage = errorData.error || response.statusText;
-            throw new Error(`パスワード保護APIエラー: ${errorMessage}`);
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({ error: response.statusText }));
+              const errorMessage = errorData.error || response.statusText;
+              console.error('パスワード保護APIエラー:', errorMessage);
+              throw new Error(`パスワード保護APIエラー: ${errorMessage}`);
+            }
+
+            // 保護されたPDFを取得
+            const protectedPdfBlob = await response.blob();
+            finalPdfBytes = new Uint8Array(await protectedPdfBlob.arrayBuffer());
+            console.log('パスワード保護成功:', finalPdfBytes.length, 'bytes');
+          } catch (fetchError) {
+            clearTimeout(timeoutId);
+            if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+              throw new Error('パスワード保護APIがタイムアウトしました');
+            }
+            throw fetchError;
           }
-
-          // 保護されたPDFを取得
-          const protectedPdfBlob = await response.blob();
-          finalPdfBytes = new Uint8Array(await protectedPdfBlob.arrayBuffer());
         } catch (apiError) {
           console.error('パスワード保護APIエラー:', apiError);
           // APIエラーの場合、保護なしでエクスポート
@@ -2975,6 +2993,7 @@ export default function Home() {
       }
 
       // ダウンロード（タイムスタンプ付きファイル名）
+      console.log('PDFダウンロード開始');
       const blob = new Blob([finalPdfBytes as BlobPart], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -2984,6 +3003,7 @@ export default function Home() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      console.log('PDFダウンロード完了');
 
       toast({
         title: "成功",
@@ -3003,6 +3023,7 @@ export default function Home() {
         variant: "destructive",
       });
     } finally {
+      console.log('エクスポート処理完了、isExportingをfalseに設定');
       setIsExporting(false);
     }
   };
