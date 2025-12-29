@@ -2586,9 +2586,9 @@ export default function Home() {
         marginRight: showAnnotationList ? '16.5rem' : 'auto',
         height: '100%',
         overflowY: 'auto',
-        overflowX: 'hidden',
-        scrollbarWidth: 'none', /* Firefox */
-        msOverflowStyle: 'none', /* IE and Edge */
+        overflowX: showAnnotationList ? 'auto' : 'hidden', // 注釈一覧表示時は横スクロールを有効化
+        scrollbarWidth: 'thin', /* Firefox */
+        msOverflowStyle: 'auto', /* IE and Edge */
       }}>
         <div className="relative flex items-center justify-between mb-6 md:mb-8">
           <h1 className="text-3xl md:text-4xl font-bold drop-shadow-sm relative inline-block">
