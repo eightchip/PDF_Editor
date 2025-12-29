@@ -2236,7 +2236,7 @@ export default function Home() {
 
   // Undo
   const handleUndo = async () => {
-    if (undoStack.length === 0 || !docId) return;
+    if (undoStack.length === 0 || !docId || !pageSize) return;
 
     const previousState = undoStack[undoStack.length - 1];
     
@@ -2258,9 +2258,8 @@ export default function Home() {
     await saveShapeAnnotations(docId, actualPageNum, previousState.shapes);
     await saveTextAnnotations(docId, actualPageNum, previousState.texts);
 
-    // 再描画（状態更新後に実行）
-    // requestAnimationFrameを使用して、状態更新が完了した後に再描画
-    requestAnimationFrame(() => {
+    // 再描画（状態更新後に確実に実行するため、setTimeoutを使用）
+    setTimeout(() => {
       if (inkCanvasRef.current && pageSize) {
         const ctx = inkCanvasRef.current.getContext('2d');
         if (ctx) {
@@ -2288,7 +2287,7 @@ export default function Home() {
           redrawTextAnnotations(ctx, previousState.texts, pageSize.width, pageSize.height);
         }
       }
-    });
+    }, 0);
   };
 
   // Redo
@@ -2374,34 +2373,36 @@ export default function Home() {
     await saveShapeAnnotations(docId, actualPageNum, newShapes);
     await saveTextAnnotations(docId, actualPageNum, newTexts);
 
-    // 再描画（キャンバスをクリアしてから再描画）
-    if (inkCanvasRef.current && pageSize) {
-      const ctx = inkCanvasRef.current.getContext('2d');
-      if (ctx) {
-        const devicePixelRatio = window.devicePixelRatio || 1;
-        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-        ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
-        redrawStrokes(ctx, newStrokes, pageSize.width, pageSize.height);
+    // 再描画（状態更新後に確実に実行するため、setTimeoutを使用）
+    setTimeout(() => {
+      if (inkCanvasRef.current && pageSize) {
+        const ctx = inkCanvasRef.current.getContext('2d');
+        if (ctx) {
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+          redrawStrokes(ctx, newStrokes, pageSize.width, pageSize.height);
+        }
       }
-    }
-    if (shapeCanvasRef.current && pageSize) {
-      const ctx = shapeCanvasRef.current.getContext('2d');
-      if (ctx) {
-        const devicePixelRatio = window.devicePixelRatio || 1;
-        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-        ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
-        redrawShapeAnnotations(ctx, newShapes, pageSize.width, pageSize.height);
+      if (shapeCanvasRef.current && pageSize) {
+        const ctx = shapeCanvasRef.current.getContext('2d');
+        if (ctx) {
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
+          redrawShapeAnnotations(ctx, newShapes, pageSize.width, pageSize.height);
+        }
       }
-    }
-    if (textCanvasRef.current && pageSize) {
-      const ctx = textCanvasRef.current.getContext('2d');
-      if (ctx) {
-        const devicePixelRatio = window.devicePixelRatio || 1;
-        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-        ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
-        redrawTextAnnotations(ctx, newTexts, pageSize.width, pageSize.height);
+      if (textCanvasRef.current && pageSize) {
+        const ctx = textCanvasRef.current.getContext('2d');
+        if (ctx) {
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
+          redrawTextAnnotations(ctx, newTexts, pageSize.width, pageSize.height);
+        }
       }
-    }
+    }, 0);
   };
 
   // Clear
@@ -2414,9 +2415,10 @@ export default function Home() {
     setTextAnnotations([]);
     setShapeAnnotations([]);
 
-    await deleteAnnotations(docId, currentPage);
-    await deleteTextAnnotations(docId, currentPage);
-    await deleteShapeAnnotations(docId, currentPage);
+    const actualPageNum = getActualPageNum(currentPage);
+    await deleteAnnotations(docId, actualPageNum);
+    await deleteTextAnnotations(docId, actualPageNum);
+    await deleteShapeAnnotations(docId, actualPageNum);
 
     // クリア
     const ctx = inkCanvasRef.current.getContext('2d');
@@ -4765,17 +4767,18 @@ export default function Home() {
                         setStrokes(newStrokes);
                         const actualPageNum = getActualPageNum(currentPage);
                         await saveAnnotations(docId, actualPageNum, newStrokes);
-                        // 再描画（キャンバスをクリアしてから再描画）
-                        if (inkCanvasRef.current && pageSize) {
-                          const ctx = inkCanvasRef.current.getContext('2d');
-                          if (ctx) {
-                            const devicePixelRatio = window.devicePixelRatio || 1;
-                            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-                            // redrawStrokes内でclearRectが呼ばれるが、念のためここでもクリア
-                            ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
-                            redrawStrokes(ctx, newStrokes, pageSize.width, pageSize.height);
+                        // 再描画（状態更新後に確実に実行するため、setTimeoutを使用）
+                        setTimeout(() => {
+                          if (inkCanvasRef.current && pageSize) {
+                            const ctx = inkCanvasRef.current.getContext('2d');
+                            if (ctx) {
+                              const devicePixelRatio = window.devicePixelRatio || 1;
+                              ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+                              ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+                              redrawStrokes(ctx, newStrokes, pageSize.width, pageSize.height);
+                            }
                           }
-                        }
+                        }, 0);
                       }
                     }}
                     className="h-6 px-2 text-xs bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-md hover:from-red-600 hover:to-pink-600 transition-all shadow-sm hover:shadow-md"
