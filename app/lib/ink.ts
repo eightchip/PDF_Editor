@@ -117,11 +117,21 @@ export function redrawStrokes(
   canvasWidth: number,
   canvasHeight: number
 ): void {
+  // 現在のtransformを保存（devicePixelRatioなどを保持）
+  const currentTransform = ctx.getTransform();
+  
   // コンテキストの状態をリセット（前の描画の影響を完全にクリア）
-  ctx.save();
+  // 実際のキャンバスサイズでクリア
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-  ctx.restore();
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  
+  // transformを元に戻す（devicePixelRatioを保持）
+  // DOMMatrixから個別の値を取得してsetTransformに渡す
+  ctx.setTransform(
+    currentTransform.a, currentTransform.b,
+    currentTransform.c, currentTransform.d,
+    currentTransform.e, currentTransform.f
+  );
   
   // 各ストロークを描画（各ストロークは独立して描画される）
   for (const stroke of strokes) {

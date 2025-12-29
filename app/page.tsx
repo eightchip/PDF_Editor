@@ -944,6 +944,18 @@ export default function Home() {
     renderCurrentPage();
   }, [pdfDoc, currentPage, scale, docId, pageRotation]);
 
+  // strokesの状態変更時に再描画（ハイライトなどが追加/削除されたとき）
+  useEffect(() => {
+    if (inkCanvasRef.current && pageSize && strokes.length >= 0) {
+      const ctx = inkCanvasRef.current.getContext('2d');
+      if (ctx) {
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        redrawStrokes(ctx, strokes, pageSize.width, pageSize.height);
+      }
+    }
+  }, [strokes, pageSize]);
+
   // サムネイル生成
   const generateThumbnails = async () => {
     if (!pdfDoc) return;
