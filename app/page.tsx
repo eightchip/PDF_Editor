@@ -2430,29 +2430,37 @@ export default function Home() {
     await deleteTextAnnotations(docId, actualPageNum);
     await deleteShapeAnnotations(docId, actualPageNum);
 
-    // クリア
-    const ctx = inkCanvasRef.current.getContext('2d');
-    if (ctx) {
-      const devicePixelRatio = window.devicePixelRatio || 1;
-      ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-      ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
-    }
-    if (textCanvasRef.current) {
-      const textCtx = textCanvasRef.current.getContext('2d');
-      if (textCtx) {
-        const devicePixelRatio = window.devicePixelRatio || 1;
-        textCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-        textCtx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
+    // クリア（状態更新後に確実に実行するため、setTimeoutを使用）
+    setTimeout(() => {
+      if (inkCanvasRef.current && pageSize) {
+        const ctx = inkCanvasRef.current.getContext('2d');
+        if (ctx) {
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+          // 空のストローク配列で再描画（念のため）
+          redrawStrokes(ctx, [], pageSize.width, pageSize.height);
+        }
       }
-    }
-    if (shapeCanvasRef.current) {
-      const shapeCtx = shapeCanvasRef.current.getContext('2d');
-      if (shapeCtx) {
-        const devicePixelRatio = window.devicePixelRatio || 1;
-        shapeCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-        shapeCtx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
+      if (textCanvasRef.current && pageSize) {
+        const textCtx = textCanvasRef.current.getContext('2d');
+        if (textCtx) {
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          textCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          textCtx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
+          redrawTextAnnotations(textCtx, [], pageSize.width, pageSize.height);
+        }
       }
-    }
+      if (shapeCanvasRef.current && pageSize) {
+        const shapeCtx = shapeCanvasRef.current.getContext('2d');
+        if (shapeCtx) {
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          shapeCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          shapeCtx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
+          redrawShapeAnnotations(shapeCtx, [], pageSize.width, pageSize.height);
+        }
+      }
+    }, 0);
   };
 
   // テキスト入力確定
@@ -2898,10 +2906,50 @@ export default function Home() {
     
     try {
       const pdfBytes = await generateAnnotatedPDF();
-      if (!pdfBytes) return;
+      if (!pdfBytes) {
+        setIsExporting(false);
+        return;
+      }
+
+      // パスワード保護が必要な場合、APIを呼び出す
+      let finalPdfBytes = pdfBytes;
+      if (exportPassword && exportPassword.trim() !== '') {
+        try {
+          // FormDataを作成
+          const formData = new FormData();
+          const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
+          formData.append('pdf', blob, 'document.pdf');
+          formData.append('password', exportPassword);
+          formData.append('permissions', JSON.stringify(exportPermissions));
+
+          // APIを呼び出し
+          const response = await fetch('/api/protect-pdf', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: response.statusText }));
+            const errorMessage = errorData.error || response.statusText;
+            throw new Error(`パスワード保護APIエラー: ${errorMessage}`);
+          }
+
+          // 保護されたPDFを取得
+          const protectedPdfBlob = await response.blob();
+          finalPdfBytes = new Uint8Array(await protectedPdfBlob.arrayBuffer());
+        } catch (apiError) {
+          console.error('パスワード保護APIエラー:', apiError);
+          // APIエラーの場合、保護なしでエクスポート
+          toast({
+            title: "警告",
+            description: 'パスワード保護に失敗しました。保護なしでエクスポートします。',
+            variant: "destructive",
+          });
+        }
+      }
 
       // ダウンロード（タイムスタンプ付きファイル名）
-      const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
+      const blob = new Blob([finalPdfBytes as BlobPart], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -2913,7 +2961,7 @@ export default function Home() {
 
       toast({
         title: "成功",
-        description: exportPassword 
+        description: exportPassword && exportPassword.trim() !== ''
           ? "パスワード保護付きPDFをエクスポートしました" 
           : "注釈付きPDFをエクスポートしました",
       });
