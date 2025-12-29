@@ -2421,56 +2421,60 @@ export default function Home() {
 
     setUndoStack([...undoStack, { strokes, shapes: shapeAnnotations, texts: textAnnotations }]);
     setRedoStack([]);
-    setStrokes([]);
-    setTextAnnotations([]);
-    setShapeAnnotations([]);
-
+    
     const actualPageNum = getActualPageNum(currentPage);
     await deleteAnnotations(docId, actualPageNum);
     await deleteTextAnnotations(docId, actualPageNum);
     await deleteShapeAnnotations(docId, actualPageNum);
+    
+    // 状態をクリア（データベース削除後に実行）
+    setStrokes([]);
+    setTextAnnotations([]);
+    setShapeAnnotations([]);
 
-    // クリア（状態更新後に確実に実行するため、setTimeoutを使用）
+    // キャンバスを即座にクリア（状態更新を待たない）
+    if (inkCanvasRef.current && pageSize) {
+      const ctx = inkCanvasRef.current.getContext('2d');
+      if (ctx) {
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+        ctx.restore();
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        // 空の配列で再描画
+        redrawStrokes(ctx, [], pageSize.width, pageSize.height);
+      }
+    }
+    if (textCanvasRef.current && pageSize) {
+      const textCtx = textCanvasRef.current.getContext('2d');
+      if (textCtx) {
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        textCtx.save();
+        textCtx.setTransform(1, 0, 0, 1, 0, 0);
+        textCtx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
+        textCtx.restore();
+        textCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        redrawTextAnnotations(textCtx, [], pageSize.width, pageSize.height);
+      }
+    }
+    if (shapeCanvasRef.current && pageSize) {
+      const shapeCtx = shapeCanvasRef.current.getContext('2d');
+      if (shapeCtx) {
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        shapeCtx.save();
+        shapeCtx.setTransform(1, 0, 0, 1, 0, 0);
+        shapeCtx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
+        shapeCtx.restore();
+        shapeCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        redrawShapeAnnotations(shapeCtx, [], pageSize.width, pageSize.height);
+      }
+    }
+    
+    // renderCurrentPageを再実行して、データベースから空の配列を読み込む（念のため）
     setTimeout(() => {
-      if (inkCanvasRef.current && pageSize) {
-        const ctx = inkCanvasRef.current.getContext('2d');
-        if (ctx) {
-          // キャンバスを完全にクリア（devicePixelRatioを考慮）
-          const devicePixelRatio = window.devicePixelRatio || 1;
-          ctx.save();
-          ctx.setTransform(1, 0, 0, 1, 0, 0);
-          ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
-          ctx.restore();
-          // 空のストローク配列で再描画（念のため）
-          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-          redrawStrokes(ctx, [], pageSize.width, pageSize.height);
-        }
-      }
-      if (textCanvasRef.current && pageSize) {
-        const textCtx = textCanvasRef.current.getContext('2d');
-        if (textCtx) {
-          const devicePixelRatio = window.devicePixelRatio || 1;
-          textCtx.save();
-          textCtx.setTransform(1, 0, 0, 1, 0, 0);
-          textCtx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
-          textCtx.restore();
-          textCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-          redrawTextAnnotations(textCtx, [], pageSize.width, pageSize.height);
-        }
-      }
-      if (shapeCanvasRef.current && pageSize) {
-        const shapeCtx = shapeCanvasRef.current.getContext('2d');
-        if (shapeCtx) {
-          const devicePixelRatio = window.devicePixelRatio || 1;
-          shapeCtx.save();
-          shapeCtx.setTransform(1, 0, 0, 1, 0, 0);
-          shapeCtx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
-          shapeCtx.restore();
-          shapeCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-          redrawShapeAnnotations(shapeCtx, [], pageSize.width, pageSize.height);
-        }
-      }
-    }, 0);
+      renderCurrentPage();
+    }, 100);
   };
 
   // テキスト入力確定

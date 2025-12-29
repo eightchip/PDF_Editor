@@ -102,6 +102,7 @@ export async function POST(request: NextRequest) {
       
       // 環境変数からqpdfのパスを取得（Vercelなどで設定可能）
       const qpdfPathFromEnv = process.env.QPDF_PATH;
+      console.log('QPDF_PATH環境変数:', qpdfPathFromEnv);
       
       // プラットフォームに応じたqpdfの検出
       let qpdfPath: string | null = null;
@@ -129,46 +130,72 @@ export async function POST(request: NextRequest) {
         );
       }
       
+      console.log('qpdf検索パス:', possiblePaths);
+      
       for (const testPath of possiblePaths) {
         try {
-          // 環境変数で指定されたパスの場合、直接試す
+          // 環境変数で指定されたパスの場合、優先的に試す
           if (qpdfPathFromEnv && testPath === qpdfPathFromEnv) {
-            // 環境変数で指定されたパスを直接使用
+            console.log('環境変数で指定されたパスを試行:', testPath);
             if (testPath === 'qpdf') {
-              // 'qpdf'が指定されている場合、PATHから検索
-              execSync('qpdf --version', { stdio: 'ignore', timeout: 5000 });
-              qpdfPath = 'qpdf';
-              break;
-            } else if (fs.existsSync(testPath)) {
-              // 直接パスが指定されている場合
-              execSync(`"${testPath}" --version`, { stdio: 'ignore', timeout: 5000 });
-              qpdfPath = testPath;
-              break;
-            } else {
-              // パスが存在しない場合でも、コマンドとして試す
+              // 'qpdf'が指定されている場合、PATHから検索を試みる
+              // 環境変数PATHにqpdfが含まれているか確認
+              const currentPath = process.env.PATH || '';
+              console.log('現在のPATH:', currentPath);
               try {
-                execSync(`"${testPath}" --version`, { stdio: 'ignore', timeout: 5000 });
-                qpdfPath = testPath;
+                execSync('qpdf --version', { stdio: 'pipe', timeout: 5000, encoding: 'utf8' });
+                qpdfPath = 'qpdf';
+                console.log('qpdfをPATHから検出:', qpdfPath);
                 break;
-              } catch (e) {
+              } catch (e: any) {
+                console.warn('PATHからqpdf検出失敗:', e.message);
+                // 環境変数で'qpdf'が指定されているが、PATHに含まれていない場合
+                // これはVercel環境では正常（qpdfがインストールされていない可能性）
                 // 次のパスを試す
                 continue;
               }
+            } else {
+              // 直接パスが指定されている場合
+              if (fs.existsSync(testPath)) {
+                execSync(`"${testPath}" --version`, { stdio: 'pipe', timeout: 5000, encoding: 'utf8' });
+                qpdfPath = testPath;
+                console.log('qpdfを直接パスから検出:', qpdfPath);
+                break;
+              } else {
+                // パスが存在しない場合でも、コマンドとして試す
+                try {
+                  execSync(`"${testPath}" --version`, { stdio: 'pipe', timeout: 5000, encoding: 'utf8' });
+                  qpdfPath = testPath;
+                  console.log('qpdfをコマンドとして検出:', qpdfPath);
+                  break;
+                } catch (e: any) {
+                  console.warn('コマンドとしてqpdf検出失敗:', e.message);
+                  continue;
+                }
+              }
             }
           } else if (testPath === 'qpdf') {
-            // PATHから検索
-            execSync('qpdf --version', { stdio: 'ignore', timeout: 5000 });
-            qpdfPath = 'qpdf';
-            break;
+            // PATHから検索（環境変数で指定されていない場合）
+            try {
+              execSync('qpdf --version', { stdio: 'pipe', timeout: 5000, encoding: 'utf8' });
+              qpdfPath = 'qpdf';
+              console.log('qpdfをPATHから検出:', qpdfPath);
+              break;
+            } catch (e: any) {
+              console.warn('PATHからqpdf検出失敗:', e.message);
+              continue;
+            }
           } else {
             // 直接パスを確認
             if (fs.existsSync(testPath)) {
-              execSync(`"${testPath}" --version`, { stdio: 'ignore', timeout: 5000 });
+              execSync(`"${testPath}" --version`, { stdio: 'pipe', timeout: 5000, encoding: 'utf8' });
               qpdfPath = testPath;
+              console.log('qpdfを直接パスから検出:', qpdfPath);
               break;
             }
           }
-        } catch (e) {
+        } catch (e: any) {
+          console.warn(`qpdf検出失敗 (${testPath}):`, e.message);
           // 次のパスを試す
           continue;
         }
