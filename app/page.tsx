@@ -567,8 +567,8 @@ export default function Home() {
       console.log('Creating SpeechRecognition instance...');
       const recognition = new SpeechRecognition();
       recognition.lang = voiceLanguage; // 選択された言語を使用
-      recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.continuous = true; // 連続認識モードに変更（手動で停止するまで続く）
+      recognition.interimResults = true; // 中間結果も取得
 
       recognition.onstart = () => {
         console.log('音声認識を開始しました');
@@ -576,17 +576,31 @@ export default function Home() {
       };
 
       recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        console.log('音声認識結果:', transcript);
-        if (textInputPosition) {
-          setTextInputValue(prev => prev + transcript);
+        // 連続認識モードでは、すべての結果を取得
+        let finalTranscript = '';
+        let interimTranscript = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
         }
-        setIsListening(false);
-        setShowVoiceInput(false);
-        toast({
-          title: "成功",
-          description: `音声を認識しました: ${transcript}`,
-        });
+        
+        // 確定した結果をテキスト入力フィールドに追加
+        if (finalTranscript.trim() && textInputPosition) {
+          setTextInputValue(prev => prev + finalTranscript);
+          console.log('音声認識結果（確定）:', finalTranscript);
+        }
+        
+        // 中間結果は表示のみ（テキスト入力フィールドには追加しない）
+        if (interimTranscript) {
+          console.log('音声認識結果（中間）:', interimTranscript);
+        }
+        
+        // 連続認識モードでは自動終了しない（手動で停止するまで続く）
       };
 
       recognition.onerror = (event: any) => {
@@ -3829,6 +3843,25 @@ export default function Home() {
                       }
                       console.log('音声ボタン（テキスト入力横）がクリックされました');
                       console.log('setShowVoiceInput(true)を実行します');
+                      
+                      // PDFコンテナの位置を確認
+                      if (containerRef.current && textInputPosition) {
+                        const containerRect = containerRef.current.getBoundingClientRect();
+                        const viewportHeight = window.innerHeight;
+                        const textInputY = textInputPosition.y;
+                        const containerBottom = containerRect.bottom;
+                        
+                        // テキスト入力フィールドがPDFの下にある場合、スクロールを誘導
+                        if (textInputY > containerBottom || textInputY + 200 > viewportHeight) {
+                          setTimeout(() => {
+                            setDialogOpen(true);
+                            setDialogTitle('音声入力モーダル');
+                            setDialogMessage('音声入力モーダルが画面下部に表示されています。下にスクロールしてご確認ください。');
+                            setDialogType('alert');
+                          }, 100);
+                        }
+                      }
+                      
                       setShowVoiceInput(true);
                     }}
                     style={{
@@ -4293,8 +4326,21 @@ export default function Home() {
       {/* 音声入力モーダル */}
       {showVoiceInput && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10002] p-4"
-          onClick={() => setShowVoiceInput(false)}
+          className="fixed inset-0 bg-black bg-opacity-50 z-[10002] p-4"
+          onClick={() => {
+            if (isListening) {
+              stopVoiceInput();
+            }
+            setShowVoiceInput(false);
+          }}
+          style={{
+            display: 'flex',
+            alignItems: textInputPosition ? 'flex-start' : 'center',
+            justifyContent: 'center',
+            paddingTop: textInputPosition 
+              ? `${Math.min(Math.max(textInputPosition.y + 150, 20), typeof window !== 'undefined' ? window.innerHeight - 400 : 400)}px`
+              : undefined,
+          }}
         >
           <div 
             className="bg-white rounded-2xl shadow-2xl p-6 max-w-lg w-full"
@@ -4303,7 +4349,12 @@ export default function Home() {
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-slate-800">音声入力</h2>
               <button
-                onClick={() => setShowVoiceInput(false)}
+                onClick={() => {
+                  if (isListening) {
+                    stopVoiceInput();
+                  }
+                  setShowVoiceInput(false);
+                }}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
                 title="閉じる"
               >
@@ -4383,15 +4434,22 @@ export default function Home() {
                   </button>
                   <button
                     type="button"
-                    onClick={stopVoiceInput}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      stopVoiceInput();
+                    }}
                     disabled={!isListening}
-                    className="px-4 py-2 border border-slate-300 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
-                    停止
+                    <MdMicOff className="text-base" />
+                    音声認識を停止
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                       stopVoiceInput();
                       setShowVoiceInput(false);
                     }}
