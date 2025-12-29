@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button"; // Dialog内でのみ使用
-import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections } from 'react-icons/md';
+import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections, MdDragHandle } from 'react-icons/md';
 import { QRCodeSVG } from 'qrcode.react';
 // PDF.jsの型は動的インポートで取得
 
@@ -40,7 +40,13 @@ export default function Home() {
   const [originalFileName, setOriginalFileName] = useState<string | null>(null); // 元のファイル名を保持
   const [pageRotation, setPageRotation] = useState(0); // 0, 90, 180, 270
   const [showThumbnails, setShowThumbnails] = useState(false);
+  const [showThumbnailModal, setShowThumbnailModal] = useState(false); // 全画面サムネイルモーダルの表示状態
   const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
+  const [pageOrder, setPageOrder] = useState<number[]>([]); // ページの表示順序
+  const [draggedPage, setDraggedPage] = useState<number | null>(null); // ドラッグ中のページ番号
+  const [dragOverPage, setDragOverPage] = useState<number | null>(null); // ドラッグオーバー中のページ番号
+  const [expandedThumbnail, setExpandedThumbnail] = useState<number | null>(null); // 拡大表示中のサムネイル番号
+  const [hasUnsavedPageOrder, setHasUnsavedPageOrder] = useState(false); // 未保存のページ順序変更があるかどうか
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showAnnotationList, setShowAnnotationList] = useState(false);
@@ -57,6 +63,8 @@ export default function Home() {
   const recognitionRef = useRef<any>(null); // Web Speech APIの認識エンジン
   const [imageFiles, setImageFiles] = useState<File[]>([]); // 複数画像を保持
   const [showImageManager, setShowImageManager] = useState(false); // 画像管理モーダルの表示状態
+  const [selectedPagesForDelete, setSelectedPagesForDelete] = useState<Set<number>>(new Set()); // 削除対象のページ番号
+  const [showPageDeleteModal, setShowPageDeleteModal] = useState(false); // ページ削除モーダルの表示状態
   
   // Dialog用のstate
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -784,7 +792,9 @@ export default function Home() {
     if (!pdfDoc || !pdfCanvasRef.current || !inkCanvasRef.current) return;
 
     try {
-      const page = await pdfDoc.getPage(currentPage);
+      // pageOrderが設定されている場合は、表示順序から実際のページ番号に変換
+      const actualPageNum = getActualPageNum(currentPage);
+      const page = await pdfDoc.getPage(actualPageNum);
       const pdfCanvas = pdfCanvasRef.current;
       const inkCanvas = inkCanvasRef.current;
 
@@ -794,7 +804,9 @@ export default function Home() {
       
       // ページサイズを記録（エクスポート用、scale=1.0でのサイズ）
       if (scale === 1.0) {
-        setPageSizes(prev => ({ ...prev, [currentPage]: size }));
+        // pageOrderが設定されている場合は、実際のページ番号で記録
+        const actualPageNum = getActualPageNum(currentPage);
+        setPageSizes(prev => ({ ...prev, [actualPageNum]: size }));
       }
 
       // テキストを抽出（スナップ機能用）
@@ -837,7 +849,9 @@ export default function Home() {
 
       // 注釈を読み込み
       if (docId) {
-        const savedStrokes = await loadAnnotations(docId, currentPage);
+        // pageOrderが設定されている場合は、表示順序から実際のページ番号に変換
+        const actualPageNum = getActualPageNum(currentPage);
+        const savedStrokes = await loadAnnotations(docId, actualPageNum);
         // 既存のストロークにIDがない場合は生成
         const strokesWithIds = savedStrokes.map(stroke => ({
           ...stroke,
@@ -848,11 +862,11 @@ export default function Home() {
         setRedoStack([]);
 
         // テキスト注釈を読み込み
-        const savedTexts = await loadTextAnnotations(docId, currentPage);
+        const savedTexts = await loadTextAnnotations(docId, actualPageNum);
         setTextAnnotations(savedTexts);
 
         // 図形注釈を読み込み
-        const savedShapes = await loadShapeAnnotations(docId, currentPage);
+        const savedShapes = await loadShapeAnnotations(docId, actualPageNum);
         setShapeAnnotations(savedShapes);
 
         // 注釈を再描画（表示サイズで描画）
@@ -954,6 +968,14 @@ export default function Home() {
     }
   }, [pdfDoc, totalPages]);
 
+  // ページ順序を初期化
+  useEffect(() => {
+    if (totalPages > 0) {
+      setPageOrder(Array.from({ length: totalPages }, (_, i) => i + 1));
+      setHasUnsavedPageOrder(false);
+    }
+  }, [totalPages]);
+
   // モバイルデバイス検出
   useEffect(() => {
     const checkMobile = () => {
@@ -975,9 +997,11 @@ export default function Home() {
 
       try {
         setIsSaving(true);
-        await saveAnnotations(docId, currentPage, strokes);
-        await saveShapeAnnotations(docId, currentPage, shapeAnnotations);
-        await saveTextAnnotations(docId, currentPage, textAnnotations);
+        // pageOrderが設定されている場合は、表示順序から実際のページ番号に変換
+        const actualPageNum = getActualPageNum(currentPage);
+        await saveAnnotations(docId, actualPageNum, strokes);
+        await saveShapeAnnotations(docId, actualPageNum, shapeAnnotations);
+        await saveTextAnnotations(docId, actualPageNum, textAnnotations);
         setLastSaved(new Date());
       } catch (error) {
         console.error('自動保存エラー:', error);
@@ -1247,7 +1271,8 @@ export default function Home() {
         const newStrokes = [...strokes, stroke];
         setStrokes(newStrokes);
         if (docId) {
-          saveAnnotations(docId, currentPage, newStrokes);
+          const actualPageNum = getActualPageNum(currentPage);
+          saveAnnotations(docId, actualPageNum, newStrokes);
         }
         
         // 再描画
@@ -1714,9 +1739,10 @@ export default function Home() {
         setTextAnnotations(movedTexts);
         
         // 保存
-        await saveAnnotations(docId, currentPage, movedStrokes);
-        await saveShapeAnnotations(docId, currentPage, movedShapes);
-        await saveTextAnnotations(docId, currentPage, movedTexts);
+        const actualPageNum = getActualPageNum(currentPage);
+        await saveAnnotations(docId, actualPageNum, movedStrokes);
+        await saveShapeAnnotations(docId, actualPageNum, movedShapes);
+        await saveTextAnnotations(docId, actualPageNum, movedTexts);
         
         // 再描画（inkCanvasRefをクリアしてから再描画 - 移動終了時に不要な描画を消すため）
         if (inkCanvasRef.current && pageSize) {
@@ -1812,7 +1838,8 @@ export default function Home() {
       isDrawingRef.current = false;
 
       // 保存
-      await saveShapeAnnotations(docId, currentPage, newShapes);
+      const actualPageNum = getActualPageNum(currentPage);
+      await saveShapeAnnotations(docId, actualPageNum, newShapes);
 
       // 再描画（確定版）
       if (shapeCanvasRef.current && pageSize) {
@@ -1846,7 +1873,8 @@ export default function Home() {
     isDrawingRef.current = false;
 
     // 保存
-    await saveAnnotations(docId, currentPage, newStrokes);
+    const actualPageNum = getActualPageNum(currentPage);
+    await saveAnnotations(docId, actualPageNum, newStrokes);
 
     e.preventDefault();
   };
@@ -1863,6 +1891,329 @@ export default function Home() {
     if (pdfDoc && currentPage < totalPages) {
       setCurrentPage(currentPage + 1);
     }
+  };
+
+  // 表示順序のインデックスから実際のページ番号に変換するヘルパー関数
+  const getActualPageNum = (displayIndex: number): number => {
+    if (pageOrder.length > 0 && displayIndex > 0 && displayIndex <= pageOrder.length) {
+      return pageOrder[displayIndex - 1];
+    }
+    return displayIndex;
+  };
+
+  // ページ削除（指定したページを削除）
+  const deletePages = async (pageNumbers: number[]) => {
+    if (!pdfDoc || !originalPdfBytes || !docId || pageNumbers.length === 0) {
+      return;
+    }
+
+    try {
+      const { PDFDocument } = await import('pdf-lib');
+      
+      // 既存のPDFを読み込み
+      const pdfDocLib = await PDFDocument.load(originalPdfBytes);
+      const currentPageCount = pdfDocLib.getPageCount();
+      
+      // 削除するページ番号を降順にソート（後ろから削除することでインデックスがずれないようにする）
+      const sortedPages = [...pageNumbers].sort((a, b) => b - a);
+      
+      // 削除するページが存在するか確認
+      for (const pageNum of sortedPages) {
+        if (pageNum < 1 || pageNum > currentPageCount) {
+          toast({
+            title: "エラー",
+            description: `ページ ${pageNum} は存在しません`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      // ページを削除（後ろから削除）
+      for (const pageNum of sortedPages) {
+        pdfDocLib.removePage(pageNum - 1); // pdf-libは0ベースインデックス
+      }
+
+      // 削除後のページ数を取得
+      const newPageCount = pdfDocLib.getPageCount();
+      
+      if (newPageCount === 0) {
+        toast({
+          title: "エラー",
+          description: "すべてのページを削除することはできません",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // 削除されたページの注釈を削除
+      for (const pageNum of pageNumbers) {
+        await deleteAnnotations(docId, pageNum);
+        await deleteTextAnnotations(docId, pageNum);
+        await deleteShapeAnnotations(docId, pageNum);
+      }
+
+      // 残りのページの注釈を再マッピング（ページ番号がずれるため）
+      const remainingPages = Array.from({ length: currentPageCount }, (_, i) => i + 1)
+        .filter(pageNum => !pageNumbers.includes(pageNum))
+        .sort((a, b) => a - b);
+
+      // 新しいページ番号に合わせて注釈を再保存
+      for (let i = 0; i < remainingPages.length; i++) {
+        const oldPageNum = remainingPages[i];
+        const newPageNum = i + 1;
+        
+        if (oldPageNum !== newPageNum) {
+          // 注釈を読み込んで新しいページ番号で保存
+          const strokes = await loadAnnotations(docId, oldPageNum);
+          const texts = await loadTextAnnotations(docId, oldPageNum);
+          const shapes = await loadShapeAnnotations(docId, oldPageNum);
+          
+          // 新しいページ番号で保存
+          await saveAnnotations(docId, newPageNum, strokes);
+          await saveTextAnnotations(docId, newPageNum, texts);
+          await saveShapeAnnotations(docId, newPageNum, shapes);
+          
+          // 古いページ番号の注釈を削除
+          await deleteAnnotations(docId, oldPageNum);
+          await deleteTextAnnotations(docId, oldPageNum);
+          await deleteShapeAnnotations(docId, oldPageNum);
+        }
+      }
+
+      // 新しいPDFを保存
+      const pdfBytes = await pdfDocLib.save();
+      const arrayBuffer = pdfBytes.buffer as ArrayBuffer;
+      
+      // 新しいPDFファイルを作成
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const pdfFile = new File([blob], originalFileName || 'edited.pdf', { type: 'application/pdf' });
+
+      // PDFを再読み込み
+      const newDoc = await loadPDF(pdfFile);
+      setPdfDoc(newDoc);
+      setTotalPages(newPageCount);
+      setOriginalPdfBytes(arrayBuffer);
+
+      // 現在のページを調整（削除されたページにいる場合は、適切なページに移動）
+      let newCurrentPage = currentPage;
+      const deletedCount = pageNumbers.filter(p => p <= currentPage).length;
+      newCurrentPage = Math.max(1, Math.min(newCurrentPage - deletedCount, newPageCount));
+      setCurrentPage(newCurrentPage);
+
+      // ページサイズをクリア
+      setPageSizes({});
+      setTextItems([]);
+
+      // サムネイルを再生成
+      setThumbnails({});
+
+      toast({
+        title: "成功",
+        description: `${pageNumbers.length}ページを削除しました`,
+      });
+
+      setSelectedPagesForDelete(new Set());
+      setShowPageDeleteModal(false);
+    } catch (error) {
+      console.error('ページ削除エラー:', error);
+      toast({
+        title: "エラー",
+        description: 'ページの削除に失敗しました: ' + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive",
+      });
+    }
+  };
+
+  // 現在のページを削除
+  const deleteCurrentPage = async () => {
+    if (!pdfDoc || totalPages <= 1) {
+      toast({
+        title: "エラー",
+        description: "最後の1ページは削除できません",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    await deletePages([currentPage]);
+  };
+
+  // 選択したページを一括削除
+  const deleteSelectedPages = async () => {
+    if (selectedPagesForDelete.size === 0) {
+      toast({
+        title: "通知",
+        description: "削除するページを選択してください",
+      });
+      return;
+    }
+
+    if (totalPages - selectedPagesForDelete.size <= 0) {
+      toast({
+        title: "エラー",
+        description: "すべてのページを削除することはできません",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const pagesToDelete = Array.from(selectedPagesForDelete);
+    await deletePages(pagesToDelete);
+  };
+
+  // ページ順序を変更（ドラッグ&ドロップで使用）
+  const reorderPages = async (newOrder: number[]) => {
+    if (!pdfDoc || !originalPdfBytes || !docId || newOrder.length !== totalPages) {
+      return;
+    }
+
+    try {
+      const { PDFDocument } = await import('pdf-lib');
+      
+      // 既存のPDFを読み込み
+      const pdfDocLib = await PDFDocument.load(originalPdfBytes);
+      const currentPageCount = pdfDocLib.getPageCount();
+      
+      // 新しいPDFを作成
+      const newPdfDoc = await PDFDocument.create();
+      
+      // 新しい順序でページをコピー
+      for (const pageNum of newOrder) {
+        if (pageNum < 1 || pageNum > currentPageCount) {
+          toast({
+            title: "エラー",
+            description: `ページ ${pageNum} は存在しません`,
+            variant: "destructive",
+          });
+          return;
+        }
+        const [copiedPage] = await newPdfDoc.copyPages(pdfDocLib, [pageNum - 1]); // pdf-libは0ベースインデックス
+        newPdfDoc.addPage(copiedPage);
+      }
+
+      // 注釈を再マッピング
+      for (let i = 0; i < newOrder.length; i++) {
+        const oldPageNum = newOrder[i];
+        const newPageNum = i + 1;
+        
+        if (oldPageNum !== newPageNum) {
+          // 注釈を読み込んで新しいページ番号で保存
+          const strokes = await loadAnnotations(docId, oldPageNum);
+          const texts = await loadTextAnnotations(docId, oldPageNum);
+          const shapes = await loadShapeAnnotations(docId, oldPageNum);
+          
+          // 新しいページ番号で保存
+          await saveAnnotations(docId, newPageNum, strokes);
+          await saveTextAnnotations(docId, newPageNum, texts);
+          await saveShapeAnnotations(docId, newPageNum, shapes);
+          
+          // 古いページ番号の注釈を削除
+          await deleteAnnotations(docId, oldPageNum);
+          await deleteTextAnnotations(docId, oldPageNum);
+          await deleteShapeAnnotations(docId, oldPageNum);
+        }
+      }
+
+      // 新しいPDFを保存
+      const pdfBytes = await newPdfDoc.save();
+      const arrayBuffer = pdfBytes.buffer as ArrayBuffer;
+      
+      // 新しいPDFファイルを作成
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const pdfFile = new File([blob], originalFileName || 'edited.pdf', { type: 'application/pdf' });
+
+      // PDFを再読み込み
+      const newDoc = await loadPDF(pdfFile);
+      setPdfDoc(newDoc);
+      setTotalPages(currentPageCount);
+      setOriginalPdfBytes(arrayBuffer);
+      setPageOrder(newOrder);
+
+      // 現在のページを新しい順序に合わせて調整
+      const newCurrentPageIndex = newOrder.indexOf(currentPage);
+      if (newCurrentPageIndex >= 0) {
+        setCurrentPage(newCurrentPageIndex + 1);
+      } else {
+        setCurrentPage(1);
+      }
+
+      // ページサイズをクリア
+      setPageSizes({});
+      setTextItems([]);
+
+      // サムネイルを再生成
+      setThumbnails({});
+
+      setHasUnsavedPageOrder(false);
+      toast({
+        title: "成功",
+        description: "ページの順序を適用しました",
+      });
+    } catch (error) {
+      console.error('ページ順序変更エラー:', error);
+      toast({
+        title: "エラー",
+        description: 'ページの順序変更に失敗しました: ' + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive",
+      });
+    }
+  };
+
+  // ドラッグ開始
+  const handleDragStart = (pageNum: number) => {
+    setDraggedPage(pageNum);
+  };
+
+  // ドラッグオーバー
+  const handleDragOver = (e: React.DragEvent, pageNum: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (draggedPage !== null && draggedPage !== pageNum) {
+      setDragOverPage(pageNum);
+    }
+  };
+
+  // ドラッグ終了
+  const handleDragEnd = () => {
+    setDraggedPage(null);
+    setDragOverPage(null);
+  };
+
+  // ドロップ
+  const handleDrop = (e: React.DragEvent, targetPageNum: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (draggedPage === null || draggedPage === targetPageNum) {
+      setDraggedPage(null);
+      setDragOverPage(null);
+      return;
+    }
+
+    const newOrder = [...pageOrder];
+    const draggedIndex = newOrder.indexOf(draggedPage);
+    const targetIndex = newOrder.indexOf(targetPageNum);
+    
+    // 順序を変更
+    newOrder.splice(draggedIndex, 1);
+    newOrder.splice(targetIndex, 0, draggedPage);
+    
+    // UIを即座に更新（PDF再構築は行わない）
+    setPageOrder(newOrder);
+    setDraggedPage(null);
+    setDragOverPage(null);
+    setHasUnsavedPageOrder(true); // 未保存の変更があることを記録
+  };
+
+  // ページ順序を適用（PDF再構築を実行）
+  const applyPageOrder = async () => {
+    if (!hasUnsavedPageOrder || pageOrder.length === 0) {
+      return;
+    }
+    
+    await reorderPages(pageOrder);
+    setHasUnsavedPageOrder(false);
   };
 
   // Undo
@@ -1884,9 +2235,10 @@ export default function Home() {
     setTextAnnotations(previousState.texts);
 
     // 保存
-    await saveAnnotations(docId, currentPage, previousState.strokes);
-    await saveShapeAnnotations(docId, currentPage, previousState.shapes);
-    await saveTextAnnotations(docId, currentPage, previousState.texts);
+    const actualPageNum = getActualPageNum(currentPage);
+    await saveAnnotations(docId, actualPageNum, previousState.strokes);
+    await saveShapeAnnotations(docId, actualPageNum, previousState.shapes);
+    await saveTextAnnotations(docId, actualPageNum, previousState.texts);
 
     // 再描画（状態更新後に実行）
     // requestAnimationFrameを使用して、状態更新が完了した後に再描画
@@ -1940,9 +2292,10 @@ export default function Home() {
     setTextAnnotations(nextState.texts);
 
     // 保存
-    await saveAnnotations(docId, currentPage, nextState.strokes);
-    await saveShapeAnnotations(docId, currentPage, nextState.shapes);
-    await saveTextAnnotations(docId, currentPage, nextState.texts);
+    const actualPageNum = getActualPageNum(currentPage);
+    await saveAnnotations(docId, actualPageNum, nextState.strokes);
+    await saveShapeAnnotations(docId, actualPageNum, nextState.shapes);
+    await saveTextAnnotations(docId, actualPageNum, nextState.texts);
 
     // 再描画（状態更新後に実行）
     // requestAnimationFrameを使用して、状態更新が完了した後に再描画
@@ -1998,9 +2351,10 @@ export default function Home() {
     setSelectedAnnotationIds({ strokes: [], shapes: [], texts: [] });
 
     // 保存
-    await saveAnnotations(docId, currentPage, newStrokes);
-    await saveShapeAnnotations(docId, currentPage, newShapes);
-    await saveTextAnnotations(docId, currentPage, newTexts);
+    const actualPageNum = getActualPageNum(currentPage);
+    await saveAnnotations(docId, actualPageNum, newStrokes);
+    await saveShapeAnnotations(docId, actualPageNum, newShapes);
+    await saveTextAnnotations(docId, actualPageNum, newTexts);
 
     // 再描画（キャンバスをクリアしてから再描画）
     if (inkCanvasRef.current && pageSize) {
@@ -2092,7 +2446,8 @@ export default function Home() {
     if (editingTextId && !textInputValue.trim()) {
       const newTexts = textAnnotations.filter(t => t.id !== editingTextId);
       setTextAnnotations(newTexts);
-      await saveTextAnnotations(docId, currentPage, newTexts);
+      const actualPageNum = getActualPageNum(currentPage);
+      await saveTextAnnotations(docId, actualPageNum, newTexts);
       setEditingTextId(null);
       setTextInputValue('');
       setTextInputPosition(null);
@@ -2135,7 +2490,8 @@ export default function Home() {
     setRedoStack([]);
 
     setTextAnnotations(updatedTexts);
-    await saveTextAnnotations(docId, currentPage, updatedTexts);
+    const actualPageNum = getActualPageNum(currentPage);
+    await saveTextAnnotations(docId, actualPageNum, updatedTexts);
 
     // 再描画
     if (textCanvasRef.current && pageSize) {
@@ -2221,7 +2577,8 @@ export default function Home() {
 
     const updatedTexts = textAnnotations.filter(t => t.id !== textId);
     setTextAnnotations(updatedTexts);
-    await saveTextAnnotations(docId, currentPage, updatedTexts);
+    const actualPageNum = getActualPageNum(currentPage);
+    await saveTextAnnotations(docId, actualPageNum, updatedTexts);
 
     // 再描画
     if (textCanvasRef.current && pageSize) {
@@ -2787,6 +3144,242 @@ export default function Home() {
         </div>
       )}
 
+      {/* 全画面サムネイルモーダル */}
+      {pdfDoc && showThumbnailModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[10003] p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowThumbnailModal(false);
+            }
+          }}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl w-full h-full max-w-[95vw] max-h-[95vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* ヘッダー */}
+            <div className="flex justify-between items-center p-4 border-b border-slate-200">
+              <h2 className="text-2xl font-bold text-slate-800">ページ管理 ({totalPages}ページ)</h2>
+              <button
+                onClick={() => {
+                  if (hasUnsavedPageOrder) {
+                    if (window.confirm('ページ順序が変更されています。変更を破棄して閉じますか？')) {
+                      // ページ順序を元に戻す
+                      setPageOrder(Array.from({ length: totalPages }, (_, i) => i + 1));
+                      setHasUnsavedPageOrder(false);
+                      setShowThumbnailModal(false);
+                    }
+                  } else {
+                    setShowThumbnailModal(false);
+                  }
+                }}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                title="閉じる"
+              >
+                <MdClose className="text-2xl text-slate-600" />
+              </button>
+            </div>
+            
+            {/* ツールバー */}
+            <div className="p-4 border-b border-slate-200 flex gap-2 flex-wrap items-center">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (selectedPagesForDelete.size > 0) {
+                    deleteSelectedPages();
+                    setShowThumbnailModal(false);
+                  } else {
+                    deleteCurrentPage();
+                    setShowThumbnailModal(false);
+                  }
+                }}
+                disabled={totalPages <= 1}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-semibold"
+                title={selectedPagesForDelete.size > 0 ? `${selectedPagesForDelete.size}ページを削除` : '現在のページを削除'}
+              >
+                <MdDelete className="text-lg" />
+                {selectedPagesForDelete.size > 0 ? `削除(${selectedPagesForDelete.size})` : '削除'}
+              </button>
+              {selectedPagesForDelete.size > 0 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedPagesForDelete(new Set());
+                  }}
+                  className="px-4 py-2 bg-slate-400 hover:bg-slate-500 text-white rounded-lg"
+                  title="選択を解除"
+                >
+                  選択解除
+                </button>
+              )}
+              {hasUnsavedPageOrder && (
+                <div className="ml-auto flex items-center gap-2">
+                  <span className="text-sm text-amber-600 font-semibold">⚠️ 順序が変更されています</span>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      await applyPageOrder();
+                    }}
+                    className="px-4 py-2 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                    title="ページ順序を適用"
+                  >
+                    <MdSave className="text-lg" />
+                    順序を適用
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // ページ順序を元に戻す
+                      setPageOrder(Array.from({ length: totalPages }, (_, i) => i + 1));
+                      setHasUnsavedPageOrder(false);
+                    }}
+                    className="px-4 py-2 bg-slate-400 hover:bg-slate-500 text-white rounded-lg"
+                    title="変更をキャンセル"
+                  >
+                    キャンセル
+                  </button>
+                </div>
+              )}
+            </div>
+            
+            {/* サムネイルグリッド */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div 
+                className="gap-4"
+                style={{ 
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                }}
+              >
+                {(pageOrder.length > 0 ? pageOrder : Array.from({ length: totalPages }, (_, i) => i + 1)).map((pageNum, index) => (
+                  <div
+                    key={pageNum}
+                    draggable
+                    onDragStart={() => handleDragStart(pageNum)}
+                    onDragOver={(e) => handleDragOver(e, pageNum)}
+                    onDragEnd={handleDragEnd}
+                    onDrop={(e) => handleDrop(e, pageNum)}
+                    className={`relative p-3 rounded-lg transition-all cursor-move ${
+                      (pageOrder.length > 0 && currentPage > 0 && currentPage <= pageOrder.length && pageOrder[currentPage - 1] === pageNum) || 
+                      (pageOrder.length === 0 && currentPage === pageNum)
+                        ? 'bg-primary/20 border-2 border-primary shadow-lg'
+                        : 'bg-white border border-slate-200 hover:border-primary/50 hover:shadow-md'
+                    } ${selectedPagesForDelete.has(pageNum) ? 'ring-2 ring-red-500' : ''} ${
+                      draggedPage === pageNum ? 'opacity-50' : ''
+                    } ${dragOverPage === pageNum ? 'border-blue-500 border-2' : ''}`}
+                  >
+                    {/* チェックボックス */}
+                    <div className="absolute top-2 left-2 z-10">
+                      <input
+                        type="checkbox"
+                        checked={selectedPagesForDelete.has(pageNum)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          const newSelected = new Set(selectedPagesForDelete);
+                          if (e.target.checked) {
+                            newSelected.add(pageNum);
+                          } else {
+                            newSelected.delete(pageNum);
+                          }
+                          setSelectedPagesForDelete(newSelected);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500 cursor-pointer"
+                      />
+                    </div>
+                    
+                    {/* ドラッグハンドル */}
+                    <div className="absolute top-2 right-2 z-10">
+                      <MdDragHandle 
+                        className="text-slate-400 cursor-move text-xl" 
+                        title="ドラッグして順序を変更"
+                      />
+                    </div>
+                    
+                    {/* サムネイル画像 */}
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        // ワンクリックでメイン画面のスライドを指定
+                        if (pageOrder.length > 0) {
+                          const displayIndex = pageOrder.indexOf(pageNum);
+                          if (displayIndex >= 0) {
+                            setCurrentPage(displayIndex + 1);
+                          } else {
+                            setCurrentPage(pageNum);
+                          }
+                        } else {
+                          setCurrentPage(pageNum);
+                        }
+                        setShowThumbnailModal(false);
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        // ダブルクリックで拡大表示
+                        setExpandedThumbnail(pageNum);
+                      }}
+                      className="relative cursor-pointer"
+                    >
+                      {thumbnails[pageNum] ? (
+                        <img
+                          src={thumbnails[pageNum]}
+                          alt={`ページ ${pageNum}`}
+                          className="w-full h-auto block rounded shadow-sm"
+                        />
+                      ) : (
+                        <div className="py-12 text-center text-slate-400 text-sm bg-slate-100 rounded">
+                          読み込み中...
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* ページ番号 */}
+                    <div className={`text-sm text-center mt-2 font-semibold ${
+                      (pageOrder.length > 0 && currentPage > 0 && currentPage <= pageOrder.length && pageOrder[currentPage - 1] === pageNum) || 
+                      (pageOrder.length === 0 && currentPage === pageNum)
+                        ? 'text-primary' : 'text-slate-600'
+                    }`}>
+                      ページ {pageNum} {pageOrder.length > 0 && `(${index + 1}番目)`}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 拡大表示モーダル */}
+      {expandedThumbnail && thumbnails[expandedThumbnail] && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[10004] p-4"
+          onClick={() => setExpandedThumbnail(null)}
+        >
+          <div 
+            className="relative max-w-[90vw] max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setExpandedThumbnail(null)}
+              className="absolute top-2 right-2 p-2 bg-white/90 hover:bg-white rounded-full shadow-lg z-10"
+              title="閉じる"
+            >
+              <MdClose className="text-2xl text-slate-800" />
+            </button>
+            <img
+              src={thumbnails[expandedThumbnail]}
+              alt={`ページ ${expandedThumbnail} (拡大)`}
+              className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+            />
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-4 py-2 rounded-lg">
+              ページ {expandedThumbnail}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* サムネイル表示 */}
       {pdfDoc && showThumbnails && (
@@ -2804,35 +3397,106 @@ export default function Home() {
               <MdClose className="text-lg" />
             </button>
         </div>
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-            <div
-              key={pageNum}
+        {/* ページ削除ボタン */}
+        <div className="mb-3 flex gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (selectedPagesForDelete.size > 0) {
+                deleteSelectedPages();
+              } else {
+                deleteCurrentPage();
+              }
+            }}
+            disabled={totalPages <= 1}
+            className="flex-1 px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+            title={selectedPagesForDelete.size > 0 ? `${selectedPagesForDelete.size}ページを削除` : '現在のページを削除'}
+          >
+            <MdDelete className="text-sm" />
+            {selectedPagesForDelete.size > 0 ? `削除(${selectedPagesForDelete.size})` : '削除'}
+          </button>
+          {selectedPagesForDelete.size > 0 && (
+            <button
               onClick={(e) => {
                 e.stopPropagation();
-                e.preventDefault();
-                setCurrentPage(pageNum);
+                setSelectedPagesForDelete(new Set());
               }}
-              className={`mb-2 p-2 rounded-md cursor-pointer transition-all ${
-                currentPage === pageNum
+              className="px-3 py-1.5 text-xs bg-slate-400 hover:bg-slate-500 text-white rounded"
+              title="選択を解除"
+            >
+              解除
+            </button>
+          )}
+        </div>
+          {(pageOrder.length > 0 ? pageOrder : Array.from({ length: totalPages }, (_, i) => i + 1)).map((pageNum, index) => (
+            <div
+              key={pageNum}
+              draggable
+              onDragStart={() => handleDragStart(pageNum)}
+              onDragOver={(e) => handleDragOver(e, pageNum)}
+              onDragEnd={handleDragEnd}
+              onDrop={(e) => handleDrop(e, pageNum)}
+              className={`mb-2 p-2 rounded-md transition-all ${
+                (pageOrder.length > 0 && currentPage > 0 && currentPage <= pageOrder.length && pageOrder[currentPage - 1] === pageNum) || 
+                (pageOrder.length === 0 && currentPage === pageNum)
                   ? 'bg-primary/10 border-2 border-primary'
                   : 'bg-white border border-slate-200 hover:border-primary/50'
-              }`}
+              } ${selectedPagesForDelete.has(pageNum) ? 'ring-2 ring-red-500' : ''} ${
+                draggedPage === pageNum ? 'opacity-50' : ''
+              } ${dragOverPage === pageNum ? 'border-blue-500 border-2' : ''}`}
             >
-                  {thumbnails[pageNum] ? (
-                    <img
-                      src={thumbnails[pageNum]}
-                      alt={`ページ ${pageNum}`}
-                      className="w-full h-auto block mb-1 rounded"
-                    />
-                  ) : (
-                    <div className="py-5 text-center text-slate-400 text-xs">
-                      読み込み中...
+              <div className="flex items-start gap-2 mb-1">
+                <input
+                  type="checkbox"
+                  checked={selectedPagesForDelete.has(pageNum)}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    const newSelected = new Set(selectedPagesForDelete);
+                    if (e.target.checked) {
+                      newSelected.add(pageNum);
+                    } else {
+                      newSelected.delete(pageNum);
+                    }
+                    setSelectedPagesForDelete(newSelected);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-1 w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                />
+                <div className="flex items-center gap-1 flex-1">
+                  <MdDragHandle 
+                    className="text-slate-400 cursor-move flex-shrink-0" 
+                    title="ドラッグして順序を変更"
+                  />
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      setCurrentPage(pageNum);
+                    }}
+                    className="flex-1 cursor-pointer"
+                  >
+                    {thumbnails[pageNum] ? (
+                      <img
+                        src={thumbnails[pageNum]}
+                        alt={`ページ ${pageNum}`}
+                        className="w-full h-auto block mb-1 rounded"
+                      />
+                    ) : (
+                      <div className="py-5 text-center text-slate-400 text-xs">
+                        読み込み中...
+                      </div>
+                    )}
+                    <div className={`text-xs text-center ${
+                      (pageOrder.length > 0 && currentPage > 0 && currentPage <= pageOrder.length && pageOrder[currentPage - 1] === pageNum) || 
+                      (pageOrder.length === 0 && currentPage === pageNum)
+                        ? 'font-bold text-primary' : 'text-slate-600'
+                    }`}>
+                      ページ {pageNum} {pageOrder.length > 0 && `(${index + 1}番目)`}
                     </div>
-                  )}
-                  <div className={`text-xs text-center ${currentPage === pageNum ? 'font-bold text-primary' : 'text-slate-600'}`}>
-                    ページ {pageNum}
                   </div>
                 </div>
+              </div>
+            </div>
               ))}
             <div className="h-8"></div> {/* スクロール用の余白 */}
           </div>
@@ -2843,29 +3507,21 @@ export default function Home() {
           <>
             <div className="mb-4 flex gap-3 md:gap-4 items-center flex-wrap transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
             <button
-              onClick={() => setShowThumbnails(!showThumbnails)}
-              title="ページ一覧のサムネイルを表示/非表示します"
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-2 shadow-sm text-white border-indigo-600 shadow-md hover:shadow-lg hover:scale-105 active:scale-95 ${
-                !showThumbnails ? 'text-slate-700 border-slate-300' : ''
-              }`}
+              onClick={() => setShowThumbnailModal(true)}
+              title="ページ一覧のサムネイルを全画面で表示します"
+              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-2 shadow-sm text-white border-indigo-600 shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
               style={{
-                background: showThumbnails 
-                  ? 'linear-gradient(to right, #4f46e5, #9333ea)' 
-                  : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                background: 'linear-gradient(to right, #4f46e5, #9333ea)',
               }}
               onMouseEnter={(e) => {
-                if (showThumbnails) {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #4338ca, #7e22ce)';
-                }
+                e.currentTarget.style.background = 'linear-gradient(to right, #4338ca, #7e22ce)';
               }}
               onMouseLeave={(e) => {
-                if (showThumbnails) {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #4f46e5, #9333ea)';
-                }
+                e.currentTarget.style.background = 'linear-gradient(to right, #4f46e5, #9333ea)';
               }}
             >
-              <MdList className={`text-lg ${showThumbnails ? 'text-white' : 'text-indigo-600'}`} />
-              {showThumbnails ? 'サムネイル非表示' : 'サムネイル表示'}
+              <MdList className="text-lg text-white" />
+              ページ管理
             </button>
             <button
               onClick={goToPrevPage}
@@ -3960,7 +4616,8 @@ export default function Home() {
                         const newStrokes = strokes.filter(s => s.id !== stroke.id);
                         // 状態を同期的に更新（注釈一覧の表示を即座に更新するため）
                         setStrokes(newStrokes);
-                        await saveAnnotations(docId, currentPage, newStrokes);
+                        const actualPageNum = getActualPageNum(currentPage);
+                        await saveAnnotations(docId, actualPageNum, newStrokes);
                         // 再描画（キャンバスをクリアしてから再描画）
                         if (inkCanvasRef.current) {
                           const ctx = inkCanvasRef.current.getContext('2d');
@@ -4020,7 +4677,8 @@ export default function Home() {
                         const newShapes = shapeAnnotations.filter(s => s.id !== shape.id);
                         // 状態を同期的に更新（注釈一覧の表示を即座に更新するため）
                         setShapeAnnotations(newShapes);
-                        await saveShapeAnnotations(docId, currentPage, newShapes);
+                        const actualPageNum = getActualPageNum(currentPage);
+                        await saveShapeAnnotations(docId, actualPageNum, newShapes);
                         // 再描画（キャンバスをクリアしてから再描画）
                         if (shapeCanvasRef.current) {
                           const ctx = shapeCanvasRef.current.getContext('2d');
@@ -4094,7 +4752,8 @@ export default function Home() {
                           const newTexts = textAnnotations.filter(t => t.id !== text.id);
                           // 状態を同期的に更新（注釈一覧の表示を即座に更新するため）
                           setTextAnnotations(newTexts);
-                          await saveTextAnnotations(docId, currentPage, newTexts);
+                          const actualPageNum = getActualPageNum(currentPage);
+                          await saveTextAnnotations(docId, actualPageNum, newTexts);
                           // 再描画（キャンバスをクリアしてから再描画）
                           if (textCanvasRef.current) {
                             const ctx = textCanvasRef.current.getContext('2d');
@@ -4229,9 +4888,9 @@ export default function Home() {
                       key={index}
                       className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50"
                     >
-                      <div className="flex-shrink-0 w-20 h-20 bg-slate-100 rounded overflow-hidden flex items-center justify-center">
+                      <div className="flex-shrink-0 w-16 h-16 bg-slate-100 rounded overflow-hidden flex items-center justify-center">
                         {file.type === 'application/pdf' ? (
-                          <MdInsertDriveFile className="text-4xl text-red-600" />
+                          <MdInsertDriveFile className="text-3xl text-red-600" />
                         ) : (
                           <img
                             src={URL.createObjectURL(file)}
@@ -4289,11 +4948,12 @@ export default function Home() {
                 >
                   クリア
                 </button>
-                <div
+                <button
+                  type="button"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log('PDFに結合して読み込むボタン（div）がクリックされました', {
+                    console.log('PDFに結合して読み込むボタンがクリックされました', {
                       imageFilesCount: imageFiles.length,
                       disabled: imageFiles.length === 0
                     });
@@ -4304,19 +4964,20 @@ export default function Home() {
                       console.warn('画像ファイルがありません');
                     }
                   }}
+                  disabled={imageFiles.length === 0}
                   style={{
                     position: 'relative',
                     zIndex: 10000,
                     pointerEvents: 'auto',
-                    cursor: imageFiles.length === 0 ? 'not-allowed' : 'pointer',
                   }}
                   className={imageFiles.length === 0 
-                    ? "px-4 py-2 bg-blue-600 opacity-50 cursor-not-allowed text-white rounded inline-block"
-                    : "px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded inline-block cursor-pointer"
+                    ? "px-6 py-3 bg-gradient-to-r from-slate-400 to-slate-500 opacity-50 cursor-not-allowed text-white rounded-lg font-semibold shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    : "px-6 py-3 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 active:scale-95 flex items-center gap-2"
                   }
                 >
+                  <MdCollections className="text-lg" />
                   PDFに結合して読み込む
-                </div>
+                </button>
               </div>
             </div>
           </div>
