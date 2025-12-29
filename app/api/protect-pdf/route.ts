@@ -97,24 +97,47 @@ export async function POST(request: NextRequest) {
       const { execSync } = await import('child_process');
       const path = await import('path');
       const os = await import('os');
+      const fs = await import('fs');
+      const platform = os.platform();
       
-      // 一般的なqpdfのインストールパスを確認
-      const possiblePaths = [
-        'qpdf', // PATHにある場合
-        path.join('C:', 'Program Files', 'qpdf 12.2.0', 'bin', 'qpdf.exe'),
-        path.join('C:', 'Program Files', 'qpdf', 'bin', 'qpdf.exe'),
-        path.join('C:', 'qpdf', 'bin', 'qpdf.exe'),
-      ];
+      // 環境変数からqpdfのパスを取得（Vercelなどで設定可能）
+      const qpdfPathFromEnv = process.env.QPDF_PATH;
       
+      // プラットフォームに応じたqpdfの検出
       let qpdfPath: string | null = null;
+      const possiblePaths: string[] = [];
+      
+      // 環境変数で指定されたパスを最初に試す
+      if (qpdfPathFromEnv) {
+        possiblePaths.push(qpdfPathFromEnv);
+      }
+      
+      if (platform === 'win32') {
+        // Windows環境
+        possiblePaths.push(
+          'qpdf', // PATHにある場合
+          path.join('C:', 'Program Files', 'qpdf 12.2.0', 'bin', 'qpdf.exe'),
+          path.join('C:', 'Program Files', 'qpdf', 'bin', 'qpdf.exe'),
+          path.join('C:', 'qpdf', 'bin', 'qpdf.exe'),
+        );
+      } else {
+        // Linux/Unix環境（Vercelなど）
+        possiblePaths.push(
+          'qpdf', // PATHにある場合（aptでインストールされた場合）
+          '/usr/bin/qpdf',
+          '/usr/local/bin/qpdf',
+        );
+      }
+      
       for (const testPath of possiblePaths) {
         try {
           if (testPath === 'qpdf') {
+            // PATHから検索
             execSync('qpdf --version', { stdio: 'ignore', timeout: 5000 });
             qpdfPath = 'qpdf';
             break;
           } else {
-            const fs = await import('fs');
+            // 直接パスを確認
             if (fs.existsSync(testPath)) {
               execSync(`"${testPath}" --version`, { stdio: 'ignore', timeout: 5000 });
               qpdfPath = testPath;
@@ -128,15 +151,33 @@ export async function POST(request: NextRequest) {
       }
 
       if (!qpdfPath) {
-        const errorMessage = 'qpdfがインストールされていません。\n\n' +
-          'Windowsでのインストール方法:\n' +
-          '1. Chocolateyを使用する場合（管理者権限が必要）:\n' +
-          '   choco install qpdf\n\n' +
-          '2. 手動インストール:\n' +
-          '   https://qpdf.sourceforge.io/ からダウンロードしてインストールしてください。\n\n' +
-          'インストール後、PATH環境変数にqpdfのパスが追加されていることを確認してください。\n' +
-          'または、C:\\Program Files\\qpdf 12.2.0\\bin\\qpdf.exe にインストールされていることを確認してください。';
-        console.error(errorMessage);
+        const isVercel = process.env.VERCEL === '1';
+        const errorMessage = platform === 'win32'
+          ? 'qpdfがインストールされていません。\n\n' +
+            'Windowsでのインストール方法:\n' +
+            '1. Chocolateyを使用する場合（管理者権限が必要）:\n' +
+            '   choco install qpdf\n\n' +
+            '2. 手動インストール:\n' +
+            '   https://qpdf.sourceforge.io/ からダウンロードしてインストールしてください。\n\n' +
+            'インストール後、PATH環境変数にqpdfのパスが追加されていることを確認してください。'
+          : isVercel
+          ? 'qpdfがインストールされていません。\n\n' +
+            'Vercel環境での設定方法:\n' +
+            '1. Vercelのプロジェクト設定で環境変数 QPDF_PATH を設定してください。\n' +
+            '2. または、Vercelのビルドコマンドでqpdfをインストールしてください。\n\n' +
+            '詳細: https://qpdf.sourceforge.io/\n' +
+            'Vercelでの設定: https://vercel.com/docs/concepts/projects/environment-variables'
+          : 'qpdfがインストールされていません。\n\n' +
+            'Linux環境でのインストール方法:\n' +
+            '1. aptを使用する場合:\n' +
+            '   sudo apt-get update && sudo apt-get install -y qpdf\n\n' +
+            '2. または、環境変数 QPDF_PATH でqpdfのパスを指定してください。\n\n' +
+            '詳細: https://qpdf.sourceforge.io/';
+        console.error('qpdf検出エラー:', errorMessage);
+        console.error('プラットフォーム:', platform);
+        console.error('Vercel環境:', isVercel);
+        console.error('環境変数 QPDF_PATH:', qpdfPathFromEnv || '未設定');
+        console.error('試行したパス:', possiblePaths);
         throw new Error(errorMessage);
       }
 

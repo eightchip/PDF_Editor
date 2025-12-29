@@ -17,14 +17,34 @@ async function loadPdfjs(): Promise<typeof import('pdfjs-dist')> {
     throw new Error('PDF.js can only be used on the client side');
   }
 
-  // Workerのパスを設定（Next.jsのpublicフォルダから読み込む）
+  // Workerのパスを設定
   const pdfjs = await import('pdfjs-dist');
-  // Next.jsではpublicフォルダのファイルがルートパスで提供される
-  // pdfjs-dist 5.xではworkerファイルは.mjs形式だが、.jsとしても動作する
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    '/pdf.worker.min.js',
-    window.location.origin
-  ).toString();
+  
+  // pdfjs-dist 5.xでは、Workerファイルのパスを適切に設定する必要がある
+  // 本番環境ではCDNから読み込む方が確実
+  if (typeof window !== 'undefined') {
+    // バージョン番号を取得（pdfjs-dist 5.4.449を使用）
+    const version = '5.4.449';
+    
+    // 本番環境ではCDNから読み込む（より確実）
+    // pdfjs-dist 5.xでは、Workerファイルは.mjs形式
+    if (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') {
+      // Vercelや本番環境ではCDNから読み込む
+      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.mjs`;
+      console.log('PDF.js Worker: CDNから読み込み', pdfjs.GlobalWorkerOptions.workerSrc);
+    } else {
+      // 開発環境では、publicフォルダのWorkerファイルを使用
+      // フォールバックとしてCDNも試す
+      try {
+        const workerUrl = new URL('/pdf.worker.min.js', window.location.origin).toString();
+        pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+        console.log('PDF.js Worker: ローカルファイルから読み込み', workerUrl);
+      } catch (error) {
+        console.warn('Workerファイルの設定に失敗、CDNから読み込みを試みます:', error);
+        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.mjs`;
+      }
+    }
+  }
 
   pdfjsLib = pdfjs;
   return pdfjs;

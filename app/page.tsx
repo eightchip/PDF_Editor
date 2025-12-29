@@ -830,8 +830,13 @@ export default function Home() {
         try {
           const items = await extractTextItems(page, scale);
           setTextItems(items);
+          console.log('テキスト抽出成功:', items.length, '個のテキストアイテム');
         } catch (error) {
-          console.warn('テキスト抽出に失敗しました:', error);
+          console.error('テキスト抽出に失敗しました:', error);
+          console.error('エラー詳細:', {
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+          });
           setTextItems([]);
         }
       } else {
@@ -1260,9 +1265,14 @@ export default function Home() {
     // ハイライトツールの場合
     if (tool === 'highlight') {
       // 自動モード：テキスト全体を検出してハイライト
-      if (highlightMode === 'auto' && textItems.length > 0) {
+      if (highlightMode === 'auto') {
+        if (textItems.length === 0) {
+          console.warn('ハイライト: テキストアイテムがありません。テキスト抽出が失敗している可能性があります。');
+          return;
+        }
         const boundingBox = findTextBoundingBox(textItems, x, y, 30);
         if (boundingBox) {
+          console.log('ハイライト: バウンディングボックスを検出', boundingBox);
         // テキスト全体のバウンディングボックスをハイライトとして描画
         // 矩形の4つの角をpointsとして追加
         // ハイライト範囲が少し上にはみ出さないように、y座標を少し下に調整
