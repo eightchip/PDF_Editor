@@ -33,19 +33,32 @@ const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { topPosition?: string }
 >(({ className, children, topPosition, style, ...props }, ref) => {
+  // classNameに!z-[10002]が含まれている場合は、オーバーレイのz-indexも調整
+  const hasHighZIndex = className?.includes('!z-[10002]') || style?.zIndex === 10002;
+  
   return (
     <DialogPortal>
-      <DialogOverlay />
+      <DialogOverlay 
+        className={hasHighZIndex ? "!z-[10001] backdrop-blur-sm" : undefined} 
+        style={hasHighZIndex ? { zIndex: 10001, backgroundColor: 'rgba(0, 0, 0, 0.5)' } : undefined} 
+      />
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
-          "fixed left-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
-          topPosition || "top-[50%] translate-y-[-50%]",
-          className
+          "fixed grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+          // カスタム位置が指定されていない場合のみ中央配置
+          !className?.includes('!top-') && !className?.includes('!right-') && !className?.includes('!left-') && (topPosition || "left-[50%] translate-x-[-50%] top-[50%] translate-y-[-50%]"),
+          className || "z-50"
         )}
         style={{
           ...(topPosition ? { transform: 'translateX(-50%) translateY(0)' } : {}),
           ...style,
+          // パスワードダイアログの場合、カスタム位置が指定されていない場合のみ中央配置
+          ...(style?.zIndex === 10002 && !style?.top && !style?.right && !style?.left ? {
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%) !important',
+          } : {}),
         }}
         {...props}
       >

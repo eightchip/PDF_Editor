@@ -17,13 +17,30 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
 
 /**
  * PDFに注釈を焼き込んでエクスポート（線分を個別に描画 + テキスト注釈）
+ * @param originalPdfBytes 元のPDFバイト
+ * @param annotations 注釈データ
+ * @param pageSizes ページサイズ
+ * @param textAnnotations テキスト注釈（オプション）
+ * @param shapeAnnotations 図形注釈（オプション）
+ * @param password パスワード（オプション、設定するとPDFを保護）
+ * @param permissions 権限設定（オプション）
  */
 export async function exportAnnotatedPDFV2(
   originalPdfBytes: ArrayBuffer,
   annotations: Record<number, Stroke[]>,
   pageSizes: Record<number, { width: number; height: number }>,
   textAnnotations?: Record<number, TextAnnotation[]>,
-  shapeAnnotations?: Record<number, ShapeAnnotation[]>
+  shapeAnnotations?: Record<number, ShapeAnnotation[]>,
+  password?: string,
+  permissions?: {
+    printing?: 'lowResolution' | 'highResolution' | 'none';
+    modifying?: boolean;
+    copying?: boolean;
+    annotating?: boolean;
+    fillingForms?: boolean;
+    contentAccessibility?: boolean;
+    documentAssembly?: boolean;
+  }
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.load(originalPdfBytes);
   const pages = pdfDoc.getPages();
@@ -267,6 +284,54 @@ export async function exportAnnotatedPDFV2(
     }
   }
 
-  return await pdfDoc.save();
+  // パスワード保護なしでPDFを保存
+  const pdfBytes = await pdfDoc.save();
+
+  // パスワード保護と権限設定
+  // 注意: pdf-libではパスワード保護ができないため、APIルートを使用
+  if (password) {
+    try {
+      // クライアント側でのみ実行（ブラウザ環境をチェック）
+      if (typeof window === 'undefined') {
+        console.warn('パスワード保護はクライアント側でのみサポートされています。');
+        return pdfBytes;
+      }
+
+      // APIルートに送信してパスワード保護を追加
+      const formData = new FormData();
+      const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
+      formData.append('pdf', blob, 'document.pdf');
+      formData.append('password', password);
+      if (permissions) {
+        formData.append('permissions', JSON.stringify(permissions));
+      }
+
+      const response = await fetch('/api/protect-pdf', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: response.statusText }));
+        const errorMessage = errorData.error || response.statusText;
+        console.error('パスワード保護APIエラー詳細:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorMessage,
+        });
+        throw new Error(`パスワード保護APIエラー: ${errorMessage}`);
+      }
+
+      const protectedPdfBytes = await response.arrayBuffer();
+      return new Uint8Array(protectedPdfBytes);
+    } catch (error) {
+      console.error('パスワード保護の適用に失敗しました:', error);
+      // エラーが発生した場合は、パスワード保護なしで返す
+      console.warn('パスワード保護なしでPDFをエクスポートします。');
+      return pdfBytes;
+    }
+  }
+
+  return pdfBytes;
 }
 

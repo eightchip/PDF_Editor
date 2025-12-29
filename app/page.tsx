@@ -19,10 +19,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogOverlay,
+  DialogPortal,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button"; // Dialog内でのみ使用
-import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections, MdDragHandle } from 'react-icons/md';
+import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections, MdDragHandle, MdLock, MdSecurity, MdCheckCircle, MdInfo } from 'react-icons/md';
 import { QRCodeSVG } from 'qrcode.react';
 // PDF.jsの型は動的インポートで取得
 
@@ -73,6 +75,20 @@ export default function Home() {
   const [dialogType, setDialogType] = useState<'alert' | 'confirm' | 'prompt'>('alert');
   const [dialogInputValue, setDialogInputValue] = useState('');
   const [dialogCallback, setDialogCallback] = useState<((value?: string | boolean) => void) | null>(null);
+  
+  // パスワード保護用のstate
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [exportPassword, setExportPassword] = useState('');
+  const [exportPasswordConfirm, setExportPasswordConfirm] = useState('');
+  const [exportPermissions, setExportPermissions] = useState({
+    printing: 'highResolution' as 'lowResolution' | 'highResolution' | 'none',
+    modifying: false,
+    copying: false,
+    annotating: true,
+    fillingForms: true,
+    contentAccessibility: true,
+    documentAssembly: false,
+  });
 
   // Dialog/Toastヘルパー関数
   const showAlert = (message: string, title: string = '') => {
@@ -2627,13 +2643,15 @@ export default function Home() {
         }
       }
 
-      // 注釈をPDFに焼き込む
+      // 注釈をPDFに焼き込む（パスワード保護が設定されている場合は適用）
       const pdfBytes = await exportAnnotatedPDFV2(
         originalPdfBytes,
         annotations,
         allPageSizes,
         textAnnotations,
-        shapeAnnotations
+        shapeAnnotations,
+        exportPassword || undefined,
+        exportPassword ? exportPermissions : undefined
       );
 
       return pdfBytes;
@@ -2691,7 +2709,95 @@ export default function Home() {
   };
 
   // 名前を付けて保存（ブラウザのネイティブファイル保存ダイアログを使用）
-  const handleSaveAs = async () => {
+  const handleSaveAs = () => {
+    console.log('handleSaveAs called', { pdfDoc: !!pdfDoc, isExporting, showPasswordDialog });
+    if (!pdfDoc) {
+      toast({
+        title: "エラー",
+        description: "PDFが読み込まれていません",
+        variant: "destructive",
+      });
+      return;
+    }
+    // パスワード保護ダイアログを表示
+    console.log('Opening password dialog, current state:', showPasswordDialog);
+    // 次のレンダリングサイクルで確実に開くようにする
+    setTimeout(() => {
+      console.log('Setting showPasswordDialog to true in setTimeout');
+      setShowPasswordDialog(true);
+    }, 0);
+    console.log('setShowPasswordDialog(true) scheduled');
+  };
+  
+  // デバッグ用: showPasswordDialogの状態変化を監視
+  useEffect(() => {
+    console.log('showPasswordDialog state changed:', showPasswordDialog);
+    if (showPasswordDialog) {
+      // ダイアログが開かれたときに、オーバーレイとコンテンツのz-indexを調整
+      const adjustZIndex = () => {
+        // Radix UIのDialogOverlayを探す（複数の方法で試す）
+        const overlaySelectors = [
+          '[data-radix-dialog-overlay]',
+          '[data-state="open"]',
+          '.fixed.inset-0.z-50',
+        ];
+        
+        let overlay: HTMLElement | null = null;
+        for (const selector of overlaySelectors) {
+          const elements = document.querySelectorAll(selector);
+          for (const el of elements) {
+            if (el instanceof HTMLElement && el.classList.contains('fixed') && el.classList.contains('inset-0')) {
+              overlay = el;
+              break;
+            }
+          }
+          if (overlay) break;
+        }
+        
+        if (overlay) {
+          overlay.style.zIndex = '10001';
+          overlay.style.display = 'block';
+          overlay.style.opacity = '1';
+          console.log('Overlay z-index set to 10001', overlay);
+        } else {
+          console.warn('Overlay not found');
+        }
+        
+        // Radix UIのDialogContentを探す
+        const contentSelectors = [
+          '[data-radix-dialog-content]',
+          '[role="dialog"]',
+        ];
+        
+        let content: HTMLElement | null = null;
+        for (const selector of contentSelectors) {
+          const el = document.querySelector(selector);
+          if (el instanceof HTMLElement) {
+            content = el;
+            break;
+          }
+        }
+        
+        if (content) {
+          content.style.zIndex = '10002';
+          content.style.display = 'block';
+          content.style.visibility = 'visible';
+          console.log('Content z-index set to 10002', content);
+        } else {
+          console.warn('Content not found');
+        }
+      };
+      
+      // 複数回試行（DOMの更新を待つ）
+      setTimeout(adjustZIndex, 0);
+      setTimeout(adjustZIndex, 10);
+      setTimeout(adjustZIndex, 50);
+      setTimeout(adjustZIndex, 100);
+    }
+  }, [showPasswordDialog]);
+  
+  // 既存のhandleSaveAs関数（後方互換性のため残す）
+  const handleSaveAsDirect = async () => {
     if (!pdfDoc) return;
 
     setIsExporting(true);
@@ -2759,7 +2865,25 @@ export default function Home() {
 
   // 既存のエクスポート関数（後方互換性のため残す）
   const handleExport = async () => {
+    // パスワード保護ダイアログを表示
+    setShowPasswordDialog(true);
+  };
+
+  // パスワード保護設定後のエクスポート実行
+  const handleExportWithPassword = async () => {
+    // パスワード確認
+    if (exportPassword && exportPassword !== exportPasswordConfirm) {
+      toast({
+        title: "エラー",
+        description: "パスワードが一致しません",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsExporting(true);
+    setShowPasswordDialog(false);
+    
     try {
       const pdfBytes = await generateAnnotatedPDF();
       if (!pdfBytes) return;
@@ -2777,8 +2901,14 @@ export default function Home() {
 
       toast({
         title: "成功",
-        description: "注釈付きPDFをエクスポートしました",
+        description: exportPassword 
+          ? "パスワード保護付きPDFをエクスポートしました" 
+          : "注釈付きPDFをエクスポートしました",
       });
+      
+      // パスワードをリセット
+      setExportPassword('');
+      setExportPasswordConfirm('');
     } catch (error) {
       console.error('エクスポートエラー:', error);
       toast({
@@ -3117,7 +3247,22 @@ export default function Home() {
             {isExporting ? '保存中...' : '上書き保存'}
           </button>
           <button
-            onClick={handleSaveAs}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('Button clicked', { pdfDoc: !!pdfDoc, isExporting, showPasswordDialog });
+              if (!pdfDoc) {
+                toast({
+                  title: "エラー",
+                  description: "PDFが読み込まれていません",
+                  variant: "destructive",
+                });
+                return;
+              }
+              console.log('Setting showPasswordDialog to true directly');
+              setShowPasswordDialog(true);
+            }}
             disabled={isExporting || !pdfDoc}
             className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-cyan-500 hover:scale-105 active:scale-95 ${
               isExporting || !pdfDoc ? 'cursor-not-allowed' : 'shadow-md'
@@ -5195,6 +5340,233 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
+      {/* パスワード保護設定ダイアログ */}
+      <Dialog 
+        open={showPasswordDialog} 
+        onOpenChange={(open) => {
+          console.log('Dialog onOpenChange called with:', open, 'current state:', showPasswordDialog);
+          // 開く場合は常に許可
+          if (open) {
+            console.log('Dialog opening - allowing');
+            setShowPasswordDialog(true);
+            return;
+          }
+          // 閉じる場合は、意図的な操作（ESCキーやオーバーレイクリックなど）のみ許可
+          console.log('Dialog closing request - allowing close');
+          setExportPassword('');
+          setExportPasswordConfirm('');
+          setShowPasswordDialog(false);
+        }}
+      >
+        <DialogContent 
+          className="max-w-2xl max-h-[75vh] overflow-y-auto !z-[10002] bg-white shadow-2xl border-2 border-slate-300 !top-4 !right-4 !left-auto !bottom-auto !translate-x-0 !translate-y-0"
+          style={{
+            zIndex: 10002,
+            position: 'fixed',
+            backgroundColor: '#ffffff',
+            top: '1rem',
+            right: '1rem',
+            left: 'auto',
+            bottom: 'auto',
+            transform: 'none',
+            borderRadius: '1rem',
+            maxWidth: 'calc(100vw - 2rem)',
+            maxHeight: 'calc(100vh - 2rem)',
+          }}
+        >
+          <DialogHeader className="pb-6 border-b-2 border-slate-300 bg-gradient-to-r from-blue-50 to-purple-50 -m-6 mb-4 p-6 rounded-t-lg">
+            <div className="flex items-center gap-4 mb-3">
+              <div className="p-3 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 shadow-lg">
+                <MdSecurity className="text-3xl text-white" />
+              </div>
+              <div className="flex-1">
+                <DialogTitle className="text-3xl font-bold text-slate-900 mb-2">
+                  PDFエクスポート設定
+                </DialogTitle>
+                <DialogDescription className="text-base text-slate-700 font-medium">
+                  パスワード保護と権限設定を行います（オプション）
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="space-y-8 py-6">
+            {/* パスワード設定 */}
+            <div className="space-y-4 p-6 rounded-xl bg-blue-50 border-3 border-blue-300 shadow-md">
+              <div className="flex items-center gap-3">
+                <MdLock className="text-2xl text-blue-700" />
+                <label className="text-xl font-bold text-slate-900">
+                  パスワード（オプション）
+                </label>
+              </div>
+              <Input
+                type="password"
+                placeholder="パスワードを入力（空欄で保護なし）"
+                value={exportPassword}
+                onChange={(e) => setExportPassword(e.target.value)}
+                className="w-full h-12 text-lg border-3 border-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-300 rounded-lg transition-all font-medium"
+                style={{ fontSize: '1.125rem', padding: '0.75rem 1rem' }}
+              />
+              {exportPassword && (
+                <Input
+                  type="password"
+                  placeholder="パスワードを再入力"
+                  value={exportPasswordConfirm}
+                  onChange={(e) => setExportPasswordConfirm(e.target.value)}
+                  className="w-full h-12 text-lg border-3 border-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-300 rounded-lg transition-all font-medium"
+                  style={{ fontSize: '1.125rem', padding: '0.75rem 1rem' }}
+                />
+              )}
+              <div className="flex items-start gap-3 p-4 rounded-lg bg-blue-100 border-2 border-blue-400">
+                <MdInfo className="text-blue-700 mt-1 flex-shrink-0 text-2xl" />
+                <p className="text-base text-slate-900 leading-relaxed font-medium">
+                  パスワードを設定すると、PDFを開く際にパスワードが必要になります
+                </p>
+              </div>
+            </div>
+
+            {/* 権限設定 */}
+            {exportPassword && (
+              <div className="space-y-5 p-6 rounded-xl bg-purple-50 border-3 border-purple-300 shadow-md animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="flex items-center gap-3">
+                  <MdSecurity className="text-2xl text-purple-700" />
+                  <label className="text-xl font-bold text-slate-900">
+                    権限設定
+                  </label>
+                </div>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-white hover:bg-purple-50 transition-colors border-2 border-slate-300 shadow-sm">
+                    <span className="text-lg font-bold text-slate-900">印刷</span>
+                    <select
+                      value={exportPermissions.printing}
+                      onChange={(e) => setExportPermissions({
+                        ...exportPermissions,
+                        printing: e.target.value as 'lowResolution' | 'highResolution' | 'none'
+                      })}
+                      className="px-4 py-2 border-3 border-slate-400 rounded-lg text-base font-medium focus:border-purple-600 focus:ring-4 focus:ring-purple-300 transition-all bg-white"
+                      style={{ fontSize: '1rem', fontWeight: '600' }}
+                    >
+                      <option value="highResolution">高解像度で許可</option>
+                      <option value="lowResolution">低解像度のみ許可</option>
+                      <option value="none">禁止</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-white hover:bg-purple-50 transition-colors border-2 border-slate-300 shadow-sm">
+                    <span className="text-lg font-bold text-slate-900">編集</span>
+                    <input
+                      type="checkbox"
+                      checked={exportPermissions.modifying}
+                      onChange={(e) => setExportPermissions({
+                        ...exportPermissions,
+                        modifying: e.target.checked
+                      })}
+                      className="w-6 h-6 rounded border-3 border-slate-400 text-purple-600 focus:ring-4 focus:ring-purple-300 cursor-pointer transition-all"
+                      style={{ accentColor: '#9333ea' }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-white hover:bg-purple-50 transition-colors border-2 border-slate-300 shadow-sm">
+                    <span className="text-lg font-bold text-slate-900">コピー</span>
+                    <input
+                      type="checkbox"
+                      checked={exportPermissions.copying}
+                      onChange={(e) => setExportPermissions({
+                        ...exportPermissions,
+                        copying: e.target.checked
+                      })}
+                      className="w-6 h-6 rounded border-3 border-slate-400 text-purple-600 focus:ring-4 focus:ring-purple-300 cursor-pointer transition-all"
+                      style={{ accentColor: '#9333ea' }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-white hover:bg-purple-50 transition-colors border-2 border-slate-300 shadow-sm">
+                    <span className="text-lg font-bold text-slate-900">注釈の追加</span>
+                    <input
+                      type="checkbox"
+                      checked={exportPermissions.annotating}
+                      onChange={(e) => setExportPermissions({
+                        ...exportPermissions,
+                        annotating: e.target.checked
+                      })}
+                      className="w-6 h-6 rounded border-3 border-slate-400 text-purple-600 focus:ring-4 focus:ring-purple-300 cursor-pointer transition-all"
+                      style={{ accentColor: '#9333ea' }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-white hover:bg-purple-50 transition-colors border-2 border-slate-300 shadow-sm">
+                    <span className="text-lg font-bold text-slate-900">フォーム入力</span>
+                    <input
+                      type="checkbox"
+                      checked={exportPermissions.fillingForms}
+                      onChange={(e) => setExportPermissions({
+                        ...exportPermissions,
+                        fillingForms: e.target.checked
+                      })}
+                      className="w-6 h-6 rounded border-3 border-slate-400 text-purple-600 focus:ring-4 focus:ring-purple-300 cursor-pointer transition-all"
+                      style={{ accentColor: '#9333ea' }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-white hover:bg-purple-50 transition-colors border-2 border-slate-300 shadow-sm">
+                    <span className="text-lg font-bold text-slate-900">コンテンツの抽出（アクセシビリティ）</span>
+                    <input
+                      type="checkbox"
+                      checked={exportPermissions.contentAccessibility}
+                      onChange={(e) => setExportPermissions({
+                        ...exportPermissions,
+                        contentAccessibility: e.target.checked
+                      })}
+                      className="w-6 h-6 rounded border-3 border-slate-400 text-purple-600 focus:ring-4 focus:ring-purple-300 cursor-pointer transition-all"
+                      style={{ accentColor: '#9333ea' }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-white hover:bg-purple-50 transition-colors border-2 border-slate-300 shadow-sm">
+                    <span className="text-lg font-bold text-slate-900">文書の組み立て</span>
+                    <input
+                      type="checkbox"
+                      checked={exportPermissions.documentAssembly}
+                      onChange={(e) => setExportPermissions({
+                        ...exportPermissions,
+                        documentAssembly: e.target.checked
+                      })}
+                      className="w-6 h-6 rounded border-3 border-slate-400 text-purple-600 focus:ring-4 focus:ring-purple-300 cursor-pointer transition-all"
+                      style={{ accentColor: '#9333ea' }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="pt-6 border-t-2 border-slate-300 gap-4 bg-slate-50 -m-6 mt-4 p-6 rounded-b-lg">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowPasswordDialog(false);
+                setExportPassword('');
+                setExportPasswordConfirm('');
+              }}
+              className="px-8 py-3 text-lg font-bold border-3 border-slate-400 hover:border-slate-500 hover:bg-slate-100 transition-all rounded-lg shadow-md hover:shadow-lg text-slate-900"
+              style={{ fontSize: '1.125rem', fontWeight: '700', borderWidth: '3px' }}
+            >
+              キャンセル
+            </Button>
+            <Button
+              onClick={handleExportWithPassword}
+              disabled={isExporting}
+              className="px-8 py-3 text-lg font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xl hover:shadow-2xl transition-all rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
+              style={{ fontSize: '1.125rem', fontWeight: '700' }}
+            >
+              {isExporting ? (
+                <>
+                  <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                  エクスポート中...
+                </>
+              ) : (
+                <>
+                  <MdFileDownload className="text-2xl" />
+                  エクスポート
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* QRコードモーダル */}
       {showQRCode && (
         <div 
@@ -5228,3 +5600,4 @@ export default function Home() {
     </div>
   );
 }
+
