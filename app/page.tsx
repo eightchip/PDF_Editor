@@ -1249,8 +1249,10 @@ export default function Home() {
         if (boundingBox) {
         // テキスト全体のバウンディングボックスをハイライトとして描画
         // 矩形の4つの角をpointsとして追加
+        // ハイライト範囲が少し上にはみ出さないように、y座標を少し下に調整
+        const yOffset = boundingBox.height * 0.05; // heightの5%分下げる
         const normalizedX1 = boundingBox.x / pageSize.width;
-        const normalizedY1 = boundingBox.y / pageSize.height;
+        const normalizedY1 = (boundingBox.y + yOffset) / pageSize.height;
         const normalizedX2 = (boundingBox.x + boundingBox.width) / pageSize.width;
         const normalizedY2 = (boundingBox.y + boundingBox.height) / pageSize.height;
 
@@ -4619,11 +4621,12 @@ export default function Home() {
                         const actualPageNum = getActualPageNum(currentPage);
                         await saveAnnotations(docId, actualPageNum, newStrokes);
                         // 再描画（キャンバスをクリアしてから再描画）
-                        if (inkCanvasRef.current) {
+                        if (inkCanvasRef.current && pageSize) {
                           const ctx = inkCanvasRef.current.getContext('2d');
                           if (ctx) {
                             const devicePixelRatio = window.devicePixelRatio || 1;
                             ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+                            // redrawStrokes内でclearRectが呼ばれるが、念のためここでもクリア
                             ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
                             redrawStrokes(ctx, newStrokes, pageSize.width, pageSize.height);
                           }

@@ -20,9 +20,27 @@ export function drawStroke(
     ctx.lineJoin = 'round';
   } else if (stroke.tool === 'highlight') {
     // ハイライトの場合は半透明で矩形を描画（テキストの上に直接重なる）
-    ctx.globalAlpha = 0.3;
-    ctx.globalCompositeOperation = 'multiply'; // 下のPDFと乗算
-    ctx.fillStyle = stroke.color;
+    // 墨消し機能：黒色の場合は墨消しとして扱う（opacityを低くして黒をデフォルト）
+    // 色の正規化（様々な形式に対応）
+    const normalizedColor = stroke.color.toLowerCase().trim();
+    const isRedact = normalizedColor === '#000000' || 
+                     normalizedColor === 'black' || 
+                     normalizedColor === 'rgb(0, 0, 0)' ||
+                     normalizedColor === 'rgba(0, 0, 0, 1)' ||
+                     normalizedColor === 'rgba(0, 0, 0, 0.5)' ||
+                     normalizedColor === 'rgba(0, 0, 0, 0.3)';
+    
+    if (isRedact) {
+      // 墨消しモード：黒で覆う（opacityを低く）
+      ctx.globalAlpha = 0.5; // 墨消し用のopacity
+      ctx.globalCompositeOperation = 'source-over'; // 通常の描画モード
+      ctx.fillStyle = '#000000'; // 黒で固定
+    } else {
+      // 通常のハイライトモード
+      ctx.globalAlpha = 0.3;
+      ctx.globalCompositeOperation = 'multiply'; // 下のPDFと乗算
+      ctx.fillStyle = stroke.color;
+    }
     
     // pointsが4つ以上ある場合（矩形の4つの角）は矩形として描画
     if (stroke.points.length >= 4) {
@@ -99,8 +117,13 @@ export function redrawStrokes(
   canvasWidth: number,
   canvasHeight: number
 ): void {
+  // コンテキストの状態をリセット（前の描画の影響を完全にクリア）
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+  ctx.restore();
   
+  // 各ストロークを描画（各ストロークは独立して描画される）
   for (const stroke of strokes) {
     drawStroke(ctx, stroke, canvasWidth, canvasHeight);
   }

@@ -57,19 +57,60 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
     return dbInstance;
   }
 
-  dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 3, {
-    upgrade(db, oldVersion) {
-      if (!db.objectStoreNames.contains('annotations')) {
-        db.createObjectStore('annotations');
+  try {
+    dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 4, {
+      upgrade(db, oldVersion) {
+        // 既存のオブジェクトストアが存在しない場合のみ作成
+        if (!db.objectStoreNames.contains('annotations')) {
+          db.createObjectStore('annotations');
+        }
+        if (!db.objectStoreNames.contains('textAnnotations')) {
+          db.createObjectStore('textAnnotations');
+        }
+        if (!db.objectStoreNames.contains('shapeAnnotations')) {
+          db.createObjectStore('shapeAnnotations');
+        }
+      },
+      // 既存のデータベースがより新しいバージョンの場合のエラーを処理
+      blocked() {
+        console.warn('IndexedDB is blocked by another tab');
+      },
+      blocking() {
+        console.warn('IndexedDB needs to be closed in other tabs');
+      },
+    });
+  } catch (error) {
+    // バージョンエラーの場合、既存のデータベースを削除して再作成
+    if (error instanceof Error && error.name === 'VersionError') {
+      console.warn('IndexedDB version mismatch. Deleting and recreating database...');
+      try {
+        // 既存のデータベースを削除
+        const deleteReq = indexedDB.deleteDatabase('pdf-annotations');
+        await new Promise<void>((resolve, reject) => {
+          deleteReq.onsuccess = () => resolve();
+          deleteReq.onerror = () => reject(deleteReq.error);
+          deleteReq.onblocked = () => {
+            console.warn('IndexedDB delete is blocked');
+            resolve(); // ブロックされても続行
+          };
+        });
+        
+        // データベースを再作成
+        dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 4, {
+          upgrade(db) {
+            db.createObjectStore('annotations');
+            db.createObjectStore('textAnnotations');
+            db.createObjectStore('shapeAnnotations');
+          },
+        });
+      } catch (recreateError) {
+        console.error('Failed to recreate IndexedDB:', recreateError);
+        throw recreateError;
       }
-      if (!db.objectStoreNames.contains('textAnnotations')) {
-        db.createObjectStore('textAnnotations');
-      }
-      if (!db.objectStoreNames.contains('shapeAnnotations')) {
-        db.createObjectStore('shapeAnnotations');
-      }
-    },
-  });
+    } else {
+      throw error;
+    }
+  }
 
   return dbInstance;
 }
