@@ -82,6 +82,119 @@ export function drawShapeAnnotation(
       );
       ctx.stroke();
       break;
+
+    case 'stamp':
+      // スタンプの描画
+      const stampX = Math.min(x1, x2);
+      const stampY = Math.min(y1, y2);
+      const stampW = Math.abs(x2 - x1);
+      const stampH = Math.abs(y2 - y1);
+
+      // スタンプの種類に応じて描画
+      if (shape.stampType === 'approved') {
+        // 承認スタンプ（円形のスタンプ）
+        const centerX = stampX + stampW / 2;
+        const centerY = stampY + stampH / 2;
+        const radius = Math.min(stampW, stampH) / 2;
+
+        // 外側の円
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = shape.width * 2;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // チェックマーク
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = shape.width * 2;
+        ctx.beginPath();
+        ctx.moveTo(centerX - radius * 0.4, centerY);
+        ctx.lineTo(centerX - radius * 0.1, centerY + radius * 0.3);
+        ctx.lineTo(centerX + radius * 0.4, centerY - radius * 0.2);
+        ctx.stroke();
+
+        // テキスト
+        if (shape.stampText) {
+          ctx.fillStyle = '#10b981';
+          ctx.font = `bold ${Math.min(stampW, stampH) * 0.15}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(shape.stampText, centerX, centerY + radius * 0.7);
+        }
+      } else if (shape.stampType === 'rejected') {
+        // 却下スタンプ（×マーク）
+        const centerX = stampX + stampW / 2;
+        const centerY = stampY + stampH / 2;
+        const radius = Math.min(stampW, stampH) / 2;
+
+        // 外側の円
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = shape.width * 2;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // ×マーク
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = shape.width * 2;
+        const crossSize = radius * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(centerX - crossSize, centerY - crossSize);
+        ctx.lineTo(centerX + crossSize, centerY + crossSize);
+        ctx.moveTo(centerX + crossSize, centerY - crossSize);
+        ctx.lineTo(centerX - crossSize, centerY + crossSize);
+        ctx.stroke();
+
+        // テキスト
+        if (shape.stampText) {
+          ctx.fillStyle = '#ef4444';
+          ctx.font = `bold ${Math.min(stampW, stampH) * 0.15}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(shape.stampText, centerX, centerY + radius * 0.7);
+        }
+      } else if (shape.stampType === 'date') {
+        // 日付スタンプ
+        const centerX = stampX + stampW / 2;
+        const centerY = stampY + stampH / 2;
+        const radius = Math.min(stampW, stampH) / 2;
+
+        // 外側の円
+        ctx.strokeStyle = shape.color || '#3b82f6';
+        ctx.lineWidth = shape.width * 2;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 日付テキスト
+        const dateText = shape.stampText || new Date().toLocaleDateString('ja-JP');
+        ctx.fillStyle = shape.color || '#3b82f6';
+        ctx.font = `bold ${Math.min(stampW, stampH) * 0.2}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(dateText, centerX, centerY);
+      } else if (shape.stampImage) {
+        // カスタム画像スタンプ
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, stampX, stampY, stampW, stampH);
+        };
+        img.src = shape.stampImage;
+      } else {
+        // デフォルトスタンプ（四角形）
+        ctx.strokeStyle = shape.color;
+        ctx.lineWidth = shape.width * 2;
+        ctx.strokeRect(stampX, stampY, stampW, stampH);
+        
+        if (shape.stampText) {
+          ctx.fillStyle = shape.color;
+          ctx.font = `bold ${Math.min(stampW, stampH) * 0.2}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(shape.stampText, stampX + stampW / 2, stampY + stampH / 2);
+        }
+      }
+      break;
   }
 
   ctx.restore();
@@ -90,14 +203,31 @@ export function drawShapeAnnotation(
 /**
  * 全図形注釈を再描画
  */
-export function redrawShapeAnnotations(
+export async function redrawShapeAnnotations(
   ctx: CanvasRenderingContext2D,
   shapes: ShapeAnnotation[],
   canvasWidth: number,
   canvasHeight: number
-): void {
+): Promise<void> {
   for (const shape of shapes) {
-    drawShapeAnnotation(ctx, shape, canvasWidth, canvasHeight);
+    if (shape.type === 'stamp' && shape.stampImage) {
+      // 画像スタンプの場合は非同期で描画
+      await new Promise<void>((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const stampX = Math.min(shape.x1, shape.x2) * canvasWidth;
+          const stampY = Math.min(shape.y1, shape.y2) * canvasHeight;
+          const stampW = Math.abs(shape.x2 - shape.x1) * canvasWidth;
+          const stampH = Math.abs(shape.y2 - shape.y1) * canvasHeight;
+          ctx.drawImage(img, stampX, stampY, stampW, stampH);
+          resolve();
+        };
+        img.onerror = () => resolve();
+        img.src = shape.stampImage!;
+      });
+    } else {
+      drawShapeAnnotation(ctx, shape, canvasWidth, canvasHeight);
+    }
   }
 }
 

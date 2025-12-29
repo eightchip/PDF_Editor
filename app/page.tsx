@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button"; // Dialog内でのみ使用
-import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections, MdDragHandle, MdLock, MdSecurity, MdCheckCircle, MdInfo } from 'react-icons/md';
+import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections, MdDragHandle, MdLock, MdSecurity, MdCheckCircle, MdInfo, MdLocalOffer } from 'react-icons/md';
 import { QRCodeSVG } from 'qrcode.react';
 // PDF.jsの型は動的インポートで取得
 
@@ -76,19 +76,6 @@ export default function Home() {
   const [dialogInputValue, setDialogInputValue] = useState('');
   const [dialogCallback, setDialogCallback] = useState<((value?: string | boolean) => void) | null>(null);
   
-  // パスワード保護用のstate
-  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
-  const [exportPassword, setExportPassword] = useState('');
-  const [exportPasswordConfirm, setExportPasswordConfirm] = useState('');
-  const [exportPermissions, setExportPermissions] = useState({
-    printing: 'highResolution' as 'lowResolution' | 'highResolution' | 'none',
-    modifying: false,
-    copying: false,
-    annotating: true,
-    fillingForms: true,
-    contentAccessibility: true,
-    documentAssembly: false,
-  });
 
   // Dialog/Toastヘルパー関数
   const showAlert = (message: string, title: string = '') => {
@@ -134,7 +121,7 @@ export default function Home() {
   };
 
   // 描画関連
-  const [tool, setTool] = useState<'pen' | 'eraser' | 'text' | 'line' | 'rectangle' | 'circle' | 'arrow' | 'highlight' | 'select'>('pen');
+  const [tool, setTool] = useState<'pen' | 'eraser' | 'text' | 'line' | 'rectangle' | 'circle' | 'arrow' | 'highlight' | 'select' | 'stamp'>('pen');
   const [highlightMode, setHighlightMode] = useState<'auto' | 'manual'>('auto'); // ハイライトモード: 'auto' = 自動（クリックで文字列全体）、'manual' = 手動（ドラッグで範囲指定）
   
   // 選択関連
@@ -168,6 +155,9 @@ export default function Home() {
   const [shapeAnnotations, setShapeAnnotations] = useState<ShapeAnnotation[]>([]);
   const [currentShape, setCurrentShape] = useState<ShapeAnnotation | null>(null);
   const [shapeStartPoint, setShapeStartPoint] = useState<{ x: number; y: number } | null>(null);
+  
+  // スタンプ関連
+  const [selectedStampType, setSelectedStampType] = useState<'date' | 'approved' | 'rejected'>('date');
 
   // Undo/Redo（strokes、shapes、textAnnotationsの全てを含む）
   type UndoState = {
@@ -913,7 +903,7 @@ export default function Home() {
           const shapeCtx = shapeCanvasRef.current.getContext('2d');
           if (shapeCtx) {
             shapeCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-            redrawShapeAnnotations(shapeCtx, savedShapes, size.width, size.height);
+            redrawShapeAnnotations(shapeCtx, savedShapes, size.width, size.height).catch(console.error);
           }
         }
       } else {
@@ -1233,6 +1223,77 @@ export default function Home() {
       return;
     }
 
+    // スタンプツールの場合
+    if (tool === 'stamp') {
+      if (!shapeCanvasRef.current || !pageSize) {
+        return;
+      }
+      
+      const target = e.currentTarget;
+      const rect = target.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const normalizedX = x / pageSize.width;
+      const normalizedY = y / pageSize.height;
+      
+      // スタンプのサイズ（デフォルト: 100x100px相当）
+      const stampSize = 100 / Math.max(pageSize.width, pageSize.height);
+      
+      // 選択されたスタンプタイプに応じてスタンプを作成
+      let stampText = '';
+      let stampColor = '#3b82f6';
+      
+      if (selectedStampType === 'date') {
+        stampText = new Date().toLocaleDateString('ja-JP');
+        stampColor = '#3b82f6';
+      } else if (selectedStampType === 'approved') {
+        stampText = '承認';
+        stampColor = '#10b981';
+      } else if (selectedStampType === 'rejected') {
+        stampText = '却下';
+        stampColor = '#ef4444';
+      }
+      
+      const newStamp: ShapeAnnotation = {
+        id: generateShapeId(),
+        type: 'stamp',
+        x1: normalizedX,
+        y1: normalizedY,
+        x2: normalizedX + stampSize,
+        y2: normalizedY + stampSize,
+        color: stampColor,
+        width: 2,
+        stampType: selectedStampType,
+        stampText: stampText,
+      };
+      
+      const newShapes = [...shapeAnnotations, newStamp];
+      setShapeAnnotations(newShapes);
+      
+      // Undoスタックに追加
+      setUndoStack([...undoStack, { strokes, shapes: shapeAnnotations, texts: textAnnotations }]);
+      setRedoStack([]);
+      
+      // 保存
+      if (docId) {
+        const actualPageNum = getActualPageNum(currentPage);
+        saveShapeAnnotations(docId, actualPageNum, newShapes);
+      }
+      
+      // 再描画
+      if (shapeCanvasRef.current && pageSize) {
+        const ctx = shapeCanvasRef.current.getContext('2d');
+        if (ctx) {
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          redrawShapeAnnotations(ctx, newShapes, pageSize.width, pageSize.height).catch(console.error);
+        }
+      }
+      
+      e.preventDefault();
+      return;
+    }
+
     // 図形ツールの場合（ここに到達する時点で、shapeCanvasRefからのイベントであることは確認済み）
     if (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow') {
       if (!shapeCanvasRef.current || !pageSize) {
@@ -1492,7 +1553,7 @@ export default function Home() {
           ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
           // キャンバスをクリアしてから再描画（不要な描画を消すため）
           ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
-          redrawShapeAnnotations(ctx, movedShapes, pageSize.width, pageSize.height);
+          redrawShapeAnnotations(ctx, movedShapes, pageSize.width, pageSize.height).catch(console.error);
         }
       }
       if (textCanvasRef.current && pageSize) {
@@ -1529,7 +1590,7 @@ export default function Home() {
     
     if (!isDrawingRef.current || !pageSize) return;
 
-    // 図形ツールの場合
+    // 図形ツールの場合（スタンプは除く）
     if (currentShape && (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow')) {
       // shapeCanvasRefからのイベントであることを確認
       if (e.currentTarget !== shapeCanvasRef.current) {
@@ -1562,7 +1623,7 @@ export default function Home() {
           ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
           ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
           // 既存の図形を再描画
-          redrawShapeAnnotations(ctx, shapeAnnotations, pageSize.width, pageSize.height);
+          redrawShapeAnnotations(ctx, shapeAnnotations, pageSize.width, pageSize.height).catch(console.error);
           // 現在描画中の図形を描画
           drawShapeAnnotation(ctx, updatedShape, pageSize.width, pageSize.height);
         }
@@ -1801,7 +1862,7 @@ export default function Home() {
           if (ctx) {
             const devicePixelRatio = window.devicePixelRatio || 1;
             ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-            redrawShapeAnnotations(ctx, movedShapes, pageSize.width, pageSize.height);
+            redrawShapeAnnotations(ctx, movedShapes, pageSize.width, pageSize.height).catch(console.error);
           }
         }
         if (textCanvasRef.current && pageSize) {
@@ -1834,7 +1895,7 @@ export default function Home() {
     
     if (!isDrawingRef.current || !docId) return;
 
-    // 図形ツールの場合
+    // 図形ツールの場合（スタンプは除く）
     if (currentShape && (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow')) {
       // shapeCanvasRefからのイベントであることを確認
       if (e.currentTarget !== shapeCanvasRef.current) {
@@ -1860,7 +1921,7 @@ export default function Home() {
             const devicePixelRatio = window.devicePixelRatio || 1;
             ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
             ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
-            redrawShapeAnnotations(ctx, shapeAnnotations, pageSize.width, pageSize.height);
+            redrawShapeAnnotations(ctx, shapeAnnotations, pageSize.width, pageSize.height).catch(console.error);
           }
         }
         e.preventDefault();
@@ -1889,7 +1950,7 @@ export default function Home() {
           const devicePixelRatio = window.devicePixelRatio || 1;
           ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
           ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
-          redrawShapeAnnotations(ctx, newShapes, pageSize.width, pageSize.height);
+          redrawShapeAnnotations(ctx, newShapes, pageSize.width, pageSize.height).catch(console.error);
         }
       }
 
@@ -2298,7 +2359,7 @@ export default function Home() {
           const devicePixelRatio = window.devicePixelRatio || 1;
           ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
           ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
-          redrawShapeAnnotations(ctx, previousState.shapes, pageSize.width, pageSize.height);
+          redrawShapeAnnotations(ctx, previousState.shapes, pageSize.width, pageSize.height).catch(console.error);
         }
       }
       if (textCanvasRef.current && pageSize) {
@@ -2413,7 +2474,7 @@ export default function Home() {
           const devicePixelRatio = window.devicePixelRatio || 1;
           ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
           ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
-          redrawShapeAnnotations(ctx, newShapes, pageSize.width, pageSize.height);
+          redrawShapeAnnotations(ctx, newShapes, pageSize.width, pageSize.height).catch(console.error);
         }
       }
       if (textCanvasRef.current && pageSize) {
@@ -2706,15 +2767,13 @@ export default function Home() {
         }
       }
 
-      // 注釈をPDFに焼き込む（パスワード保護が設定されている場合は適用）
+      // 注釈をPDFに焼き込む
       const pdfBytes = await exportAnnotatedPDFV2(
         originalPdfBytes,
         annotations,
         allPageSizes,
         textAnnotations,
-        shapeAnnotations,
-        exportPassword || undefined,
-        exportPassword ? exportPermissions : undefined
+        shapeAnnotations
       );
 
       return pdfBytes;
@@ -2771,9 +2830,8 @@ export default function Home() {
     }
   };
 
-  // 名前を付けて保存（ブラウザのネイティブファイル保存ダイアログを使用）
-  const handleSaveAs = () => {
-    console.log('handleSaveAs called', { pdfDoc: !!pdfDoc, isExporting, showPasswordDialog });
+  // 名前を付けて保存
+  const handleSaveAs = async () => {
     if (!pdfDoc) {
       toast({
         title: "エラー",
@@ -2782,82 +2840,75 @@ export default function Home() {
       });
       return;
     }
-    // パスワード保護ダイアログを表示
-    console.log('Opening password dialog, current state:', showPasswordDialog);
-    // 次のレンダリングサイクルで確実に開くようにする
-    setTimeout(() => {
-      console.log('Setting showPasswordDialog to true in setTimeout');
-      setShowPasswordDialog(true);
-    }, 0);
-    console.log('setShowPasswordDialog(true) scheduled');
-  };
-  
-  // デバッグ用: showPasswordDialogの状態変化を監視
-  useEffect(() => {
-    console.log('showPasswordDialog state changed:', showPasswordDialog);
-    if (showPasswordDialog) {
-      // ダイアログが開かれたときに、オーバーレイとコンテンツのz-indexを調整
-      const adjustZIndex = () => {
-        // Radix UIのDialogOverlayを探す（複数の方法で試す）
-        const overlaySelectors = [
-          '[data-radix-dialog-overlay]',
-          '[data-state="open"]',
-          '.fixed.inset-0.z-50',
-        ];
-        
-        let overlay: HTMLElement | null = null;
-        for (const selector of overlaySelectors) {
-          const elements = document.querySelectorAll(selector);
-          for (const el of elements) {
-            if (el instanceof HTMLElement && el.classList.contains('fixed') && el.classList.contains('inset-0')) {
-              overlay = el;
-              break;
-            }
+
+    setIsExporting(true);
+    try {
+      const pdfBytes = await generateAnnotatedPDF();
+      if (!pdfBytes) {
+        setIsExporting(false);
+        return;
+      }
+
+      // File System Access APIを使用（サポートされている場合）
+      if ('showSaveFilePicker' in window) {
+        try {
+          const defaultFileName = originalFileName || 'annotated.pdf';
+          const fileHandle = await (window as any).showSaveFilePicker({
+            suggestedName: defaultFileName,
+            types: [{
+              description: 'PDF files',
+              accept: { 'application/pdf': ['.pdf'] },
+            }],
+          });
+
+          const writable = await fileHandle.createWritable();
+          await writable.write(pdfBytes);
+          await writable.close();
+
+          toast({
+            title: "成功",
+            description: "PDFを保存しました",
+          });
+          setIsExporting(false);
+          return;
+        } catch (error: any) {
+          // ユーザーがキャンセルした場合はエラーを無視
+          if (error.name === 'AbortError' || error.name === 'NotAllowedError') {
+            setIsExporting(false);
+            return;
           }
-          if (overlay) break;
+          // その他のエラーはフォールバック処理に進む
+          console.error('File System Access API エラー:', error);
         }
-        
-        if (overlay) {
-          overlay.style.zIndex = '10001';
-          overlay.style.display = 'block';
-          overlay.style.opacity = '1';
-          console.log('Overlay z-index set to 10001', overlay);
-        } else {
-          console.warn('Overlay not found');
-        }
-        
-        // Radix UIのDialogContentを探す
-        const contentSelectors = [
-          '[data-radix-dialog-content]',
-          '[role="dialog"]',
-        ];
-        
-        let content: HTMLElement | null = null;
-        for (const selector of contentSelectors) {
-          const el = document.querySelector(selector);
-          if (el instanceof HTMLElement) {
-            content = el;
-            break;
-          }
-        }
-        
-        if (content) {
-          content.style.zIndex = '10002';
-          content.style.display = 'block';
-          content.style.visibility = 'visible';
-          console.log('Content z-index set to 10002', content);
-        } else {
-          console.warn('Content not found');
-        }
-      };
-      
-      // 複数回試行（DOMの更新を待つ）
-      setTimeout(adjustZIndex, 0);
-      setTimeout(adjustZIndex, 10);
-      setTimeout(adjustZIndex, 50);
-      setTimeout(adjustZIndex, 100);
+      }
+
+      // フォールバック: ダウンロード方式（File System Access APIがサポートされていない場合）
+      const defaultFileName = originalFileName || 'annotated.pdf';
+      const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = defaultFileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "成功",
+        description: "PDFをエクスポートしました",
+      });
+    } catch (error) {
+      console.error('エクスポートエラー:', error);
+      toast({
+        title: "エラー",
+        description: 'エクスポートに失敗しました: ' + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
     }
-  }, [showPasswordDialog]);
+  };
   
   // 既存のhandleSaveAs関数（後方互換性のため残す）
   const handleSaveAsDirect = async () => {
@@ -2928,138 +2979,10 @@ export default function Home() {
 
   // 既存のエクスポート関数（後方互換性のため残す）
   const handleExport = async () => {
-    // パスワード保護ダイアログを表示
-    setShowPasswordDialog(true);
+    // 名前を付けて保存を実行
+    handleSaveAs();
   };
 
-  // パスワード保護設定後のエクスポート実行
-  const handleExportWithPassword = async () => {
-    // パスワード確認
-    if (exportPassword && exportPassword !== exportPasswordConfirm) {
-      toast({
-        title: "エラー",
-        description: "パスワードが一致しません",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsExporting(true);
-    setShowPasswordDialog(false);
-    
-    try {
-      console.log('エクスポート開始');
-      const pdfBytes = await generateAnnotatedPDF();
-      if (!pdfBytes) {
-        console.error('PDF生成失敗');
-        setIsExporting(false);
-        return;
-      }
-      console.log('PDF生成成功:', pdfBytes.length, 'bytes');
-
-      // パスワード保護が必要な場合、APIを呼び出す
-      let finalPdfBytes = pdfBytes;
-      if (exportPassword && exportPassword.trim() !== '') {
-        console.log('パスワード保護APIを呼び出し');
-        try {
-          // FormDataを作成
-          const formData = new FormData();
-          const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
-          formData.append('pdf', blob, 'document.pdf');
-          formData.append('password', exportPassword);
-          formData.append('permissions', JSON.stringify(exportPermissions));
-
-          // APIを呼び出し（タイムアウトを設定）
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒でタイムアウト
-          
-          try {
-            const response = await fetch('/api/protect-pdf', {
-              method: 'POST',
-              body: formData,
-              signal: controller.signal,
-            });
-            
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-              const errorData = await response.json().catch(() => ({ error: response.statusText }));
-              const errorMessage = errorData.error || response.statusText;
-              console.error('パスワード保護APIエラー:', errorMessage);
-              console.error('エラー詳細:', errorData);
-              
-              // qpdfが見つからない場合は、より明確なエラーメッセージを表示
-              if (errorData.qpdfNotFound) {
-                throw new Error(`qpdfが見つかりません。\n\n${errorMessage}\n\n保護なしでエクスポートを続行しますか？`);
-              }
-              
-              throw new Error(`パスワード保護APIエラー: ${errorMessage}`);
-            }
-
-            // 保護されたPDFを取得
-            const protectedPdfBlob = await response.blob();
-            finalPdfBytes = new Uint8Array(await protectedPdfBlob.arrayBuffer());
-            console.log('パスワード保護成功:', finalPdfBytes.length, 'bytes');
-          } catch (fetchError) {
-            clearTimeout(timeoutId);
-            if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-              throw new Error('パスワード保護APIがタイムアウトしました');
-            }
-            throw fetchError;
-          }
-        } catch (apiError) {
-          console.error('パスワード保護APIエラー:', apiError);
-          const errorMessage = apiError instanceof Error ? apiError.message : String(apiError);
-          
-          // APIエラーの場合、保護なしでエクスポート
-          toast({
-            title: "警告",
-            description: errorMessage.includes('qpdfが見つかりません') 
-              ? 'qpdfが見つかりません。保護なしでエクスポートします。'
-              : 'パスワード保護に失敗しました。保護なしでエクスポートします。',
-            variant: "destructive",
-          });
-          
-          // qpdfが見つからない場合は、エクスポートを続行（保護なし）
-          // それ以外のエラーの場合も、エクスポートを続行
-        }
-      }
-
-      // ダウンロード（タイムスタンプ付きファイル名）
-      console.log('PDFダウンロード開始');
-      const blob = new Blob([finalPdfBytes as BlobPart], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `annotated_${Date.now()}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      console.log('PDFダウンロード完了');
-
-      toast({
-        title: "成功",
-        description: exportPassword && exportPassword.trim() !== ''
-          ? "パスワード保護付きPDFをエクスポートしました" 
-          : "注釈付きPDFをエクスポートしました",
-      });
-      
-      // パスワードをリセット
-      setExportPassword('');
-      setExportPasswordConfirm('');
-    } catch (error) {
-      console.error('エクスポートエラー:', error);
-      toast({
-        title: "エラー",
-        description: 'エクスポートに失敗しました: ' + (error instanceof Error ? error.message : String(error)),
-        variant: "destructive",
-      });
-    } finally {
-      console.log('エクスポート処理完了、isExportingをfalseに設定');
-      setIsExporting(false);
-    }
-  };
 
   // 注釈をJSON形式でエクスポート
   const handleExportJSON = async () => {
@@ -3356,9 +3279,9 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 保存ボタン（画面上部中央） */}
+      {/* 保存ボタン（画面上部右側） */}
       {pdfDoc && (
-        <div className="mb-6 flex justify-center items-center gap-3 flex-wrap">
+        <div className="mb-6 flex justify-end items-center gap-3 flex-wrap">
           <button
             onClick={handleSave}
             disabled={isExporting || !pdfDoc || !originalFileName}
@@ -3388,21 +3311,7 @@ export default function Home() {
           </button>
           <button
             type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log('Button clicked', { pdfDoc: !!pdfDoc, isExporting, showPasswordDialog });
-              if (!pdfDoc) {
-                toast({
-                  title: "エラー",
-                  description: "PDFが読み込まれていません",
-                  variant: "destructive",
-                });
-                return;
-              }
-              console.log('Setting showPasswordDialog to true directly');
-              setShowPasswordDialog(true);
-            }}
+            onClick={handleSaveAs}
             disabled={isExporting || !pdfDoc}
             className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-cyan-500 hover:scale-105 active:scale-95 ${
               isExporting || !pdfDoc ? 'cursor-not-allowed' : 'shadow-md'
@@ -3792,186 +3701,191 @@ export default function Home() {
         {/* ページ操作 */}
         {pdfDoc && (
           <>
-            <div className="mb-4 flex gap-3 md:gap-4 items-center flex-wrap transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
-            <button
-              onClick={() => setShowThumbnailModal(true)}
-              title="ページ一覧のサムネイルを全画面で表示します"
-              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-2 shadow-sm text-white border-indigo-600 shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
-              style={{
-                background: 'linear-gradient(to right, #4f46e5, #9333ea)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(to right, #4338ca, #7e22ce)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(to right, #4f46e5, #9333ea)';
-              }}
-            >
-              <MdList className="text-lg text-white" />
-              ページ管理
-            </button>
-            <button
-              onClick={goToPrevPage}
-              disabled={currentPage === 1}
-              title="前のページに移動します (←)"
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-cyan-500 shadow-md hover:scale-105 active:scale-95 ${
-                currentPage === 1 ? 'cursor-not-allowed' : ''
-              }`}
-              style={{
-                background: currentPage === 1
-                  ? '#e2e8f0'
-                  : 'linear-gradient(to right, #06b6d4, #3b82f6)',
-                color: currentPage === 1 ? '#94a3b8' : 'white',
-              }}
-              onMouseEnter={(e) => {
-                if (currentPage !== 1) {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #0891b2, #2563eb)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (currentPage !== 1) {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #06b6d4, #3b82f6)';
-                }
-              }}
-            >
-              <MdNavigateBefore className={`text-lg ${currentPage === 1 ? 'text-slate-400' : 'text-white'}`} />
-              前へ
-            </button>
-            <span className="text-sm font-semibold bg-gradient-to-r from-slate-600 to-slate-700 bg-clip-text text-transparent px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
-              ページ {currentPage} / {totalPages}
-            </span>
-            <button
-              onClick={goToNextPage}
-              disabled={currentPage === totalPages}
-              title="次のページに移動します (→)"
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-cyan-500 shadow-md hover:scale-105 active:scale-95 ${
-                currentPage === totalPages ? 'cursor-not-allowed' : ''
-              }`}
-              style={{
-                background: currentPage === totalPages
-                  ? '#e2e8f0'
-                  : 'linear-gradient(to right, #06b6d4, #3b82f6)',
-                color: currentPage === totalPages ? '#94a3b8' : 'white',
-              }}
-              onMouseEnter={(e) => {
-                if (currentPage !== totalPages) {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #0891b2, #2563eb)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (currentPage !== totalPages) {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #06b6d4, #3b82f6)';
-                }
-              }}
-            >
-              次へ
-              <MdNavigateNext className={`text-lg ${currentPage === totalPages ? 'text-slate-400' : 'text-white'}`} />
-            </button>
-            <span className="text-slate-300 mx-1">|</span>
-            <button
-              onClick={() => setPageRotation((prev) => (prev + 90) % 360)}
-              title="ページを90度回転します"
-              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm text-white border-emerald-500 shadow-md hover:scale-105 active:scale-95"
-              style={{
-                background: 'linear-gradient(to right, #10b981, #14b8a6)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(to right, #059669, #0d9488)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(to right, #10b981, #14b8a6)';
-              }}
-            >
-              <MdRotateRight className="text-lg" />
-              回転 ({pageRotation}°)
-            </button>
-        </div>
+            <div className="mb-4 flex gap-3 md:gap-4 items-center flex-wrap justify-between transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
+              {/* 左側: ページ管理とナビゲーション */}
+              <div className="flex gap-3 md:gap-4 items-center flex-wrap">
+                <button
+                  onClick={() => setShowThumbnailModal(true)}
+                  title="ページ一覧のサムネイルを全画面で表示します"
+                  className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-2 shadow-sm text-white border-indigo-600 shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
+                  style={{
+                    background: 'linear-gradient(to right, #4f46e5, #9333ea)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #4338ca, #7e22ce)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #4f46e5, #9333ea)';
+                  }}
+                >
+                  <MdList className="text-lg text-white" />
+                  ページ管理
+                </button>
+                <button
+                  onClick={goToPrevPage}
+                  disabled={currentPage === 1}
+                  title="前のページに移動します (←)"
+                  className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-cyan-500 shadow-md hover:scale-105 active:scale-95 ${
+                    currentPage === 1 ? 'cursor-not-allowed' : ''
+                  }`}
+                  style={{
+                    background: currentPage === 1
+                      ? '#e2e8f0'
+                      : 'linear-gradient(to right, #06b6d4, #3b82f6)',
+                    color: currentPage === 1 ? '#94a3b8' : 'white',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (currentPage !== 1) {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #0891b2, #2563eb)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (currentPage !== 1) {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #06b6d4, #3b82f6)';
+                    }
+                  }}
+                >
+                  <MdNavigateBefore className={`text-lg ${currentPage === 1 ? 'text-slate-400' : 'text-white'}`} />
+                  前へ
+                </button>
+                <span className="text-sm font-semibold bg-gradient-to-r from-slate-600 to-slate-700 bg-clip-text text-transparent px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
+                  ページ {currentPage} / {totalPages}
+                </span>
+                <button
+                  onClick={goToNextPage}
+                  disabled={currentPage === totalPages}
+                  title="次のページに移動します (→)"
+                  className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-cyan-500 shadow-md hover:scale-105 active:scale-95 ${
+                    currentPage === totalPages ? 'cursor-not-allowed' : ''
+                  }`}
+                  style={{
+                    background: currentPage === totalPages
+                      ? '#e2e8f0'
+                      : 'linear-gradient(to right, #06b6d4, #3b82f6)',
+                    color: currentPage === totalPages ? '#94a3b8' : 'white',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (currentPage !== totalPages) {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #0891b2, #2563eb)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (currentPage !== totalPages) {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #06b6d4, #3b82f6)';
+                    }
+                  }}
+                >
+                  次へ
+                  <MdNavigateNext className={`text-lg ${currentPage === totalPages ? 'text-slate-400' : 'text-white'}`} />
+                </button>
+                <span className="text-slate-300 mx-1">|</span>
+                <button
+                  onClick={() => setPageRotation((prev) => (prev + 90) % 360)}
+                  title="ページを90度回転します"
+                  className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm text-white border-emerald-500 shadow-md hover:scale-105 active:scale-95"
+                  style={{
+                    background: 'linear-gradient(to right, #10b981, #14b8a6)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #059669, #0d9488)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #10b981, #14b8a6)';
+                  }}
+                >
+                  <MdRotateRight className="text-lg" />
+                  回転 ({pageRotation}°)
+                </button>
+              </div>
+              
+              {/* 右側: ズーム */}
+              <div className="flex gap-3 items-center flex-wrap">
+                <span className="text-sm font-medium text-slate-700 flex items-center gap-1">
+                  <MdZoomOut className="text-base" />
+                  ズーム:
+                </span>
+                <button
+                  onClick={() => setScale(0.75)}
+                  title="表示倍率を75%に設定します"
+                  className={`px-3 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm border-violet-500 ${
+                    scale === 0.75 ? 'shadow-md' : ''
+                  }`}
+                  style={{
+                    background: scale === 0.75
+                      ? 'linear-gradient(to right, #8b5cf6, #a855f7)'
+                      : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                    color: scale === 0.75 ? 'white' : '#334155',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (scale === 0.75) {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #7c3aed, #9333ea)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (scale === 0.75) {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #8b5cf6, #a855f7)';
+                    }
+                  }}
+                >
+                  75%
+                </button>
+                <button
+                  onClick={() => setScale(1.0)}
+                  title="表示倍率を100%に設定します"
+                  className={`px-3 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm border-violet-500 ${
+                    scale === 1.0 ? 'shadow-md' : ''
+                  }`}
+                  style={{
+                    background: scale === 1.0
+                      ? 'linear-gradient(to right, #8b5cf6, #a855f7)'
+                      : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                    color: scale === 1.0 ? 'white' : '#334155',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (scale === 1.0) {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #7c3aed, #9333ea)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (scale === 1.0) {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #8b5cf6, #a855f7)';
+                    }
+                  }}
+                >
+                  100%
+                </button>
+                <button
+                  onClick={() => setScale(1.25)}
+                  title="表示倍率を125%に設定します"
+                  className={`px-3 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm border-violet-500 ${
+                    scale === 1.25 ? 'shadow-md' : ''
+                  }`}
+                  style={{
+                    background: scale === 1.25
+                      ? 'linear-gradient(to right, #8b5cf6, #a855f7)'
+                      : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                    color: scale === 1.25 ? 'white' : '#334155',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (scale === 1.25) {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #7c3aed, #9333ea)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (scale === 1.25) {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #8b5cf6, #a855f7)';
+                    }
+                  }}
+                >
+                  125%
+                </button>
+              </div>
+            </div>
 
-          {/* ズーム */}
-          <div className="mb-4 flex gap-3 items-center flex-wrap relative z-50" style={{ pointerEvents: 'auto' }}>
-            <span className="text-sm font-medium text-slate-700 flex items-center gap-1">
-              <MdZoomOut className="text-base" />
-              ズーム:
-            </span>
-            <button
-              onClick={() => setScale(0.75)}
-              title="表示倍率を75%に設定します"
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm border-violet-500 ${
-                scale === 0.75 ? 'shadow-md' : ''
-              }`}
-              style={{
-                background: scale === 0.75
-                  ? 'linear-gradient(to right, #8b5cf6, #a855f7)'
-                  : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
-                color: scale === 0.75 ? 'white' : '#334155',
-              }}
-              onMouseEnter={(e) => {
-                if (scale === 0.75) {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #7c3aed, #9333ea)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (scale === 0.75) {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #8b5cf6, #a855f7)';
-                }
-              }}
-            >
-              75%
-            </button>
-            <button
-              onClick={() => setScale(1.0)}
-              title="表示倍率を100%に設定します"
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm border-violet-500 ${
-                scale === 1.0 ? 'shadow-md' : ''
-              }`}
-              style={{
-                background: scale === 1.0
-                  ? 'linear-gradient(to right, #8b5cf6, #a855f7)'
-                  : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
-                color: scale === 1.0 ? 'white' : '#334155',
-              }}
-              onMouseEnter={(e) => {
-                if (scale === 1.0) {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #7c3aed, #9333ea)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (scale === 1.0) {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #8b5cf6, #a855f7)';
-                }
-              }}
-            >
-              100%
-            </button>
-            <button
-              onClick={() => setScale(1.25)}
-              title="表示倍率を125%に設定します"
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm border-violet-500 ${
-                scale === 1.25 ? 'shadow-md' : ''
-              }`}
-              style={{
-                background: scale === 1.25
-                  ? 'linear-gradient(to right, #8b5cf6, #a855f7)'
-                  : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
-                color: scale === 1.25 ? 'white' : '#334155',
-              }}
-              onMouseEnter={(e) => {
-                if (scale === 1.25) {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #7c3aed, #9333ea)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (scale === 1.25) {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #8b5cf6, #a855f7)';
-                }
-              }}
-            >
-              125%
-            </button>
-          </div>
 
           {/* ツールバー */}
-          <div className="mb-4 flex gap-3 md:gap-4 items-center flex-wrap transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
+          <div className="mb-4 flex gap-3 md:gap-4 items-center flex-wrap justify-between transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
+            {/* 左側: 描画ツール */}
             <div className="flex gap-3 flex-wrap">
               <button
                 onClick={() => setTool('pen')}
@@ -4181,6 +4095,63 @@ export default function Home() {
                 <MdHighlight className={`text-base ${tool === 'highlight' ? 'text-slate-800' : 'text-yellow-500'}`} />
                 ハイライト
               </button>
+              <div className="relative">
+                <button
+                  onClick={() => setTool('stamp')}
+                  title="スタンプを追加します"
+                  className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-purple-500 ${
+                    tool === 'stamp' ? 'shadow-md' : ''
+                  }`}
+                  style={{
+                    background: tool === 'stamp'
+                      ? 'linear-gradient(to right, #a855f7, #9333ea)'
+                      : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                    color: tool === 'stamp' ? 'white' : '#334155',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (tool === 'stamp') {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #9333ea, #7e22ce)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (tool === 'stamp') {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #a855f7, #9333ea)';
+                    }
+                  }}
+                >
+                  <MdLocalOffer className={`text-base ${tool === 'stamp' ? 'text-white' : 'text-purple-500'}`} />
+                  スタンプ
+                  {tool === 'stamp' && (
+                    <span className="ml-1 text-xs">
+                      ({selectedStampType === 'date' ? '日付' : selectedStampType === 'approved' ? '承認' : '却下'})
+                    </span>
+                  )}
+                </button>
+                {tool === 'stamp' && (
+                  <div className="absolute top-full left-0 mt-1 bg-white border border-purple-300 rounded-lg shadow-lg p-2 z-50">
+                    <div className="flex flex-col gap-1">
+                      <button
+                        onClick={() => setSelectedStampType('date')}
+                        className={`px-3 py-1 text-sm rounded ${selectedStampType === 'date' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'}`}
+                      >
+                        日付
+                      </button>
+                      <button
+                        onClick={() => setSelectedStampType('approved')}
+                        className={`px-3 py-1 text-sm rounded ${selectedStampType === 'approved' ? 'bg-green-100 text-green-700' : 'hover:bg-gray-100'}`}
+                      >
+                        承認
+                      </button>
+                      <button
+                        onClick={() => setSelectedStampType('rejected')}
+                        className={`px-3 py-1 text-sm rounded ${selectedStampType === 'rejected' ? 'bg-red-100 text-red-700' : 'hover:bg-gray-100'}`}
+                      >
+                        却下
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => {
                   setTool('select');
@@ -4975,7 +4946,7 @@ export default function Home() {
                             const devicePixelRatio = window.devicePixelRatio || 1;
                             ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
                             ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
-                            redrawShapeAnnotations(ctx, newShapes, pageSize.width, pageSize.height);
+                            redrawShapeAnnotations(ctx, newShapes, pageSize.width, pageSize.height).catch(console.error);
                           }
                         }
                       }
@@ -5477,233 +5448,6 @@ export default function Home() {
                 }}>OK</Button>
               </>
             )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* パスワード保護設定ダイアログ */}
-      <Dialog 
-        open={showPasswordDialog} 
-        onOpenChange={(open) => {
-          console.log('Dialog onOpenChange called with:', open, 'current state:', showPasswordDialog);
-          // 開く場合は常に許可
-          if (open) {
-            console.log('Dialog opening - allowing');
-            setShowPasswordDialog(true);
-            return;
-          }
-          // 閉じる場合は、意図的な操作（ESCキーやオーバーレイクリックなど）のみ許可
-          console.log('Dialog closing request - allowing close');
-          setExportPassword('');
-          setExportPasswordConfirm('');
-          setShowPasswordDialog(false);
-        }}
-      >
-        <DialogContent 
-          className="max-w-2xl max-h-[75vh] overflow-y-auto !z-[10002] bg-white shadow-2xl border-2 border-slate-300 !top-4 !right-4 !left-auto !bottom-auto !translate-x-0 !translate-y-0"
-          style={{
-            zIndex: 10002,
-            position: 'fixed',
-            backgroundColor: '#ffffff',
-            top: '1rem',
-            right: '1rem',
-            left: 'auto',
-            bottom: 'auto',
-            transform: 'none',
-            borderRadius: '1rem',
-            maxWidth: 'calc(100vw - 2rem)',
-            maxHeight: 'calc(100vh - 2rem)',
-          }}
-        >
-          <DialogHeader className="pb-6 border-b-2 border-slate-300 bg-gradient-to-r from-blue-50 to-purple-50 -m-6 mb-4 p-6 rounded-t-lg">
-            <div className="flex items-center gap-4 mb-3">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 shadow-lg">
-                <MdSecurity className="text-3xl text-white" />
-              </div>
-              <div className="flex-1">
-                <DialogTitle className="text-3xl font-bold text-slate-900 mb-2">
-                  PDFエクスポート設定
-                </DialogTitle>
-                <DialogDescription className="text-base text-slate-700 font-medium">
-                  パスワード保護と権限設定を行います（オプション）
-                </DialogDescription>
-              </div>
-            </div>
-          </DialogHeader>
-          <div className="space-y-8 py-6">
-            {/* パスワード設定 */}
-            <div className="space-y-4 p-6 rounded-xl bg-blue-50 border-3 border-blue-300 shadow-md">
-              <div className="flex items-center gap-3">
-                <MdLock className="text-2xl text-blue-700" />
-                <label className="text-xl font-bold text-slate-900">
-                  パスワード（オプション）
-                </label>
-              </div>
-              <Input
-                type="password"
-                placeholder="パスワードを入力（空欄で保護なし）"
-                value={exportPassword}
-                onChange={(e) => setExportPassword(e.target.value)}
-                className="w-full h-12 text-lg border-3 border-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-300 rounded-lg transition-all font-medium"
-                style={{ fontSize: '1.125rem', padding: '0.75rem 1rem' }}
-              />
-              {exportPassword && (
-                <Input
-                  type="password"
-                  placeholder="パスワードを再入力"
-                  value={exportPasswordConfirm}
-                  onChange={(e) => setExportPasswordConfirm(e.target.value)}
-                  className="w-full h-12 text-lg border-3 border-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-300 rounded-lg transition-all font-medium"
-                  style={{ fontSize: '1.125rem', padding: '0.75rem 1rem' }}
-                />
-              )}
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-blue-100 border-2 border-blue-400">
-                <MdInfo className="text-blue-700 mt-1 flex-shrink-0 text-2xl" />
-                <p className="text-base text-slate-900 leading-relaxed font-medium">
-                  パスワードを設定すると、PDFを開く際にパスワードが必要になります
-                </p>
-              </div>
-            </div>
-
-            {/* 権限設定 */}
-            {exportPassword && (
-              <div className="space-y-5 p-6 rounded-xl bg-purple-50 border-3 border-purple-300 shadow-md animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="flex items-center gap-3">
-                  <MdSecurity className="text-2xl text-purple-700" />
-                  <label className="text-xl font-bold text-slate-900">
-                    権限設定
-                  </label>
-                </div>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 rounded-lg bg-white hover:bg-purple-50 transition-colors border-2 border-slate-300 shadow-sm">
-                    <span className="text-lg font-bold text-slate-900">印刷</span>
-                    <select
-                      value={exportPermissions.printing}
-                      onChange={(e) => setExportPermissions({
-                        ...exportPermissions,
-                        printing: e.target.value as 'lowResolution' | 'highResolution' | 'none'
-                      })}
-                      className="px-4 py-2 border-3 border-slate-400 rounded-lg text-base font-medium focus:border-purple-600 focus:ring-4 focus:ring-purple-300 transition-all bg-white"
-                      style={{ fontSize: '1rem', fontWeight: '600' }}
-                    >
-                      <option value="highResolution">高解像度で許可</option>
-                      <option value="lowResolution">低解像度のみ許可</option>
-                      <option value="none">禁止</option>
-                    </select>
-                  </div>
-                  <div className="flex items-center justify-between p-4 rounded-lg bg-white hover:bg-purple-50 transition-colors border-2 border-slate-300 shadow-sm">
-                    <span className="text-lg font-bold text-slate-900">編集</span>
-                    <input
-                      type="checkbox"
-                      checked={exportPermissions.modifying}
-                      onChange={(e) => setExportPermissions({
-                        ...exportPermissions,
-                        modifying: e.target.checked
-                      })}
-                      className="w-6 h-6 rounded border-3 border-slate-400 text-purple-600 focus:ring-4 focus:ring-purple-300 cursor-pointer transition-all"
-                      style={{ accentColor: '#9333ea' }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between p-4 rounded-lg bg-white hover:bg-purple-50 transition-colors border-2 border-slate-300 shadow-sm">
-                    <span className="text-lg font-bold text-slate-900">コピー</span>
-                    <input
-                      type="checkbox"
-                      checked={exportPermissions.copying}
-                      onChange={(e) => setExportPermissions({
-                        ...exportPermissions,
-                        copying: e.target.checked
-                      })}
-                      className="w-6 h-6 rounded border-3 border-slate-400 text-purple-600 focus:ring-4 focus:ring-purple-300 cursor-pointer transition-all"
-                      style={{ accentColor: '#9333ea' }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between p-4 rounded-lg bg-white hover:bg-purple-50 transition-colors border-2 border-slate-300 shadow-sm">
-                    <span className="text-lg font-bold text-slate-900">注釈の追加</span>
-                    <input
-                      type="checkbox"
-                      checked={exportPermissions.annotating}
-                      onChange={(e) => setExportPermissions({
-                        ...exportPermissions,
-                        annotating: e.target.checked
-                      })}
-                      className="w-6 h-6 rounded border-3 border-slate-400 text-purple-600 focus:ring-4 focus:ring-purple-300 cursor-pointer transition-all"
-                      style={{ accentColor: '#9333ea' }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between p-4 rounded-lg bg-white hover:bg-purple-50 transition-colors border-2 border-slate-300 shadow-sm">
-                    <span className="text-lg font-bold text-slate-900">フォーム入力</span>
-                    <input
-                      type="checkbox"
-                      checked={exportPermissions.fillingForms}
-                      onChange={(e) => setExportPermissions({
-                        ...exportPermissions,
-                        fillingForms: e.target.checked
-                      })}
-                      className="w-6 h-6 rounded border-3 border-slate-400 text-purple-600 focus:ring-4 focus:ring-purple-300 cursor-pointer transition-all"
-                      style={{ accentColor: '#9333ea' }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between p-4 rounded-lg bg-white hover:bg-purple-50 transition-colors border-2 border-slate-300 shadow-sm">
-                    <span className="text-lg font-bold text-slate-900">コンテンツの抽出（アクセシビリティ）</span>
-                    <input
-                      type="checkbox"
-                      checked={exportPermissions.contentAccessibility}
-                      onChange={(e) => setExportPermissions({
-                        ...exportPermissions,
-                        contentAccessibility: e.target.checked
-                      })}
-                      className="w-6 h-6 rounded border-3 border-slate-400 text-purple-600 focus:ring-4 focus:ring-purple-300 cursor-pointer transition-all"
-                      style={{ accentColor: '#9333ea' }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between p-4 rounded-lg bg-white hover:bg-purple-50 transition-colors border-2 border-slate-300 shadow-sm">
-                    <span className="text-lg font-bold text-slate-900">文書の組み立て</span>
-                    <input
-                      type="checkbox"
-                      checked={exportPermissions.documentAssembly}
-                      onChange={(e) => setExportPermissions({
-                        ...exportPermissions,
-                        documentAssembly: e.target.checked
-                      })}
-                      className="w-6 h-6 rounded border-3 border-slate-400 text-purple-600 focus:ring-4 focus:ring-purple-300 cursor-pointer transition-all"
-                      style={{ accentColor: '#9333ea' }}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter className="pt-6 border-t-2 border-slate-300 gap-4 bg-slate-50 -m-6 mt-4 p-6 rounded-b-lg">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowPasswordDialog(false);
-                setExportPassword('');
-                setExportPasswordConfirm('');
-              }}
-              className="px-8 py-3 text-lg font-bold border-3 border-slate-400 hover:border-slate-500 hover:bg-slate-100 transition-all rounded-lg shadow-md hover:shadow-lg text-slate-900"
-              style={{ fontSize: '1.125rem', fontWeight: '700', borderWidth: '3px' }}
-            >
-              キャンセル
-            </Button>
-            <Button
-              onClick={handleExportWithPassword}
-              disabled={isExporting}
-              className="px-8 py-3 text-lg font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xl hover:shadow-2xl transition-all rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
-              style={{ fontSize: '1.125rem', fontWeight: '700' }}
-            >
-              {isExporting ? (
-                <>
-                  <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
-                  エクスポート中...
-                </>
-              ) : (
-                <>
-                  <MdFileDownload className="text-2xl" />
-                  エクスポート
-                </>
-              )}
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -22,7 +22,7 @@ export type TextAnnotation = {
 
 export type ShapeAnnotation = {
   id: string;
-  type: 'line' | 'rectangle' | 'circle' | 'arrow';
+  type: 'line' | 'rectangle' | 'circle' | 'arrow' | 'stamp';
   x1: number; // 0..1 の比率
   y1: number; // 0..1 の比率
   x2: number; // 0..1 の比率
@@ -30,6 +30,10 @@ export type ShapeAnnotation = {
   color: string;
   width: number;
   fill?: boolean; // 塗りつぶし（矩形・円のみ）
+  // スタンプ用の追加プロパティ
+  stampType?: string; // スタンプの種類（'approved', 'rejected', 'date', 'custom'など）
+  stampImage?: string; // カスタムスタンプの画像データ（base64）
+  stampText?: string; // スタンプに表示するテキスト（日付など）
 };
 
 interface AnnotationsDB extends DBSchema {

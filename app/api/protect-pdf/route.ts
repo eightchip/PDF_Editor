@@ -123,10 +123,14 @@ export async function POST(request: NextRequest) {
         );
       } else {
         // Linux/Unix環境（Vercelなど）
+        // Vercelのビルド環境では、多くのパッケージが既にインストールされている可能性がある
         possiblePaths.push(
           'qpdf', // PATHにある場合（aptでインストールされた場合）
           '/usr/bin/qpdf',
           '/usr/local/bin/qpdf',
+          // Vercelのビルド環境でよく使われるパス
+          '/opt/homebrew/bin/qpdf',
+          '/usr/local/homebrew/bin/qpdf',
         );
       }
       
@@ -213,12 +217,15 @@ export async function POST(request: NextRequest) {
             'インストール後、PATH環境変数にqpdfのパスが追加されていることを確認してください。'
           : isVercel
           ? 'qpdfがインストールされていません。\n\n' +
-            'Vercel環境では、qpdfをインストールする必要があります。\n\n' +
+            'Vercel環境では、qpdfを直接インストールすることはできません（sudo権限が必要なため）。\n\n' +
             '解決方法:\n' +
-            '1. Vercelのビルドコマンドでqpdfをインストール:\n' +
-            '   package.jsonのscriptsに以下を追加:\n' +
-            '   "vercel-build": "apt-get update && apt-get install -y qpdf && next build"\n\n' +
-            '2. または、環境変数 QPDF_PATH でqpdfのパスを指定（qpdfがインストールされている場合）\n\n' +
+            '1. Vercelのビルド環境でqpdfが利用可能か確認:\n' +
+            '   Vercelのビルドログでqpdfの検出状況を確認してください。\n\n' +
+            '2. 環境変数 QPDF_PATH でqpdfのパスを指定:\n' +
+            '   Vercelのプロジェクト設定で環境変数 QPDF_PATH を設定してください。\n' +
+            '   例: QPDF_PATH=/usr/bin/qpdf\n\n' +
+            '3. パスワード保護なしでエクスポート:\n' +
+            '   現在、パスワード保護なしでPDFをエクスポートできます。\n\n' +
             '詳細: https://qpdf.sourceforge.io/\n' +
             'Vercelでの設定: https://vercel.com/docs/concepts/projects/environment-variables'
           : 'qpdfがインストールされていません。\n\n' +

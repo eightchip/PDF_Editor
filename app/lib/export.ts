@@ -22,25 +22,13 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
  * @param pageSizes ページサイズ
  * @param textAnnotations テキスト注釈（オプション）
  * @param shapeAnnotations 図形注釈（オプション）
- * @param password パスワード（オプション、設定するとPDFを保護）
- * @param permissions 権限設定（オプション）
  */
 export async function exportAnnotatedPDFV2(
   originalPdfBytes: ArrayBuffer,
   annotations: Record<number, Stroke[]>,
   pageSizes: Record<number, { width: number; height: number }>,
   textAnnotations?: Record<number, TextAnnotation[]>,
-  shapeAnnotations?: Record<number, ShapeAnnotation[]>,
-  password?: string,
-  permissions?: {
-    printing?: 'lowResolution' | 'highResolution' | 'none';
-    modifying?: boolean;
-    copying?: boolean;
-    annotating?: boolean;
-    fillingForms?: boolean;
-    contentAccessibility?: boolean;
-    documentAssembly?: boolean;
-  }
+  shapeAnnotations?: Record<number, ShapeAnnotation[]>
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.load(originalPdfBytes);
   const pages = pdfDoc.getPages();
@@ -225,7 +213,7 @@ export async function exportAnnotatedPDFV2(
             }
             break;
 
-          case 'circle':
+          case 'circle': {
             const centerX = (x1 + x2) / 2;
             const centerY = (y1 + y2) / 2;
             const radius = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)) / 2;
@@ -248,6 +236,7 @@ export async function exportAnnotatedPDFV2(
               });
             }
             break;
+          }
 
           case 'arrow':
             // 線を描画
@@ -279,59 +268,134 @@ export async function exportAnnotatedPDFV2(
               color: rgb(color.r, color.g, color.b),
             });
             break;
+
+          case 'stamp': {
+            // スタンプの描画
+            const stampX = Math.min(x1, x2);
+            const stampY = Math.min(y1, y2);
+            const stampW = Math.abs(x2 - x1);
+            const stampH = Math.abs(y2 - y1);
+            const centerX = stampX + stampW / 2;
+            const centerY = stampY + stampH / 2;
+            const radius = Math.min(stampW, stampH) / 2;
+
+            if (shape.stampType === 'approved') {
+              // 承認スタンプ
+              page.drawCircle({
+                x: centerX,
+                y: centerY,
+                size: radius * 2,
+                borderColor: rgb(0.06, 0.72, 0.51), // #10b981
+                borderWidth: shape.width * 2,
+              });
+              // チェックマーク（簡易版：線で表現）
+              const checkSize = radius * 0.3;
+              page.drawLine({
+                start: { x: centerX - checkSize, y: centerY },
+                end: { x: centerX, y: centerY + checkSize },
+                thickness: shape.width * 2,
+                color: rgb(0.06, 0.72, 0.51),
+              });
+              page.drawLine({
+                start: { x: centerX, y: centerY + checkSize },
+                end: { x: centerX + checkSize, y: centerY - checkSize },
+                thickness: shape.width * 2,
+                color: rgb(0.06, 0.72, 0.51),
+              });
+              if (shape.stampText) {
+                page.drawText(shape.stampText, {
+                  x: centerX,
+                  y: centerY + radius * 0.7,
+                  size: Math.min(stampW, stampH) * 0.15,
+                  color: rgb(0.06, 0.72, 0.51),
+                });
+              }
+            } else if (shape.stampType === 'rejected') {
+              // 却下スタンプ
+              page.drawCircle({
+                x: centerX,
+                y: centerY,
+                size: radius * 2,
+                borderColor: rgb(0.94, 0.27, 0.27), // #ef4444
+                borderWidth: shape.width * 2,
+              });
+              // ×マーク
+              const crossSize = radius * 0.5;
+              page.drawLine({
+                start: { x: centerX - crossSize, y: centerY - crossSize },
+                end: { x: centerX + crossSize, y: centerY + crossSize },
+                thickness: shape.width * 2,
+                color: rgb(0.94, 0.27, 0.27),
+              });
+              page.drawLine({
+                start: { x: centerX + crossSize, y: centerY - crossSize },
+                end: { x: centerX - crossSize, y: centerY + crossSize },
+                thickness: shape.width * 2,
+                color: rgb(0.94, 0.27, 0.27),
+              });
+              if (shape.stampText) {
+                page.drawText(shape.stampText, {
+                  x: centerX,
+                  y: centerY + radius * 0.7,
+                  size: Math.min(stampW, stampH) * 0.15,
+                  color: rgb(0.94, 0.27, 0.27),
+                });
+              }
+            } else if (shape.stampType === 'date') {
+              // 日付スタンプ
+              page.drawCircle({
+                x: centerX,
+                y: centerY,
+                size: radius * 2,
+                borderColor: rgb(color.r, color.g, color.b),
+                borderWidth: shape.width * 2,
+              });
+              const dateText = shape.stampText || new Date().toLocaleDateString('ja-JP');
+              page.drawText(dateText, {
+                x: centerX,
+                y: centerY,
+                size: Math.min(stampW, stampH) * 0.2,
+                color: rgb(color.r, color.g, color.b),
+              });
+            } else if (shape.stampImage) {
+              // カスタム画像スタンプ（pdf-libでは画像の埋め込みが必要）
+              // 簡易版：テキストで代替
+              if (shape.stampText) {
+                page.drawText(shape.stampText, {
+                  x: stampX,
+                  y: stampY + stampH,
+                  size: Math.min(stampW, stampH) * 0.2,
+                  color: rgb(color.r, color.g, color.b),
+                });
+              }
+            } else {
+              // デフォルトスタンプ
+              page.drawRectangle({
+                x: stampX,
+                y: stampY,
+                width: stampW,
+                height: stampH,
+                borderColor: rgb(color.r, color.g, color.b),
+                borderWidth: shape.width * 2,
+              });
+              if (shape.stampText) {
+                page.drawText(shape.stampText, {
+                  x: centerX,
+                  y: centerY,
+                  size: Math.min(stampW, stampH) * 0.2,
+                  color: rgb(color.r, color.g, color.b),
+                });
+              }
+            }
+            break;
+          }
         }
       }
     }
   }
 
-  // パスワード保護なしでPDFを保存
+  // PDFを保存
   const pdfBytes = await pdfDoc.save();
-
-  // パスワード保護と権限設定
-  // 注意: pdf-libではパスワード保護ができないため、APIルートを使用
-  if (password) {
-    try {
-      // クライアント側でのみ実行（ブラウザ環境をチェック）
-      if (typeof window === 'undefined') {
-        console.warn('パスワード保護はクライアント側でのみサポートされています。');
-        return pdfBytes;
-      }
-
-      // APIルートに送信してパスワード保護を追加
-      const formData = new FormData();
-      const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
-      formData.append('pdf', blob, 'document.pdf');
-      formData.append('password', password);
-      if (permissions) {
-        formData.append('permissions', JSON.stringify(permissions));
-      }
-
-      const response = await fetch('/api/protect-pdf', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: response.statusText }));
-        const errorMessage = errorData.error || response.statusText;
-        console.error('パスワード保護APIエラー詳細:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorMessage,
-        });
-        throw new Error(`パスワード保護APIエラー: ${errorMessage}`);
-      }
-
-      const protectedPdfBytes = await response.arrayBuffer();
-      return new Uint8Array(protectedPdfBytes);
-    } catch (error) {
-      console.error('パスワード保護の適用に失敗しました:', error);
-      // エラーが発生した場合は、パスワード保護なしで返す
-      console.warn('パスワード保護なしでPDFをエクスポートします。');
-      return pdfBytes;
-    }
-  }
-
   return pdfBytes;
 }
 
