@@ -240,6 +240,7 @@ export default function Home() {
   const containerRef = useRef<HTMLDivElement>(null);
   const isDrawingRef = useRef(false);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
+  const isClearingRef = useRef(false); // クリア処理中かどうかを追跡
 
   // 選択ツールに切り替えたときに描画状態をリセット
   useEffect(() => {
@@ -1004,7 +1005,7 @@ export default function Home() {
       }
 
       // 注釈を読み込み
-      if (docId) {
+      if (docId && !isClearingRef.current) {
         // pageOrderが設定されている場合は、表示順序から実際のページ番号に変換
         const actualPageNum = getActualPageNum(currentPage);
         const savedStrokes = await loadAnnotations(docId, actualPageNum);
@@ -1082,11 +1083,19 @@ export default function Home() {
 
   // strokesの状態変更時に再描画（ハイライトなどが追加/削除されたとき）
   useEffect(() => {
-    if (inkCanvasRef.current && pageSize && strokes.length >= 0) {
+    if (inkCanvasRef.current && pageSize) {
       const ctx = inkCanvasRef.current.getContext('2d');
       if (ctx) {
         const devicePixelRatio = window.devicePixelRatio || 1;
         ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        // strokesが空の配列の場合は、キャンバスをクリアしてから再描画
+        if (strokes.length === 0) {
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+          ctx.restore();
+          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        }
         redrawStrokes(ctx, strokes, pageSize.width, pageSize.height);
       }
     }
@@ -2640,6 +2649,9 @@ export default function Home() {
 
     console.log('handleClear: 開始', { docId, currentPage, pageSize });
 
+    // クリア処理中フラグを設定
+    isClearingRef.current = true;
+
     setUndoStack([...undoStack, { strokes, shapes: shapeAnnotations, texts: textAnnotations }]);
     setRedoStack([]);
     
@@ -2658,26 +2670,20 @@ export default function Home() {
     console.log('handleClear: 削除確認', { verifyStrokes: verifyStrokes.length });
     
     // 状態をクリア（データベース削除後に実行）
-    setStrokes([]);
-    setTextAnnotations([]);
-    setShapeAnnotations([]);
-
-    console.log('handleClear: 状態をクリア完了');
-
-    // キャンバスを即座にクリア（状態更新を待たない）
+    // 状態をクリアする前に、キャンバスをクリアしてから状態を更新
     if (inkCanvasRef.current && pageSize) {
-    const ctx = inkCanvasRef.current.getContext('2d');
-    if (ctx) {
-      const devicePixelRatio = window.devicePixelRatio || 1;
+      const ctx = inkCanvasRef.current.getContext('2d');
+      if (ctx) {
+        const devicePixelRatio = window.devicePixelRatio || 1;
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+        ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
         ctx.restore();
         ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
         // 空の配列で再描画
         redrawStrokes(ctx, [], pageSize.width, pageSize.height);
         console.log('handleClear: inkCanvasをクリア');
-    }
+      }
     }
     if (textCanvasRef.current && pageSize) {
       const textCtx = textCanvasRef.current.getContext('2d');
@@ -2706,10 +2712,18 @@ export default function Home() {
       }
     }
     
-    console.log('handleClear: 完了');
+    // 状態をクリア（キャンバスをクリアした後に実行）
+    // setTimeoutで状態更新を遅延させ、renderCurrentPageが呼ばれてもデータベースが空であることを保証
+    setTimeout(() => {
+      setStrokes([]);
+      setTextAnnotations([]);
+      setShapeAnnotations([]);
+      // クリア処理完了後、フラグをリセット
+      isClearingRef.current = false;
+      console.log('handleClear: 状態をクリア完了');
+    }, 100); // 100ms待機してからフラグをリセット
     
-    // renderCurrentPageを再実行しない（データベースから読み込むと古いデータが復元される可能性がある）
-    // 代わりに、状態が既に空の配列に設定されているので、useEffectが再描画を実行する
+    console.log('handleClear: 完了');
   };
 
   // テキスト入力確定
