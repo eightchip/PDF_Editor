@@ -1,5 +1,7 @@
 import { PDFDocument, rgb } from 'pdf-lib';
 import type { Stroke, TextAnnotation, ShapeAnnotation } from './db';
+import { setFormFieldValues, calculateFormFields, type FormField } from './forms';
+import { addSignatureToPDF, type Signature } from './signature';
 
 /**
  * 16進数カラーをRGBに変換
@@ -28,10 +30,36 @@ export async function exportAnnotatedPDFV2(
   annotations: Record<number, Stroke[]>,
   pageSizes: Record<number, { width: number; height: number }>,
   textAnnotations?: Record<number, TextAnnotation[]>,
-  shapeAnnotations?: Record<number, ShapeAnnotation[]>
+  shapeAnnotations?: Record<number, ShapeAnnotation[]>,
+  formFields?: FormField[],
+  formFieldValues?: Record<string, string | boolean | string[]>,
+  signatures?: Signature[]
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.load(originalPdfBytes);
   const pages = pdfDoc.getPages();
+  
+  // フォームフィールドに値を設定
+  if (formFields && formFields.length > 0 && formFieldValues) {
+    try {
+      // 計算フィールドを計算
+      const calculatedValues = calculateFormFields(formFields, formFieldValues);
+      // フォームに値を設定
+      await setFormFieldValues(pdfDoc, calculatedValues);
+    } catch (error) {
+      console.warn('フォームフィールドの設定に失敗:', error);
+    }
+  }
+  
+  // 署名を追加
+  if (signatures && signatures.length > 0) {
+    try {
+      for (const signature of signatures) {
+        await addSignatureToPDF(pdfDoc, signature);
+      }
+    } catch (error) {
+      console.warn('署名の追加に失敗:', error);
+    }
+  }
   
   // デフォルトフォントを取得
   const helveticaFont = await pdfDoc.embedFont('Helvetica');

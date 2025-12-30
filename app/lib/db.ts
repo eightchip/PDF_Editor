@@ -49,6 +49,14 @@ interface AnnotationsDB extends DBSchema {
     key: string; // `${docId}_${pageNumber}`
     value: ShapeAnnotation[];
   };
+  signatures: {
+    key: string; // `${docId}_${signatureId}`
+    value: import('./signature').Signature;
+  };
+  approvalWorkflows: {
+    key: string; // `${docId}_${workflowId}`
+    value: import('./signature').ApprovalWorkflow;
+  };
 }
 
 let dbInstance: IDBPDatabase<AnnotationsDB> | null = null;
@@ -62,7 +70,7 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
   }
 
   try {
-    dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 4, {
+    dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 5, {
       upgrade(db, oldVersion) {
         // 既存のオブジェクトストアが存在しない場合のみ作成
         if (!db.objectStoreNames.contains('annotations')) {
@@ -73,6 +81,12 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
         }
         if (!db.objectStoreNames.contains('shapeAnnotations')) {
           db.createObjectStore('shapeAnnotations');
+        }
+        if (!db.objectStoreNames.contains('signatures')) {
+          db.createObjectStore('signatures');
+        }
+        if (!db.objectStoreNames.contains('approvalWorkflows')) {
+          db.createObjectStore('approvalWorkflows');
         }
       },
       // 既存のデータベースがより新しいバージョンの場合のエラーを処理
@@ -100,11 +114,13 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
         });
         
         // データベースを再作成
-        dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 4, {
+        dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 5, {
           upgrade(db) {
             db.createObjectStore('annotations');
             db.createObjectStore('textAnnotations');
             db.createObjectStore('shapeAnnotations');
+            db.createObjectStore('signatures');
+            db.createObjectStore('approvalWorkflows');
           },
         });
       } catch (recreateError) {
@@ -294,5 +310,65 @@ export async function getAllShapeAnnotations(
   }
   
   return shapes;
+}
+
+// 署名関連の関数
+export async function saveSignature(docId: string, signature: import('./signature').Signature): Promise<void> {
+  const db = await getDB();
+  const key = `${docId}_${signature.id}`;
+  await db.put('signatures', signature, key);
+}
+
+export async function getAllSignatures(docId: string): Promise<import('./signature').Signature[]> {
+  const db = await getDB();
+  const tx = db.transaction('signatures', 'readonly');
+  const store = tx.objectStore('signatures');
+  const allKeys = await store.getAllKeys();
+  
+  // docIdでフィルタリング
+  const matchingKeys = allKeys.filter(key => String(key).startsWith(`${docId}_`));
+  const signatures: import('./signature').Signature[] = [];
+  
+  for (const key of matchingKeys) {
+    const sig = await store.get(key);
+    if (sig) {
+      signatures.push(sig);
+    }
+  }
+  
+  return signatures;
+}
+
+export async function deleteSignature(docId: string, signatureId: string): Promise<void> {
+  const db = await getDB();
+  const key = `${docId}_${signatureId}`;
+  await db.delete('signatures', key);
+}
+
+// 承認ワークフロー関連の関数
+export async function saveApprovalWorkflow(docId: string, workflow: import('./signature').ApprovalWorkflow): Promise<void> {
+  const db = await getDB();
+  const key = `${docId}_${workflow.id}`;
+  await db.put('approvalWorkflows', workflow, key);
+}
+
+export async function getAllApprovalWorkflows(docId: string): Promise<import('./signature').ApprovalWorkflow[]> {
+  const db = await getDB();
+  const tx = db.transaction('approvalWorkflows', 'readonly');
+  const store = tx.objectStore('approvalWorkflows');
+  const allKeys = await store.getAllKeys();
+  
+  // docIdでフィルタリング
+  const matchingKeys = allKeys.filter(key => String(key).startsWith(`${docId}_`));
+  const workflows: import('./signature').ApprovalWorkflow[] = [];
+  
+  for (const key of matchingKeys) {
+    const wf = await store.get(key);
+    if (wf) {
+      workflows.push(wf);
+    }
+  }
+  
+  return workflows;
 }
 

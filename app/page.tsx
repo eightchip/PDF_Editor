@@ -11,6 +11,10 @@ import { drawTextAnnotation, redrawTextAnnotations, generateTextId } from './lib
 import { drawShapeAnnotation, redrawShapeAnnotations, generateShapeId } from './lib/shapes';
 import { extractTextItems, findNearestTextLine, findTextBoundingBox, smoothStroke, type TextItem } from './lib/text-detection';
 import { convertImageToPDF } from './lib/image-to-pdf';
+import { extractFormFields, setFormFieldValues, calculateFormFields, setupCommonCalculations, type FormField } from './lib/forms';
+import { generateSignatureId, createApprovalWorkflow, approveStep, rejectStep, type Signature, type ApprovalWorkflow } from './lib/signature';
+import { saveSignature, getAllSignatures, deleteSignature, saveApprovalWorkflow, getAllApprovalWorkflows } from './lib/db';
+import { splitPDF, splitPDFByRanges, splitPDFByPageGroups } from './lib/pdf-split';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -24,9 +28,36 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button"; // Dialog内でのみ使用
-import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections, MdDragHandle, MdLock, MdSecurity, MdCheckCircle, MdInfo, MdLocalOffer } from 'react-icons/md';
+import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections, MdDragHandle, MdLock, MdSecurity, MdCheckCircle, MdInfo, MdLocalOffer, MdAssignment, MdContentCut } from 'react-icons/md';
 import { QRCodeSVG } from 'qrcode.react';
 // PDF.jsの型は動的インポートで取得
+
+// ページ範囲文字列をパースする関数（例: "1-3, 5, 7-9" → [{start: 1, end: 3}, {start: 5, end: 5}, {start: 7, end: 9}]
+function parsePageRanges(input: string, maxPages: number): Array<{ start: number; end: number }> {
+  const ranges: Array<{ start: number; end: number }> = [];
+  if (!input.trim()) return ranges;
+  
+  // カンマで分割
+  const parts = input.split(',').map(s => s.trim()).filter(s => s);
+  
+  for (const part of parts) {
+    if (part.includes('-')) {
+      // 範囲指定（例: "1-3"）
+      const [startStr, endStr] = part.split('-').map(s => s.trim());
+      const start = Math.max(1, Math.min(maxPages, parseInt(startStr) || 1));
+      const end = Math.max(1, Math.min(maxPages, parseInt(endStr) || start));
+      if (start <= end) {
+        ranges.push({ start, end });
+      }
+    } else {
+      // 単一ページ（例: "5"）
+      const page = Math.max(1, Math.min(maxPages, parseInt(part) || 1));
+      ranges.push({ start: page, end: page });
+    }
+  }
+  
+  return ranges;
+}
 
 export default function Home() {
   const { toast } = useToast();
@@ -159,6 +190,39 @@ export default function Home() {
   // スタンプ関連
   const [selectedStampType, setSelectedStampType] = useState<'date' | 'approved' | 'rejected'>('date');
 
+  // フォームフィールド関連
+  const [formFields, setFormFields] = useState<FormField[]>([]);
+  const [formFieldValues, setFormFieldValues] = useState<Record<string, string | boolean | string[]>>({});
+  const [showFormFields, setShowFormFields] = useState(false); // フォームフィールドパネルの表示状態
+  const [editingFormField, setEditingFormField] = useState<string | null>(null); // 編集中のフォームフィールドID
+
+  // 電子署名・承認関連
+  const [signatures, setSignatures] = useState<Signature[]>([]);
+  const [showSignatureDialog, setShowSignatureDialog] = useState(false);
+  const [signatureName, setSignatureName] = useState('');
+  const [signatureEmail, setSignatureEmail] = useState('');
+  const [signatureReason, setSignatureReason] = useState('');
+  const [signatureLocation, setSignatureLocation] = useState('');
+  const [signatureImage, setSignatureImage] = useState<string | null>(null); // Base64画像
+  const [signatureText, setSignatureText] = useState(''); // テキスト署名
+  const [signaturePosition, setSignaturePosition] = useState<'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'>('bottom-left'); // 署名位置
+  const [approvalWorkflows, setApprovalWorkflows] = useState<ApprovalWorkflow[]>([]);
+  const [showApprovalWorkflowDialog, setShowApprovalWorkflowDialog] = useState(false);
+  const [showSplitDialog, setShowSplitDialog] = useState(false); // PDF分割ダイアログ
+  const [splitRangeInputs, setSplitRangeInputs] = useState<string[]>(['']); // PDF分割の範囲入力の配列（例: ["1-3, 5, 7-9", "11-13, 15, 17-19"]）
+  const [showSplitDialogFromThumbnail, setShowSplitDialogFromThumbnail] = useState(false); // ページ管理モーダルから開いたPDF分割ダイアログ
+  
+  // ダイアログが開いているときにbodyのpointer-eventsを有効化
+  useEffect(() => {
+    if (showSignatureDialog || showApprovalWorkflowDialog || showSplitDialog) {
+      // ダイアログが開いているときはbodyのpointer-eventsをautoに設定
+      document.body.style.pointerEvents = 'auto';
+    } else {
+      // ダイアログが閉じているときは元に戻す（必要に応じて）
+      // document.body.style.pointerEvents = '';
+    }
+  }, [showSignatureDialog, showApprovalWorkflowDialog, showSplitDialog]);
+
   // Undo/Redo（strokes、shapes、textAnnotationsの全てを含む）
   type UndoState = {
     strokes: Stroke[];
@@ -196,6 +260,19 @@ export default function Home() {
       }
     }
   }, [tool, strokes, pageSize]);
+
+  // ダイアログ状態の監視（デバッグ用）
+  useEffect(() => {
+    console.log('showSignatureDialog changed:', showSignatureDialog);
+  }, [showSignatureDialog]);
+
+  useEffect(() => {
+    console.log('showApprovalWorkflowDialog changed:', showApprovalWorkflowDialog);
+  }, [showApprovalWorkflowDialog]);
+
+  useEffect(() => {
+    console.log('showSplitDialog changed:', showSplitDialog);
+  }, [showSplitDialog]);
 
   // 自動オープン機能は無効化（手書きボタンのクリックでのみモーダルを開く）
   // テキスト入力フィールドにフォーカスしたときに自動的に手書きモーダルを開く機能は、
@@ -726,8 +803,12 @@ export default function Home() {
 
   // ファイル選択（PDFまたは画像）
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, addToCollection: boolean = false) => {
+    console.log('handleFileSelect called', { files: e.target.files, addToCollection });
     const files = e.target.files;
-    if (!files || files.length === 0) return;
+    if (!files || files.length === 0) {
+      console.log('handleFileSelect: ファイルが選択されていません');
+      return;
+    }
 
     // 複数ファイルが選択された場合、すべてをコレクションに追加
     if (files.length > 1) {
@@ -756,14 +837,19 @@ export default function Home() {
       } else {
         // PDFファイルの場合は直接読み込む
         try {
+          console.log('PDFファイルを読み込みます:', file.name, file.type, file.size);
           const arrayBuffer = await file.arrayBuffer();
+          console.log('ファイルをArrayBufferに変換しました:', arrayBuffer.byteLength, 'bytes');
           const id = await generateDocId(file);
+          console.log('DocIdを生成しました:', id);
           setDocId(id);
           
           setOriginalPdfBytes(arrayBuffer);
           setOriginalFileName(file.name); // 元のファイル名を保存
           
+          console.log('PDF.jsでPDFを読み込みます...');
           const doc = await loadPDF(file);
+          console.log('PDFを読み込みました:', doc.numPages, 'pages');
           setPdfDoc(doc);
           setTotalPages(doc.numPages);
           setCurrentPage(1);
@@ -773,8 +859,67 @@ export default function Home() {
           setRedoStack([]);
           setPageSizes({});
           setTextItems([]);
+          
+          // フォームフィールドを抽出
+          try {
+            const { PDFDocument } = await import('pdf-lib');
+            const pdfDoc = await PDFDocument.load(arrayBuffer);
+            const fields = await extractFormFields(pdfDoc);
+            const fieldsWithCalculations = setupCommonCalculations(fields);
+            setFormFields(fieldsWithCalculations);
+            
+            // 初期値を設定
+            const initialValues: Record<string, string | boolean | string[]> = {};
+            fieldsWithCalculations.forEach(field => {
+              initialValues[field.name] = field.value;
+            });
+            setFormFieldValues(initialValues);
+            
+            if (fieldsWithCalculations.length > 0) {
+              toast({
+                title: "フォーム検出",
+                description: `${fieldsWithCalculations.length}個のフォームフィールドを検出しました`,
+              });
+            }
+          } catch (formError) {
+            console.warn('フォームフィールドの抽出に失敗:', formError);
+            // フォームフィールドがない場合はエラーを無視
+            setFormFields([]);
+            setFormFieldValues({});
+          }
+          
+          // 署名と承認ワークフローを読み込む
+          if (id) {
+            try {
+              const loadedSignatures = await getAllSignatures(id);
+              setSignatures(loadedSignatures);
+              
+              const loadedWorkflows = await getAllApprovalWorkflows(id);
+              setApprovalWorkflows(loadedWorkflows);
+            } catch (error) {
+              console.warn('署名・ワークフローの読み込みに失敗:', error);
+            }
+          }
+          
+          // 署名と承認ワークフローを読み込む
+          if (id) {
+            try {
+              const loadedSignatures = await getAllSignatures(id);
+              setSignatures(loadedSignatures);
+              
+              const loadedWorkflows = await getAllApprovalWorkflows(id);
+              setApprovalWorkflows(loadedWorkflows);
+            } catch (error) {
+              console.warn('署名・ワークフローの読み込みに失敗:', error);
+            }
+          }
         } catch (error) {
           console.error('ファイル読み込みエラー:', error);
+          console.error('エラーの詳細:', {
+            name: error instanceof Error ? error.name : 'Unknown',
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+          });
           toast({
             title: "エラー",
             description: 'ファイルの読み込みに失敗しました: ' + (error instanceof Error ? error.message : String(error)),
@@ -2767,13 +2912,19 @@ export default function Home() {
         }
       }
 
-      // 注釈をPDFに焼き込む
+      // 署名を読み込む
+      const allSignatures = docId ? await getAllSignatures(docId) : [];
+      
+      // 注釈をPDFに焼き込む（フォームフィールドの値と署名も含む）
       const pdfBytes = await exportAnnotatedPDFV2(
         originalPdfBytes,
         annotations,
         allPageSizes,
         textAnnotations,
-        shapeAnnotations
+        shapeAnnotations,
+        formFields,
+        formFieldValues,
+        allSignatures
       );
 
       return pdfBytes;
@@ -3398,16 +3549,59 @@ export default function Home() {
                 {selectedPagesForDelete.size > 0 ? `削除(${selectedPagesForDelete.size})` : '削除'}
               </button>
               {selectedPagesForDelete.size > 0 && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedPagesForDelete(new Set());
-                  }}
-                  className="px-4 py-2 bg-slate-400 hover:bg-slate-500 text-white rounded-lg"
-                  title="選択を解除"
-                >
-                  選択解除
-                </button>
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedPagesForDelete(new Set());
+                    }}
+                    className="px-4 py-2 bg-slate-400 hover:bg-slate-500 text-white rounded-lg"
+                    title="選択を解除"
+                  >
+                    選択解除
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // 選択したページを範囲として設定
+                      const selectedPages = Array.from(selectedPagesForDelete).sort((a, b) => a - b);
+                      if (selectedPages.length > 0) {
+                        // 連続するページを範囲にまとめる
+                        const ranges: string[] = [];
+                        let start = selectedPages[0];
+                        let end = selectedPages[0];
+                        
+                        for (let i = 1; i < selectedPages.length; i++) {
+                          if (selectedPages[i] === end + 1) {
+                            end = selectedPages[i];
+                          } else {
+                            if (start === end) {
+                              ranges.push(`${start}`);
+                            } else {
+                              ranges.push(`${start}-${end}`);
+                            }
+                            start = selectedPages[i];
+                            end = selectedPages[i];
+                          }
+                        }
+                        if (start === end) {
+                          ranges.push(`${start}`);
+                        } else {
+                          ranges.push(`${start}-${end}`);
+                        }
+                        
+                        setSplitRangeInputs([ranges.join(', ')]);
+                        setShowSplitDialogFromThumbnail(true);
+                        setShowThumbnailModal(false);
+                      }
+                    }}
+                    className="px-4 py-2 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                    title="選択したページでPDF分割"
+                  >
+                    <MdContentCut className="text-lg" />
+                    PDF分割 ({selectedPagesForDelete.size}ページ)
+                  </button>
+                </>
               )}
               {hasUnsavedPageOrder && (
                 <div className="ml-auto flex items-center gap-2">
@@ -3886,7 +4080,7 @@ export default function Home() {
           {/* ツールバー */}
           <div className="mb-4 flex gap-3 md:gap-4 items-center flex-wrap justify-between transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
             {/* 左側: 描画ツール */}
-            <div className="flex gap-3 flex-wrap">
+            <div className="flex gap-3 flex-wrap flex-1">
               <button
                 onClick={() => setTool('pen')}
                 title="手書きで線を描画します"
@@ -4216,6 +4410,34 @@ export default function Home() {
                 <MdList className={`text-base ${showAnnotationList ? 'text-white' : 'text-green-500'}`} />
                 注釈一覧
               </button>
+              {formFields.length > 0 && (
+                <button
+                  onClick={() => setShowFormFields(!showFormFields)}
+                  title="フォームフィールドを表示/非表示"
+                  className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-purple-500 ${
+                    showFormFields ? 'shadow-md' : ''
+                  }`}
+                  style={{
+                    background: showFormFields
+                      ? 'linear-gradient(to right, #a855f7, #ec4899)'
+                      : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                    color: showFormFields ? 'white' : '#334155',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (showFormFields) {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #9333ea, #db2777)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (showFormFields) {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #a855f7, #ec4899)';
+                    }
+                  }}
+                >
+                  <MdTextFields className={`text-base ${showFormFields ? 'text-white' : 'text-purple-500'}`} />
+                  フォーム ({formFields.length})
+                </button>
+              )}
             </div>
 
             {(tool === 'pen' || tool === 'highlight') && (
@@ -4388,6 +4610,95 @@ export default function Home() {
 
           {/* 操作ボタン */}
           <div className="mb-4 flex gap-3 md:gap-4 items-center flex-wrap transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
+            {/* アクションツール（電子署名、承認ワークフロー、PDF分割） */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('電子署名ボタンがクリックされました');
+                console.log('showSignatureDialogをtrueに設定します');
+                setShowSignatureDialog(true);
+                console.log('setShowSignatureDialog(true)を実行しました');
+              }}
+              title="電子署名を追加"
+              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-blue-500 shadow-md hover:scale-105 active:scale-95"
+              style={{
+                background: 'linear-gradient(to right, #3b82f6, #06b6d4)',
+                color: 'white',
+                pointerEvents: 'auto',
+                cursor: 'pointer',
+                zIndex: 10,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #2563eb, #0891b2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #3b82f6, #06b6d4)';
+              }}
+            >
+              <MdAssignment className="text-base text-white" />
+              電子署名
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('承認ワークフローボタンがクリックされました');
+                console.log('showApprovalWorkflowDialogをtrueに設定します');
+                setShowApprovalWorkflowDialog(true);
+                console.log('setShowApprovalWorkflowDialog(true)を実行しました');
+              }}
+              title="承認ワークフローを設定"
+              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-indigo-500 shadow-md hover:scale-105 active:scale-95"
+              style={{
+                background: 'linear-gradient(to right, #6366f1, #8b5cf6)',
+                color: 'white',
+                pointerEvents: 'auto',
+                cursor: 'pointer',
+                zIndex: 10,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #4f46e5, #7c3aed)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #6366f1, #8b5cf6)';
+              }}
+            >
+              <MdCheckCircle className="text-base text-white" />
+              承認ワークフロー
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('PDF分割ボタンがクリックされました');
+                console.log('showSplitDialogをtrueに設定します');
+                setShowSplitDialog(true);
+                console.log('setShowSplitDialog(true)を実行しました');
+              }}
+              title="PDFを分割"
+              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-orange-500 shadow-md hover:scale-105 active:scale-95"
+              style={{
+                background: 'linear-gradient(to right, #f97316, #f59e0b)',
+                color: 'white',
+                pointerEvents: 'auto',
+                cursor: 'pointer',
+                zIndex: 10,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #ea580c, #d97706)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #f97316, #f59e0b)';
+              }}
+            >
+              <MdContentCut className="text-base text-white" />
+              PDF分割
+            </button>
+            <span className="text-slate-300 mx-1">|</span>
             <button
               onClick={handleUndo}
               disabled={undoStack.length === 0}
@@ -5047,6 +5358,168 @@ export default function Home() {
         </div>
       )}
 
+      {/* 右側フォームフィールドパネル */}
+      {pdfDoc && showFormFields && formFields.length > 0 && (
+        <div 
+          className="fixed right-0 top-0 bottom-0 w-80 bg-gradient-to-b from-slate-50 to-slate-100 border-l border-slate-200 z-[99] shadow-lg flex flex-col" 
+          style={{ 
+            position: 'fixed', 
+            right: showAnnotationList ? '16rem' : 0, 
+            top: 0, 
+            bottom: 0, 
+            width: '20rem', 
+            height: '100vh', 
+            display: 'flex', 
+            flexDirection: 'column' 
+          }}
+        >
+          <div 
+            className="flex-shrink-0 p-3 mb-0 font-semibold flex justify-between items-center bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md" 
+            style={{ flexShrink: 0 }}
+          >
+            <span className="flex items-center gap-2">
+              <MdTextFields className="text-lg" />
+              フォームフィールド ({formFields.length})
+            </span>
+            <button
+              onClick={(e) => {
+                setShowFormFields(false);
+              }}
+              className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-white/20 text-white transition-colors"
+              title="閉じる"
+            >
+              <MdClose className="text-lg" />
+            </button>
+          </div>
+          <div 
+            className="flex-1 overflow-y-auto overflow-x-hidden p-3" 
+            style={{ 
+              flex: '1 1 0%', 
+              minHeight: 0, 
+              overflowY: 'auto', 
+              overflowX: 'hidden'
+            }}
+          >
+            {formFields.map((field) => {
+              const isCalculated = !!field.calculationScript;
+              const currentValue = formFieldValues[field.name] ?? field.value;
+              
+              return (
+                <div key={field.id} className="mb-4 p-3 bg-white rounded-lg border border-purple-200 shadow-sm">
+                  <label className="block text-xs font-semibold text-purple-700 mb-2">
+                    {field.name}
+                    {field.required && <span className="text-red-500 ml-1">*</span>}
+                    {isCalculated && <span className="text-blue-500 ml-1 text-xs">(計算)</span>}
+                    {field.readOnly && <span className="text-gray-500 ml-1 text-xs">(読み取り専用)</span>}
+                  </label>
+                  
+                  {field.type === 'text' && (
+                    <input
+                      type="text"
+                      value={String(currentValue)}
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        setFormFieldValues(prev => {
+                          const updated = { ...prev, [field.name]: newValue };
+                          // 計算フィールドを再計算
+                          const calculated = calculateFormFields(formFields, updated);
+                          return calculated;
+                        });
+                      }}
+                      disabled={field.readOnly || isCalculated}
+                      maxLength={field.maxLength}
+                      className={`w-full px-2 py-1.5 text-sm border rounded-md ${
+                        field.readOnly || isCalculated
+                          ? 'bg-gray-100 text-gray-600 cursor-not-allowed'
+                          : 'bg-white border-purple-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200'
+                      }`}
+                      placeholder={field.defaultValue ? String(field.defaultValue) : ''}
+                    />
+                  )}
+                  
+                  {field.type === 'checkbox' && (
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(currentValue)}
+                        onChange={(e) => {
+                          setFormFieldValues(prev => {
+                            const updated = { ...prev, [field.name]: e.target.checked };
+                            const calculated = calculateFormFields(formFields, updated);
+                            return calculated;
+                          });
+                        }}
+                        disabled={field.readOnly || isCalculated}
+                        className="w-4 h-4 text-purple-600 border-purple-300 rounded focus:ring-purple-200 disabled:opacity-50"
+                      />
+                      <span className="text-sm text-slate-700">
+                        {Boolean(currentValue) ? 'チェック済み' : '未チェック'}
+                      </span>
+                    </label>
+                  )}
+                  
+                  {field.type === 'dropdown' && field.options && (
+                    <select
+                      value={Array.isArray(currentValue) ? currentValue[0] : String(currentValue)}
+                      onChange={(e) => {
+                        setFormFieldValues(prev => {
+                          const updated = { ...prev, [field.name]: [e.target.value] };
+                          const calculated = calculateFormFields(formFields, updated);
+                          return calculated;
+                        });
+                      }}
+                      disabled={field.readOnly || isCalculated}
+                      className={`w-full px-2 py-1.5 text-sm border rounded-md ${
+                        field.readOnly || isCalculated
+                          ? 'bg-gray-100 text-gray-600 cursor-not-allowed'
+                          : 'bg-white border-purple-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200'
+                      }`}
+                    >
+                      {field.options.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  
+                  {field.type === 'radio' && field.options && (
+                    <div className="space-y-1">
+                      {field.options.map((option) => (
+                        <label key={option} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name={field.name}
+                            value={option}
+                            checked={String(currentValue) === option}
+                            onChange={(e) => {
+                              setFormFieldValues(prev => {
+                                const updated = { ...prev, [field.name]: e.target.value };
+                                const calculated = calculateFormFields(formFields, updated);
+                                return calculated;
+                              });
+                            }}
+                            disabled={field.readOnly || isCalculated}
+                            className="w-4 h-4 text-purple-600 border-purple-300 focus:ring-purple-200 disabled:opacity-50"
+                          />
+                          <span className="text-sm text-slate-700">{option}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {isCalculated && field.calculationScript && (
+                    <div className="mt-2 text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                      計算式: {field.calculationScript}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
 
       {/* カメラモーダル */}
       {showCameraModal && (
@@ -5481,6 +5954,826 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* 電子署名ダイアログ */}
+      <Dialog 
+        open={showSignatureDialog}
+        onOpenChange={(open) => {
+          console.log('電子署名ダイアログ onOpenChange called with:', open);
+          // openがtrueの場合のみ状態を更新
+          if (open) {
+            setShowSignatureDialog(true);
+          }
+          // openがfalseの場合は無視（手動で閉じるボタンのみで閉じる）
+        }}
+      >
+        <DialogContent 
+          topPosition="top-[15%]"
+          className="max-w-2xl"
+          style={{
+            zIndex: 10001,
+            left: '50%',
+            top: '15%',
+            transform: 'translateX(-50%) translateY(0)',
+            backgroundColor: 'white',
+          }}
+          onClose={() => {
+            setShowSignatureDialog(false);
+            setSignatureName('');
+            setSignatureEmail('');
+            setSignatureReason('');
+            setSignatureLocation('');
+            setSignatureImage(null);
+            setSignatureText('');
+          }}
+        >
+            <DialogHeader>
+              <DialogTitle>電子署名を追加</DialogTitle>
+              <DialogDescription>PDFに電子署名を追加します</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  署名者名 <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={signatureName}
+                  onChange={(e) => setSignatureName(e.target.value)}
+                  placeholder="山田 太郎"
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  メールアドレス
+                </label>
+                <Input
+                  type="email"
+                  value={signatureEmail}
+                  onChange={(e) => setSignatureEmail(e.target.value)}
+                  placeholder="example@company.com"
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  署名理由
+                </label>
+                <Input
+                  value={signatureReason}
+                  onChange={(e) => setSignatureReason(e.target.value)}
+                  placeholder="承認"
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  署名場所
+                </label>
+                <Input
+                  value={signatureLocation}
+                  onChange={(e) => setSignatureLocation(e.target.value)}
+                  placeholder="東京"
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  署名画像（オプション）
+                </label>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        const result = event.target?.result as string;
+                        // 画像をリサイズしてから設定
+                        const img = new Image();
+                        img.onload = () => {
+                          const canvas = document.createElement('canvas');
+                          const maxWidth = 400;
+                          const maxHeight = 200;
+                          let width = img.width;
+                          let height = img.height;
+                          
+                          if (width > maxWidth || height > maxHeight) {
+                            const ratio = Math.min(maxWidth / width, maxHeight / height);
+                            width = width * ratio;
+                            height = height * ratio;
+                          }
+                          
+                          canvas.width = width;
+                          canvas.height = height;
+                          const ctx = canvas.getContext('2d');
+                          if (ctx) {
+                            ctx.drawImage(img, 0, 0, width, height);
+                            setSignatureImage(canvas.toDataURL('image/png'));
+                          }
+                        };
+                        img.src = result;
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  className="w-full text-sm"
+                />
+                {signatureImage && (
+                  <div className="mt-2">
+                    <img 
+                      src={signatureImage} 
+                      alt="署名画像" 
+                      className="max-w-full max-h-48 border rounded object-contain" 
+                      style={{ maxWidth: '400px', maxHeight: '200px' }}
+                    />
+                    <button
+                      onClick={() => setSignatureImage(null)}
+                      className="mt-1 text-xs text-red-600 hover:text-red-800"
+                    >
+                      画像を削除
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  署名テキスト（画像がない場合）
+                </label>
+                <Input
+                  value={signatureText}
+                  onChange={(e) => setSignatureText(e.target.value)}
+                  placeholder="署名"
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  署名位置
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      name="signaturePosition"
+                      value="bottom-left"
+                      checked={signaturePosition === 'bottom-left'}
+                      onChange={(e) => setSignaturePosition(e.target.value as 'bottom-left')}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm">左下</span>
+                  </label>
+                  <label className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      name="signaturePosition"
+                      value="bottom-right"
+                      checked={signaturePosition === 'bottom-right'}
+                      onChange={(e) => setSignaturePosition(e.target.value as 'bottom-right')}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm">右下</span>
+                  </label>
+                  <label className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      name="signaturePosition"
+                      value="top-left"
+                      checked={signaturePosition === 'top-left'}
+                      onChange={(e) => setSignaturePosition(e.target.value as 'top-left')}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm">左上</span>
+                  </label>
+                  <label className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      name="signaturePosition"
+                      value="top-right"
+                      checked={signaturePosition === 'top-right'}
+                      onChange={(e) => setSignaturePosition(e.target.value as 'top-right')}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm">右上</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowSignatureDialog(false);
+                  setSignatureName('');
+                  setSignatureEmail('');
+                  setSignatureReason('');
+                  setSignatureLocation('');
+                  setSignatureImage(null);
+                  setSignatureText('');
+                  setSignaturePosition('bottom-left');
+                }}
+              >
+                キャンセル
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!signatureName || !docId || !pageSize) {
+                    toast({
+                      title: "エラー",
+                      description: "署名者名を入力してください",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  
+                  // 署名位置を計算
+                  let x = 0.1, y = 0.1;
+                  if (signaturePosition === 'bottom-right') {
+                    x = 0.6; // 右側
+                    y = 0.1; // 下側
+                  } else if (signaturePosition === 'top-left') {
+                    x = 0.1; // 左側
+                    y = 0.75; // 上側（PDF座標系は下から上）
+                  } else if (signaturePosition === 'top-right') {
+                    x = 0.6; // 右側
+                    y = 0.75; // 上側
+                  } else {
+                    // bottom-left (デフォルト)
+                    x = 0.1;
+                    y = 0.1;
+                  }
+                  
+                  const signature: Signature = {
+                    id: generateSignatureId(),
+                    signerName: signatureName,
+                    signerEmail: signatureEmail || undefined,
+                    signDate: new Date(),
+                    signatureImage: signatureImage || undefined,
+                    signatureText: signatureText || undefined,
+                    position: {
+                      pageNumber: currentPage,
+                      x,
+                      y,
+                      width: 0.3,
+                      height: 0.15,
+                    },
+                    reason: signatureReason || undefined,
+                    location: signatureLocation || undefined,
+                  };
+                  
+                  await saveSignature(docId, signature);
+                  setSignatures(prev => [...prev, signature]);
+                  
+                  toast({
+                    title: "成功",
+                    description: "電子署名を追加しました",
+                  });
+                  
+                  setShowSignatureDialog(false);
+                  setSignatureName('');
+                  setSignatureEmail('');
+                  setSignatureReason('');
+                  setSignatureLocation('');
+                  setSignatureImage(null);
+                  setSignatureText('');
+                  setSignaturePosition('bottom-left');
+                }}
+                disabled={!signatureName}
+              >
+                署名を追加
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+      {/* 承認ワークフローダイアログ */}
+      <Dialog 
+        open={showApprovalWorkflowDialog}
+        onOpenChange={(open) => {
+          console.log('承認ワークフローダイアログ onOpenChange called with:', open);
+          // openがtrueの場合のみ状態を更新
+          if (open) {
+            setShowApprovalWorkflowDialog(true);
+          }
+          // openがfalseの場合は無視（手動で閉じるボタンのみで閉じる）
+        }}
+      >
+        <DialogContent 
+          topPosition="top-[15%]"
+          className="max-w-3xl max-h-[80vh] overflow-y-auto"
+          style={{
+            zIndex: 10001,
+            left: '50%',
+            top: '15%',
+            transform: 'translateX(-50%) translateY(0)',
+            backgroundColor: 'white',
+          }}
+          onClose={() => {
+            setShowApprovalWorkflowDialog(false);
+          }}
+        >
+            <DialogHeader>
+              <DialogTitle>承認ワークフローを設定</DialogTitle>
+              <DialogDescription>複数の承認者を設定して順次承認を行います</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {approvalWorkflows.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="font-semibold text-slate-700">承認ワークフロー一覧</h3>
+                  {approvalWorkflows.map((workflow) => (
+                    <div key={workflow.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <div className="font-medium text-slate-800">
+                            ステップ {workflow.currentStep} / {workflow.approvers.length}
+                          </div>
+                          <div className="text-sm text-slate-600">
+                            ステータス: {workflow.status === 'pending' ? '承認待ち' : workflow.status === 'approved' ? '承認済み' : workflow.status === 'rejected' ? '却下' : '完了'}
+                          </div>
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {workflow.createdAt.toLocaleDateString('ja-JP')}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        {workflow.approvers.map((approver) => (
+                          <div
+                            key={approver.stepNumber}
+                            className={`text-sm p-2 rounded ${
+                              approver.status === 'approved'
+                                ? 'bg-green-50 text-green-800'
+                                : approver.status === 'rejected'
+                                ? 'bg-red-50 text-red-800'
+                                : approver.stepNumber === workflow.currentStep
+                                ? 'bg-blue-50 text-blue-800'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            {approver.stepNumber}. {approver.approverName}
+                            {approver.role && ` (${approver.role})`}
+                            {approver.status === 'approved' && approver.approvedAt && (
+                              <span className="ml-2 text-xs">
+                                ✓ {approver.approvedAt.toLocaleDateString('ja-JP')}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="border-t pt-4">
+                <h3 className="font-semibold text-slate-700 mb-3">新しい承認ワークフローを作成</h3>
+                <div className="space-y-2" id="approvers-list">
+                  {/* 承認者リストは動的に追加 */}
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const list = document.getElementById('approvers-list');
+                    if (list) {
+                      const div = document.createElement('div');
+                      div.className = 'flex gap-2 items-center p-2 bg-slate-50 rounded';
+                      div.innerHTML = `
+                        <input type="text" placeholder="承認者名" class="flex-1 px-2 py-1 border rounded text-sm" />
+                        <input type="text" placeholder="役職（オプション）" class="flex-1 px-2 py-1 border rounded text-sm" />
+                        <input type="email" placeholder="メール（オプション）" class="flex-1 px-2 py-1 border rounded text-sm" />
+                        <button class="px-2 py-1 bg-red-500 text-white rounded text-sm">削除</button>
+                      `;
+                      list.appendChild(div);
+                    }
+                  }}
+                  className="mt-2"
+                >
+                  承認者を追加
+                </Button>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowApprovalWorkflowDialog(false)}
+              >
+                閉じる
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!docId) return;
+                  
+                  const list = document.getElementById('approvers-list');
+                  if (!list) return;
+                  
+                  const approvers: Array<Omit<import('./lib/signature').ApprovalStep, 'stepNumber' | 'status'>> = [];
+                  const inputs = list.querySelectorAll('div');
+                  
+                  inputs.forEach((div) => {
+                    const nameInput = div.querySelector('input[type="text"]:first-of-type') as HTMLInputElement;
+                    const roleInput = div.querySelector('input[type="text"]:nth-of-type(2)') as HTMLInputElement;
+                    const emailInput = div.querySelector('input[type="email"]') as HTMLInputElement;
+                    
+                    if (nameInput?.value) {
+                      approvers.push({
+                        approverName: nameInput.value,
+                        role: roleInput?.value || undefined,
+                        approverEmail: emailInput?.value || undefined,
+                        required: true,
+                      });
+                    }
+                  });
+                  
+                  if (approvers.length === 0) {
+                    toast({
+                      title: "エラー",
+                      description: "少なくとも1人の承認者を追加してください",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  
+                  const workflow = createApprovalWorkflow(docId, approvers);
+                  await saveApprovalWorkflow(docId, workflow);
+                  setApprovalWorkflows(prev => [...prev, workflow]);
+                  
+                  toast({
+                    title: "成功",
+                    description: "承認ワークフローを作成しました",
+                  });
+                  
+                  setShowApprovalWorkflowDialog(false);
+                }}
+              >
+                ワークフローを作成
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+      {/* PDF分割ダイアログ（ページ管理モーダルから） */}
+      <Dialog 
+        open={showSplitDialogFromThumbnail}
+        onOpenChange={(open) => {
+          console.log('PDF分割ダイアログ（ページ管理から） onOpenChange called with:', open);
+          if (open) {
+            setShowSplitDialogFromThumbnail(true);
+          }
+        }}
+      >
+        <DialogContent 
+          topPosition="top-[15%]"
+          className="max-w-2xl"
+          style={{
+            zIndex: 10001,
+            left: '50%',
+            top: '15%',
+            transform: 'translateX(-50%) translateY(0)',
+            backgroundColor: 'white',
+          }}
+          onClose={() => {
+            setShowSplitDialogFromThumbnail(false);
+            setSplitRangeInputs(['']);
+            setSelectedPagesForDelete(new Set());
+          }}
+        >
+            <DialogHeader>
+              <DialogTitle>PDFを分割（選択したページから）</DialogTitle>
+              <DialogDescription>ページ管理で選択したページを範囲としてPDFを分割します</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-3">
+                {splitRangeInputs.map((input, index) => (
+                  <div key={index} className="space-y-2">
+                    <label className="block text-sm font-medium text-slate-700">
+                      範囲 {index + 1}（例: 1-3, 5, 7-9）
+                    </label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        value={input}
+                        onChange={(e) => {
+                          const newInputs = [...splitRangeInputs];
+                          newInputs[index] = e.target.value;
+                          setSplitRangeInputs(newInputs);
+                        }}
+                        placeholder="1-3, 5, 7-9"
+                        className="flex-1"
+                      />
+                      {splitRangeInputs.length > 1 && (
+                        <button
+                          onClick={() => {
+                            setSplitRangeInputs(splitRangeInputs.filter((_, i) => i !== index));
+                          }}
+                          className="px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                        >
+                          削除
+                        </button>
+                      )}
+                    </div>
+                    {input && (() => {
+                      const ranges = parsePageRanges(input, totalPages);
+                      const allPages: number[] = [];
+                      ranges.forEach(range => {
+                        for (let i = range.start; i <= range.end; i++) {
+                          allPages.push(i);
+                        }
+                      });
+                      const uniquePages = [...new Set(allPages)].sort((a, b) => a - b);
+                      return (
+                        <div className="p-2 bg-slate-50 rounded border border-slate-200">
+                          <p className="text-xs text-slate-600">
+                            ページ: {uniquePages.join(', ')}
+                          </p>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSplitRangeInputs([...splitRangeInputs, '']);
+                  }}
+                  className="w-full"
+                >
+                  範囲を追加
+                </Button>
+                <p className="text-xs text-slate-500">
+                  各範囲指定は1つのPDFファイルとして出力されます。例: "1-3, 5, 7-9" → 1つのPDF（1, 2, 3, 5, 7, 8, 9ページを含む）
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowSplitDialogFromThumbnail(false);
+                  setSplitRangeInputs(['']);
+                  setSelectedPagesForDelete(new Set());
+                }}
+              >
+                キャンセル
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!originalPdfBytes) {
+                    toast({
+                      title: "エラー",
+                      description: "PDFファイルが読み込まれていません",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  
+                  // 有効な範囲入力のみを抽出
+                  const validInputs = splitRangeInputs.filter(input => input.trim());
+                  if (validInputs.length === 0) {
+                    toast({
+                      title: "エラー",
+                      description: "分割範囲を指定してください",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  
+                  try {
+                    // 各範囲入力をページ番号の配列に変換
+                    const pageGroups: number[][] = validInputs.map(input => {
+                      const ranges = parsePageRanges(input, totalPages);
+                      const allPages: number[] = [];
+                      ranges.forEach(range => {
+                        for (let i = range.start; i <= range.end; i++) {
+                          allPages.push(i);
+                        }
+                      });
+                      return [...new Set(allPages)].sort((a, b) => a - b);
+                    });
+                    
+                    const splitPdfs = await splitPDFByPageGroups(originalPdfBytes, pageGroups);
+                    
+                    // 各分割PDFをダウンロード
+                    for (let i = 0; i < splitPdfs.length; i++) {
+                      const pages = pageGroups[i];
+                      const blob = new Blob([splitPdfs[i] as BlobPart], { type: 'application/pdf' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      const pageStr = pages.length === 1 
+                        ? `page${pages[0]}` 
+                        : `pages${pages[0]}-${pages[pages.length - 1]}`;
+                      a.download = `${originalFileName?.replace('.pdf', '') || 'document'}_${pageStr}.pdf`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    }
+                    
+                    toast({
+                      title: "成功",
+                      description: `${splitPdfs.length}個のPDFファイルをダウンロードしました`,
+                    });
+                    
+                    setShowSplitDialogFromThumbnail(false);
+                    setSplitRangeInputs(['']);
+                    setSelectedPagesForDelete(new Set());
+                  } catch (error) {
+                    console.error('PDF分割エラー:', error);
+                    toast({
+                      title: "エラー",
+                      description: 'PDFの分割に失敗しました: ' + (error instanceof Error ? error.message : String(error)),
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                disabled={splitRangeInputs.filter(input => input.trim()).length === 0}
+              >
+                分割してダウンロード
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+      {/* PDF分割ダイアログ */}
+      <Dialog 
+        open={showSplitDialog}
+        onOpenChange={(open) => {
+          console.log('PDF分割ダイアログ onOpenChange called with:', open);
+          // openがtrueの場合のみ状態を更新
+          if (open) {
+            setShowSplitDialog(true);
+          }
+          // openがfalseの場合は無視（手動で閉じるボタンのみで閉じる）
+        }}
+      >
+        <DialogContent 
+          topPosition="top-[15%]"
+          className="max-w-2xl"
+          style={{
+            zIndex: 10001,
+            left: '50%',
+            top: '15%',
+            transform: 'translateX(-50%) translateY(0)',
+            backgroundColor: 'white',
+          }}
+          onClose={() => {
+            setShowSplitDialog(false);
+            setSplitRangeInputs(['']);
+          }}
+        >
+            <DialogHeader>
+              <DialogTitle>PDFを分割</DialogTitle>
+              <DialogDescription>指定したページ範囲でPDFを分割します</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-3">
+                {splitRangeInputs.map((input, index) => (
+                  <div key={index} className="space-y-2">
+                    <label className="block text-sm font-medium text-slate-700">
+                      範囲 {index + 1}（例: 1-3, 5, 7-9）
+                    </label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        value={input}
+                        onChange={(e) => {
+                          const newInputs = [...splitRangeInputs];
+                          newInputs[index] = e.target.value;
+                          setSplitRangeInputs(newInputs);
+                        }}
+                        placeholder="1-3, 5, 7-9"
+                        className="flex-1"
+                      />
+                      {splitRangeInputs.length > 1 && (
+                        <button
+                          onClick={() => {
+                            setSplitRangeInputs(splitRangeInputs.filter((_, i) => i !== index));
+                          }}
+                          className="px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                        >
+                          削除
+                        </button>
+                      )}
+                    </div>
+                    {input && (() => {
+                      const ranges = parsePageRanges(input, totalPages);
+                      const allPages: number[] = [];
+                      ranges.forEach(range => {
+                        for (let i = range.start; i <= range.end; i++) {
+                          allPages.push(i);
+                        }
+                      });
+                      const uniquePages = [...new Set(allPages)].sort((a, b) => a - b);
+                      return (
+                        <div className="p-2 bg-slate-50 rounded border border-slate-200">
+                          <p className="text-xs text-slate-600">
+                            ページ: {uniquePages.join(', ')}
+                          </p>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSplitRangeInputs([...splitRangeInputs, '']);
+                  }}
+                  className="w-full"
+                >
+                  範囲を追加
+                </Button>
+                <p className="text-xs text-slate-500">
+                  各範囲指定は1つのPDFファイルとして出力されます。例: "1-3, 5, 7-9" → 1つのPDF（1, 2, 3, 5, 7, 8, 9ページを含む）
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowSplitDialog(false);
+                  setSplitRangeInputs(['']);
+                }}
+              >
+                キャンセル
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!originalPdfBytes) {
+                    toast({
+                      title: "エラー",
+                      description: "PDFファイルが読み込まれていません",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  
+                  // 有効な範囲入力のみを抽出
+                  const validInputs = splitRangeInputs.filter(input => input.trim());
+                  if (validInputs.length === 0) {
+                    toast({
+                      title: "エラー",
+                      description: "分割範囲を指定してください",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  
+                  try {
+                    // 各範囲入力をページ番号の配列に変換
+                    const pageGroups: number[][] = validInputs.map(input => {
+                      const ranges = parsePageRanges(input, totalPages);
+                      const allPages: number[] = [];
+                      ranges.forEach(range => {
+                        for (let i = range.start; i <= range.end; i++) {
+                          allPages.push(i);
+                        }
+                      });
+                      return [...new Set(allPages)].sort((a, b) => a - b);
+                    });
+                    
+                    const splitPdfs = await splitPDFByPageGroups(originalPdfBytes, pageGroups);
+                    
+                    // 各分割PDFをダウンロード
+                    for (let i = 0; i < splitPdfs.length; i++) {
+                      const pages = pageGroups[i];
+                      const blob = new Blob([splitPdfs[i] as BlobPart], { type: 'application/pdf' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      const pageStr = pages.length === 1 
+                        ? `page${pages[0]}` 
+                        : `pages${pages[0]}-${pages[pages.length - 1]}`;
+                      a.download = `${originalFileName?.replace('.pdf', '') || 'document'}_${pageStr}.pdf`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    }
+                    
+                    toast({
+                      title: "成功",
+                      description: `${splitPdfs.length}個のPDFファイルをダウンロードしました`,
+                    });
+                    
+                    setShowSplitDialog(false);
+                    setSplitRangeInputs(['']);
+                  } catch (error) {
+                    console.error('PDF分割エラー:', error);
+                    toast({
+                      title: "エラー",
+                      description: 'PDFの分割に失敗しました: ' + (error instanceof Error ? error.message : String(error)),
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                disabled={splitRangeInputs.filter(input => input.trim()).length === 0}
+              >
+                分割してダウンロード
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
