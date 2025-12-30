@@ -55,22 +55,34 @@ export async function extractFormFields(pdfDoc: PDFDocument): Promise<FormField[
       if (fieldType.includes('TextField')) {
         const textField = field as PDFTextField;
         const acroField = textField.acroField;
-        const rect = acroField.getRectangle();
-        if (rect) {
-          x = rect.x;
-          y = rect.y;
-          width = rect.width;
-          height = rect.height;
+        // pdf-libでは、rectプロパティを直接アクセスするか、getRect()メソッドを使用
+        // 型安全性のため、anyでキャストしてアクセス
+        const rect = (acroField as any).rect || (acroField as any).getRect?.();
+        if (rect && typeof rect === 'object') {
+          x = rect.x || rect[0] || 0;
+          y = rect.y || rect[1] || 0;
+          width = rect.width || (rect[2] ? rect[2] - x : 100);
+          height = rect.height || (rect[3] ? rect[3] - y : 20);
         }
       } else if (fieldType.includes('CheckBox')) {
         const checkBox = field as PDFCheckBox;
         const acroField = checkBox.acroField;
-        const rect = acroField.getRectangle();
-        if (rect) {
-          x = rect.x;
-          y = rect.y;
-          width = rect.width;
-          height = rect.height;
+        const rect = (acroField as any).rect || (acroField as any).getRect?.();
+        if (rect && typeof rect === 'object') {
+          x = rect.x || rect[0] || 0;
+          y = rect.y || rect[1] || 0;
+          width = rect.width || (rect[2] ? rect[2] - x : 100);
+          height = rect.height || (rect[3] ? rect[3] - y : 20);
+        }
+      } else if (fieldType.includes('Dropdown')) {
+        const dropdown = field as PDFDropdown;
+        const acroField = dropdown.acroField;
+        const rect = (acroField as any).rect || (acroField as any).getRect?.();
+        if (rect && typeof rect === 'object') {
+          x = rect.x || rect[0] || 0;
+          y = rect.y || rect[1] || 0;
+          width = rect.width || (rect[2] ? rect[2] - x : 100);
+          height = rect.height || (rect[3] ? rect[3] - y : 20);
         }
       }
     } catch (e) {
@@ -98,27 +110,31 @@ export async function extractFormFields(pdfDoc: PDFDocument): Promise<FormField[
     if (fieldType.includes('TextField')) {
       const textField = field as PDFTextField;
       value = textField.getText() || '';
-      defaultValue = textField.getDefaultValue() || undefined;
+      // getDefaultValue()は存在しないため、デフォルト値は取得しない
+      defaultValue = undefined;
       readOnly = textField.isReadOnly();
       required = textField.isRequired();
       maxLength = textField.getMaxLength();
     } else if (fieldType.includes('CheckBox')) {
       const checkBox = field as PDFCheckBox;
       value = checkBox.isChecked();
-      defaultValue = checkBox.getDefaultValue() || false;
+      // getDefaultValue()は存在しないため、デフォルト値は取得しない
+      defaultValue = undefined;
       readOnly = checkBox.isReadOnly();
       required = checkBox.isRequired();
     } else if (fieldType.includes('Dropdown')) {
       const dropdown = field as PDFDropdown;
       value = dropdown.getSelected() || [];
-      defaultValue = dropdown.getDefaultValue() || undefined;
+      // getDefaultValue()は存在しないため、デフォルト値は取得しない
+      defaultValue = undefined;
       readOnly = dropdown.isReadOnly();
       required = dropdown.isRequired();
       options = dropdown.getOptions();
     } else if (fieldType.includes('RadioGroup')) {
       const radioGroup = field as PDFRadioGroup;
       value = radioGroup.getSelected() || '';
-      defaultValue = radioGroup.getDefaultValue() || undefined;
+      // getDefaultValue()は存在しないため、デフォルト値は取得しない
+      defaultValue = undefined;
       readOnly = radioGroup.isReadOnly();
       required = radioGroup.isRequired();
       options = radioGroup.getOptions();

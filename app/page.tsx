@@ -3281,10 +3281,31 @@ export default function Home() {
   const siteUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-50 to-slate-100 relative overflow-hidden" style={{ height: '100vh', overflow: 'hidden' }}>
-      <div className="h-full max-w-[1800px] mx-auto p-4 md:p-6 lg:p-8 transition-all duration-300" style={{ 
-        position: 'relative', 
-        zIndex: 1,
+    <>
+      <style>{`
+        @keyframes gradientShift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .animated-gradient {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #00f2fe 100%);
+          background-size: 400% 400%;
+          animation: gradientShift 15s ease infinite;
+        }
+      `}</style>
+      <div className="h-screen relative overflow-hidden animated-gradient" style={{ 
+        height: '100vh', 
+        overflow: 'hidden',
+      }}>
+        {/* 装飾的な円形要素 */}
+        <div className="absolute top-0 left-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
+        <div className="absolute top-1/4 right-0 w-80 h-80 bg-pink-300/20 rounded-full blur-3xl translate-x-1/2 animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute bottom-0 left-1/3 w-72 h-72 bg-blue-300/20 rounded-full blur-3xl -translate-y-1/2 animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute top-1/2 right-1/4 w-64 h-64 bg-purple-300/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+        <div className="absolute bottom-1/4 left-1/2 w-56 h-56 bg-cyan-300/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }}></div>
+      
+      <div className="h-full max-w-[1800px] mx-auto p-4 md:p-6 lg:p-8 transition-all duration-300 relative z-10" style={{ 
         marginLeft: showThumbnails ? '13rem' : 'auto',
         marginRight: showAnnotationList ? '16.5rem' : 'auto',
         height: '100%',
@@ -3312,16 +3333,24 @@ export default function Home() {
 
       {/* ファイル選択 */}
       <div
-        className="mb-6 p-6 border-2 border-dashed rounded-xl bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 hover:from-blue-100 hover:via-purple-100 hover:to-pink-100 transition-all duration-300 text-center hover:scale-[1.02] hover:shadow-lg border-blue-300 hover:border-purple-400"
+        className="mb-6 p-6 border-2 border-dashed rounded-xl bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 hover:from-blue-100 hover:via-purple-100 hover:to-pink-100 transition-all duration-300 text-center hover:scale-[1.02] hover:shadow-lg border-blue-300 hover:border-purple-400 relative overflow-hidden"
         onDragOver={(e) => {
           e.preventDefault();
           e.stopPropagation();
+          e.currentTarget.classList.add('ring-4', 'ring-blue-400', 'ring-opacity-50');
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          e.currentTarget.classList.remove('ring-4', 'ring-blue-400', 'ring-opacity-50');
         }}
         onDragEnter={(e) => {
           e.preventDefault();
           e.stopPropagation();
+          e.currentTarget.classList.add('ring-4', 'ring-blue-400', 'ring-opacity-50');
         }}
         onDrop={async (e) => {
+          e.currentTarget.classList.remove('ring-4', 'ring-blue-400', 'ring-opacity-50');
           e.preventDefault();
           e.stopPropagation();
           const files = e.dataTransfer.files;
@@ -3383,8 +3412,95 @@ export default function Home() {
           }
         }}
       >
-        <div className="flex gap-2">
-          <label className="inline-block flex-1">
+        <div className="flex gap-3">
+          <label 
+            className="inline-block flex-1"
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.currentTarget.classList.add('ring-4', 'ring-blue-400', 'ring-opacity-50');
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.currentTarget.classList.remove('ring-4', 'ring-blue-400', 'ring-opacity-50');
+            }}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.currentTarget.classList.add('ring-4', 'ring-blue-400', 'ring-opacity-50');
+            }}
+            onDrop={async (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.currentTarget.classList.remove('ring-4', 'ring-blue-400', 'ring-opacity-50');
+              const files = e.dataTransfer.files;
+              if (files.length > 0) {
+                const file = files[0];
+                if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
+                  if (file.type.startsWith('image/')) {
+                    handleImageFileSelect(file, false);
+                  } else {
+                    // PDFファイルの場合、直接処理
+                    try {
+                      const arrayBuffer = await file.arrayBuffer();
+                      const id = await generateDocId(file);
+                      setDocId(id);
+                      setOriginalPdfBytes(arrayBuffer);
+                      setOriginalFileName(file.name);
+                      const doc = await loadPDF(file);
+                      setPdfDoc(doc);
+                      setTotalPages(doc.numPages);
+                      setCurrentPage(1);
+                      setScale(1.0);
+                      setStrokes([]);
+                      setUndoStack([]);
+                      setRedoStack([]);
+                      setPageSizes({});
+                      setTextItems([]);
+                      
+                      // フォームフィールドを抽出
+                      try {
+                        const { PDFDocument } = await import('pdf-lib');
+                        const pdfDoc = await PDFDocument.load(arrayBuffer);
+                        const fields = await extractFormFields(pdfDoc);
+                        const fieldsWithCalculations = setupCommonCalculations(fields);
+                        setFormFields(fieldsWithCalculations);
+                        const initialValues: Record<string, string | boolean | string[]> = {};
+                        fieldsWithCalculations.forEach(field => {
+                          initialValues[field.name] = field.value;
+                        });
+                        setFormFieldValues(initialValues);
+                      } catch (formError) {
+                        console.warn('フォームフィールドの抽出に失敗:', formError);
+                        setFormFields([]);
+                        setFormFieldValues({});
+                      }
+                      
+                      // 署名と承認ワークフローを読み込む
+                      if (id) {
+                        try {
+                          const loadedSignatures = await getAllSignatures(id);
+                          setSignatures(loadedSignatures);
+                          const loadedWorkflows = await getAllApprovalWorkflows(id);
+                          setApprovalWorkflows(loadedWorkflows);
+                        } catch (error) {
+                          console.warn('署名・ワークフローの読み込みに失敗:', error);
+                        }
+                      }
+                    } catch (error) {
+                      console.error('ファイル読み込みエラー:', error);
+                      toast({
+                        title: "エラー",
+                        description: 'ファイルの読み込みに失敗しました: ' + (error instanceof Error ? error.message : String(error)),
+                        variant: "destructive",
+                      });
+                    }
+                  }
+                }
+              }
+            }}
+          >
             <input
               type="file"
               accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp,image/gif"
@@ -3400,7 +3516,39 @@ export default function Home() {
               </div>
             </div>
           </label>
-          <label className="inline-block">
+          <label 
+            className="inline-block"
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.currentTarget.classList.add('ring-4', 'ring-purple-400', 'ring-opacity-50');
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.currentTarget.classList.remove('ring-4', 'ring-purple-400', 'ring-opacity-50');
+            }}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.currentTarget.classList.add('ring-4', 'ring-purple-400', 'ring-opacity-50');
+            }}
+            onDrop={async (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.currentTarget.classList.remove('ring-4', 'ring-purple-400', 'ring-opacity-50');
+              const files = e.dataTransfer.files;
+              if (files.length > 0) {
+                const validFiles = Array.from(files).filter(f => 
+                  f.type.startsWith('image/') || f.type === 'application/pdf'
+                );
+                if (validFiles.length > 0) {
+                  setImageFiles(prev => [...prev, ...validFiles]);
+                  setShowImageManager(true);
+                }
+              }
+            }}
+          >
             <input
               type="file"
               accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp,image/gif"
@@ -3418,12 +3566,12 @@ export default function Home() {
             </div>
           </label>
         </div>
-        <div className="mt-4 px-5 py-4 bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 border-3 border-blue-600 rounded-xl shadow-lg" style={{ borderWidth: '3px', borderStyle: 'solid', borderColor: '#2563eb' }}>
-          <div className="text-sm text-slate-800 font-bold mb-2.5 flex items-center gap-2">
-            <MdInsertDriveFile className="text-blue-600 text-lg" />
+        <div className="mt-4 px-5 py-4 bg-white/90 backdrop-blur-sm border-3 border-blue-500 rounded-xl shadow-xl" style={{ borderWidth: '3px', borderStyle: 'solid', borderColor: '#3b82f6' }}>
+          <div className="text-base text-slate-900 font-bold mb-3 flex items-center gap-2">
+            <MdInsertDriveFile className="text-blue-600 text-xl" />
             PDFファイルまたは画像ファイル（PNG、JPEG、WebP、GIF）を選択できます
           </div>
-          <div className="text-xs text-slate-700 pl-7 space-y-1">
+          <div className="text-sm text-slate-800 pl-8 space-y-1.5 font-medium">
             <div>• 画像ファイルは自動的にPDFに変換されます</div>
             <div>• または、ファイルをここにドラッグ&ドロップしてください</div>
           </div>
@@ -6786,6 +6934,7 @@ export default function Home() {
         </Dialog>
       </div>
     </div>
+    </>
   );
 }
 
