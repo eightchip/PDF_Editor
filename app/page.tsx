@@ -6148,7 +6148,7 @@ export default function Home() {
             left: '50%',
             top: '15%',
             transform: 'translateX(-50%) translateY(0)',
-            backgroundColor: 'white',
+            background: 'linear-gradient(135deg, #dbeafe 0%, #e0f2fe 50%, #bae6fd 100%)',
           }}
           onClose={() => {
             setShowSignatureDialog(false);
@@ -6160,7 +6160,7 @@ export default function Home() {
             setSignatureText('');
           }}
         >
-            <DialogHeader className="pb-4 border-b border-slate-200 mb-4">
+            <DialogHeader className="pb-4 border-b border-blue-200 mb-4">
               <DialogTitle className="text-2xl font-bold text-slate-900 mb-2">電子署名を追加</DialogTitle>
               <DialogDescription className="text-base text-slate-600">PDFに電子署名を追加します</DialogDescription>
             </DialogHeader>
@@ -6333,7 +6333,7 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <DialogFooter className="pt-4 border-t border-slate-200 mt-4">
+            <DialogFooter className="pt-4 border-t border-blue-200 mt-4">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -6441,13 +6441,13 @@ export default function Home() {
             left: '50%',
             top: '15%',
             transform: 'translateX(-50%) translateY(0)',
-            backgroundColor: 'white',
+            background: 'linear-gradient(135deg, #ede9fe 0%, #f3e8ff 50%, #e9d5ff 100%)',
           }}
           onClose={() => {
             setShowApprovalWorkflowDialog(false);
           }}
         >
-            <DialogHeader className="pb-4 border-b border-slate-200 mb-4">
+            <DialogHeader className="pb-4 border-b border-purple-200 mb-4">
               <DialogTitle className="text-2xl font-bold text-slate-900 mb-2">承認ワークフローを設定</DialogTitle>
               <DialogDescription className="text-base text-slate-600">複数の承認者を設定して順次承認を行います</DialogDescription>
             </DialogHeader>
@@ -6525,7 +6525,7 @@ export default function Home() {
                 </Button>
               </div>
             </div>
-            <DialogFooter className="pt-4 border-t border-slate-200 mt-4">
+            <DialogFooter className="pt-4 border-t border-purple-200 mt-4">
               <Button
                 variant="outline"
                 onClick={() => setShowApprovalWorkflowDialog(false)}
@@ -6681,7 +6681,7 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <DialogFooter className="pt-4 border-t border-slate-200 mt-4">
+            <DialogFooter className="pt-4 border-t border-orange-200 mt-4">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -6792,14 +6792,14 @@ export default function Home() {
             left: '50%',
             top: '15%',
             transform: 'translateX(-50%) translateY(0)',
-            backgroundColor: 'white',
+            background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 50%, #fed7aa 100%)',
           }}
           onClose={() => {
             setShowSplitDialog(false);
             setSplitRangeInputs(['']);
           }}
         >
-            <DialogHeader className="pb-4 border-b border-slate-200 mb-4">
+            <DialogHeader className="pb-4 border-b border-orange-200 mb-4">
               <DialogTitle className="text-2xl font-bold text-slate-900 mb-2">PDFを分割</DialogTitle>
               <DialogDescription className="text-base text-slate-600">指定したページ範囲でPDFを分割します</DialogDescription>
             </DialogHeader>
@@ -6868,7 +6868,7 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <DialogFooter className="pt-4 border-t border-slate-200 mt-4">
+            <DialogFooter className="pt-4 border-t border-orange-200 mt-4">
               <Button
                 variant="outline"
                 onClick={() => {
