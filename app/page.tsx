@@ -1424,8 +1424,8 @@ export default function Home() {
       const newShapes = [...shapeAnnotations, newStamp];
       setShapeAnnotations(newShapes);
       
-      // Undoスタックに追加
-      setUndoStack([...undoStack, { strokes, shapes: shapeAnnotations, texts: textAnnotations }]);
+      // Undoスタックに追加（関数形式で最新の状態を取得）
+      setUndoStack(prev => [...prev, { strokes, shapes: shapeAnnotations, texts: textAnnotations }]);
       setRedoStack([]);
       
       // 保存
@@ -2085,8 +2085,8 @@ export default function Home() {
       const newShapes = [...shapeAnnotations, currentShape];
       setShapeAnnotations(newShapes);
       
-      // Undoスタックに追加
-      setUndoStack([...undoStack, { strokes, shapes: shapeAnnotations, texts: textAnnotations }]);
+      // Undoスタックに追加（関数形式で最新の状態を取得）
+      setUndoStack(prev => [...prev, { strokes, shapes: shapeAnnotations, texts: textAnnotations }]);
       setRedoStack([]);
       
       setCurrentShape(null);
@@ -2121,10 +2121,12 @@ export default function Home() {
     if (!currentStroke) return;
 
     // ストロークを確定
+    // 現在の状態をUndoスタックに追加（currentStrokeを追加する前の状態）
+    setUndoStack(prev => [...prev, { strokes, shapes: shapeAnnotations, texts: textAnnotations }]);
+    setRedoStack([]);
+    
     const newStrokes = [...strokes, currentStroke];
     setStrokes(newStrokes);
-    setUndoStack([...undoStack, { strokes, shapes: shapeAnnotations, texts: textAnnotations }]);
-    setRedoStack([]);
     setCurrentStroke(null);
     isDrawingRef.current = false;
 
@@ -2476,112 +2478,118 @@ export default function Home() {
   const handleUndo = async () => {
     if (undoStack.length === 0 || !docId || !pageSize) return;
 
-    const previousState = undoStack[undoStack.length - 1];
+    // 現在の状態をRedoスタックに追加（関数形式で最新の状態を取得）
+    setRedoStack(prev => [...prev, { strokes, shapes: shapeAnnotations, texts: textAnnotations }]);
     
-    // 現在の状態をRedoスタックに追加
-    setRedoStack([...redoStack, { strokes, shapes: shapeAnnotations, texts: textAnnotations }]);
-    
-    // Undoスタックから最後の要素を削除
-    const newUndoStack = undoStack.slice(0, -1);
-    setUndoStack(newUndoStack);
-    
-    // 状態を更新（同期的に）
-    setStrokes(previousState.strokes);
-    setShapeAnnotations(previousState.shapes);
-    setTextAnnotations(previousState.texts);
+    // Undoスタックから最後の要素を取得して削除（関数形式で最新の状態を取得）
+    setUndoStack(prev => {
+      if (prev.length === 0) return prev;
+      const previousState = prev[prev.length - 1];
+      
+      // 状態を更新（同期的に）
+      setStrokes(previousState.strokes);
+      setShapeAnnotations(previousState.shapes);
+      setTextAnnotations(previousState.texts);
 
-    // 保存
-    const actualPageNum = getActualPageNum(currentPage);
-    await saveAnnotations(docId, actualPageNum, previousState.strokes);
-    await saveShapeAnnotations(docId, actualPageNum, previousState.shapes);
-    await saveTextAnnotations(docId, actualPageNum, previousState.texts);
+      // 保存
+      const actualPageNum = getActualPageNum(currentPage);
+      saveAnnotations(docId, actualPageNum, previousState.strokes);
+      saveShapeAnnotations(docId, actualPageNum, previousState.shapes);
+      saveTextAnnotations(docId, actualPageNum, previousState.texts);
 
-    // 再描画（状態更新後に確実に実行するため、setTimeoutを使用）
-    setTimeout(() => {
-      if (inkCanvasRef.current && pageSize) {
-        const ctx = inkCanvasRef.current.getContext('2d');
-        if (ctx) {
-          const devicePixelRatio = window.devicePixelRatio || 1;
-          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-          ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
-          redrawStrokes(ctx, previousState.strokes, pageSize.width, pageSize.height);
+      // 再描画（状態更新後に確実に実行するため、setTimeoutを使用）
+      setTimeout(() => {
+        if (inkCanvasRef.current && pageSize) {
+          const ctx = inkCanvasRef.current.getContext('2d');
+          if (ctx) {
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+            ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+            redrawStrokes(ctx, previousState.strokes, pageSize.width, pageSize.height);
+          }
         }
-      }
-      if (shapeCanvasRef.current && pageSize) {
-        const ctx = shapeCanvasRef.current.getContext('2d');
-        if (ctx) {
-          const devicePixelRatio = window.devicePixelRatio || 1;
-          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-          ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
-          redrawShapeAnnotations(ctx, previousState.shapes, pageSize.width, pageSize.height).catch(console.error);
+        if (shapeCanvasRef.current && pageSize) {
+          const ctx = shapeCanvasRef.current.getContext('2d');
+          if (ctx) {
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+            ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
+            redrawShapeAnnotations(ctx, previousState.shapes, pageSize.width, pageSize.height).catch(console.error);
+          }
         }
-      }
-      if (textCanvasRef.current && pageSize) {
-        const ctx = textCanvasRef.current.getContext('2d');
-        if (ctx) {
-          const devicePixelRatio = window.devicePixelRatio || 1;
-          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-          ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
-          redrawTextAnnotations(ctx, previousState.texts, pageSize.width, pageSize.height);
+        if (textCanvasRef.current && pageSize) {
+          const ctx = textCanvasRef.current.getContext('2d');
+          if (ctx) {
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+            ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
+            redrawTextAnnotations(ctx, previousState.texts, pageSize.width, pageSize.height);
+          }
         }
-      }
-    }, 0);
+      }, 0);
+      
+      // 最後の要素を削除
+      return prev.slice(0, -1);
+    });
   };
 
   // Redo
   const handleRedo = async () => {
     if (redoStack.length === 0 || !docId) return;
 
-    const nextState = redoStack[redoStack.length - 1];
+    // 現在の状態をUndoスタックに追加（関数形式で最新の状態を取得）
+    setUndoStack(prev => [...prev, { strokes, shapes: shapeAnnotations, texts: textAnnotations }]);
     
-    // 現在の状態をUndoスタックに追加
-    setUndoStack([...undoStack, { strokes, shapes: shapeAnnotations, texts: textAnnotations }]);
-    
-    // Redoスタックから最後の要素を削除
-    const newRedoStack = redoStack.slice(0, -1);
-    setRedoStack(newRedoStack);
-    
-    // 状態を更新（同期的に）
-    setStrokes(nextState.strokes);
-    setShapeAnnotations(nextState.shapes);
-    setTextAnnotations(nextState.texts);
+    // Redoスタックから最後の要素を取得して削除（関数形式で最新の状態を取得）
+    setRedoStack(prev => {
+      if (prev.length === 0) return prev;
+      const nextState = prev[prev.length - 1];
+      
+      // 状態を更新（同期的に）
+      setStrokes(nextState.strokes);
+      setShapeAnnotations(nextState.shapes);
+      setTextAnnotations(nextState.texts);
 
-    // 保存
-    const actualPageNum = getActualPageNum(currentPage);
-    await saveAnnotations(docId, actualPageNum, nextState.strokes);
-    await saveShapeAnnotations(docId, actualPageNum, nextState.shapes);
-    await saveTextAnnotations(docId, actualPageNum, nextState.texts);
+      // 保存
+      const actualPageNum = getActualPageNum(currentPage);
+      saveAnnotations(docId, actualPageNum, nextState.strokes);
+      saveShapeAnnotations(docId, actualPageNum, nextState.shapes);
+      saveTextAnnotations(docId, actualPageNum, nextState.texts);
 
-    // 再描画（状態更新後に実行）
-    // requestAnimationFrameを使用して、状態更新が完了した後に再描画
-    requestAnimationFrame(() => {
-    if (inkCanvasRef.current && pageSize) {
-      const ctx = inkCanvasRef.current.getContext('2d');
-      if (ctx) {
-        const devicePixelRatio = window.devicePixelRatio || 1;
-        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-        ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
-        redrawStrokes(ctx, nextState.strokes, pageSize.width, pageSize.height);
-      }
-    }
-    if (shapeCanvasRef.current && pageSize) {
-      const ctx = shapeCanvasRef.current.getContext('2d');
-      if (ctx) {
-        const devicePixelRatio = window.devicePixelRatio || 1;
-        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-        ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
-        redrawShapeAnnotations(ctx, nextState.shapes, pageSize.width, pageSize.height);
-      }
-    }
-    if (textCanvasRef.current && pageSize) {
-      const ctx = textCanvasRef.current.getContext('2d');
-      if (ctx) {
-        const devicePixelRatio = window.devicePixelRatio || 1;
-        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-        ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
-        redrawTextAnnotations(ctx, nextState.texts, pageSize.width, pageSize.height);
-      }
-    }
+      // 再描画（状態更新後に実行）
+      // requestAnimationFrameを使用して、状態更新が完了した後に再描画
+      requestAnimationFrame(() => {
+        if (inkCanvasRef.current && pageSize) {
+          const ctx = inkCanvasRef.current.getContext('2d');
+          if (ctx) {
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+            ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+            redrawStrokes(ctx, nextState.strokes, pageSize.width, pageSize.height);
+          }
+        }
+        if (shapeCanvasRef.current && pageSize) {
+          const ctx = shapeCanvasRef.current.getContext('2d');
+          if (ctx) {
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+            ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
+            redrawShapeAnnotations(ctx, nextState.shapes, pageSize.width, pageSize.height);
+          }
+        }
+        if (textCanvasRef.current && pageSize) {
+          const ctx = textCanvasRef.current.getContext('2d');
+          if (ctx) {
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+            ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
+            redrawTextAnnotations(ctx, nextState.texts, pageSize.width, pageSize.height);
+          }
+        }
+      });
+      
+      // 最後の要素を削除
+      return prev.slice(0, -1);
     });
   };
 
@@ -3303,7 +3311,7 @@ export default function Home() {
           100% { background-position: 0% 50%; }
         }
         .animated-gradient {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #00f2fe 100%);
+          background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 25%, #7dd3fc 50%, #38bdf8 75%, #0ea5e9 100%);
           background-size: 400% 400%;
           animation: gradientShift 15s ease infinite;
         }
@@ -3313,11 +3321,11 @@ export default function Home() {
         overflow: 'hidden',
       }}>
         {/* 装飾的な円形要素 */}
-        <div className="absolute top-0 left-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
-        <div className="absolute top-1/4 right-0 w-80 h-80 bg-pink-300/20 rounded-full blur-3xl translate-x-1/2 animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute bottom-0 left-1/3 w-72 h-72 bg-blue-300/20 rounded-full blur-3xl -translate-y-1/2 animate-pulse" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute top-1/2 right-1/4 w-64 h-64 bg-purple-300/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '0.5s' }}></div>
-        <div className="absolute bottom-1/4 left-1/2 w-56 h-56 bg-cyan-300/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }}></div>
+        <div className="absolute top-0 left-0 w-96 h-96 bg-blue-100/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
+        <div className="absolute top-1/4 right-0 w-80 h-80 bg-cyan-100/20 rounded-full blur-3xl translate-x-1/2 animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute bottom-0 left-1/3 w-72 h-72 bg-teal-100/20 rounded-full blur-3xl -translate-y-1/2 animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute top-1/2 right-1/4 w-64 h-64 bg-emerald-100/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+        <div className="absolute bottom-1/4 left-1/2 w-56 h-56 bg-sky-100/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }}></div>
       
       <div className="h-full max-w-[1800px] mx-auto p-4 md:p-6 lg:p-8 transition-all duration-300 relative z-10" style={{ 
         marginLeft: showThumbnails ? '13rem' : 'auto',
@@ -3570,10 +3578,10 @@ export default function Home() {
               className="hidden"
               multiple
             />
-            <div className="px-6 py-4 border-2 border-dashed rounded-xl bg-gradient-to-br from-purple-50 via-pink-50 to-rose-50 hover:from-purple-100 hover:via-pink-100 hover:to-rose-100 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-lg border-purple-300 hover:border-pink-400">
-              <div className="flex items-center justify-center gap-3">
-                <MdCollections className="text-3xl text-purple-600" />
-                <span className="text-base font-semibold bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 bg-clip-text text-transparent">
+            <div className="px-4 py-2 border border-slate-300 rounded-lg bg-white/80 backdrop-blur-sm hover:bg-white cursor-pointer transition-all duration-200 hover:shadow-md">
+              <div className="flex items-center justify-center gap-2">
+                <MdCollections className="text-lg text-slate-600" />
+                <span className="text-xs text-slate-600 font-medium">
                   コレクションに追加
                 </span>
               </div>
@@ -4241,8 +4249,10 @@ export default function Home() {
 
           {/* ツールバー */}
           <div className="mb-4 flex gap-3 md:gap-4 items-center flex-wrap justify-between transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
-            {/* 左側: 描画ツール */}
-            <div className="flex gap-3 flex-wrap flex-1">
+            {/* ツールボックス: 描画ツールをまとめる */}
+            <div className="bg-white/90 backdrop-blur-sm border-2 border-slate-200 rounded-xl p-3 shadow-lg">
+              <div className="text-xs font-semibold text-slate-600 mb-2 px-2">ツール</div>
+              <div className="flex gap-2 flex-wrap">
               <button
                 onClick={() => setTool('pen')}
                 title="手書きで線を描画します"
@@ -4600,6 +4610,7 @@ export default function Home() {
                   フォーム ({formFields.length})
                 </button>
               )}
+              </div>
             </div>
 
             {(tool === 'pen' || tool === 'highlight') && (
