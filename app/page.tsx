@@ -186,7 +186,7 @@ export default function Home() {
   const [shapeAnnotations, setShapeAnnotations] = useState<ShapeAnnotation[]>([]);
   const [currentShape, setCurrentShape] = useState<ShapeAnnotation | null>(null);
   const [shapeStartPoint, setShapeStartPoint] = useState<{ x: number; y: number } | null>(null);
-  
+
   // スタンプ関連
   const [selectedStampType, setSelectedStampType] = useState<'date' | 'approved' | 'rejected'>('date');
 
@@ -1164,19 +1164,19 @@ export default function Home() {
     const autoSaveInterval = setInterval(async () => {
       if (isSaving) return; // 既に保存中の場合はスキップ
 
-      try {
-        setIsSaving(true);
+    try {
+      setIsSaving(true);
         // pageOrderが設定されている場合は、表示順序から実際のページ番号に変換
         const actualPageNum = getActualPageNum(currentPage);
         await saveAnnotations(docId, actualPageNum, strokes);
         await saveShapeAnnotations(docId, actualPageNum, shapeAnnotations);
         await saveTextAnnotations(docId, actualPageNum, textAnnotations);
-        setLastSaved(new Date());
-      } catch (error) {
+      setLastSaved(new Date());
+    } catch (error) {
         console.error('自動保存エラー:', error);
-      } finally {
-        setIsSaving(false);
-      }
+    } finally {
+      setIsSaving(false);
+    }
     }, 30000); // 30秒ごと
 
     return () => clearInterval(autoSaveInterval);
@@ -1487,8 +1487,8 @@ export default function Home() {
       if (highlightMode === 'auto') {
         if (textItems.length === 0) {
           console.warn('ハイライト: テキストアイテムがありません。テキスト抽出が失敗している可能性があります。');
-          return;
-        }
+            return;
+          }
         const boundingBox = findTextBoundingBox(textItems, x, y, 30);
         if (boundingBox) {
           console.log('ハイライト: バウンディングボックスを検出', boundingBox);
@@ -2098,11 +2098,11 @@ export default function Home() {
           redrawShapeAnnotations(ctx, newShapes, pageSize.width, pageSize.height).catch(console.error);
         }
       }
-
+      
       e.preventDefault();
       return;
     }
-
+    
     // ペン/消しゴムツールの場合
     const canvas = inkCanvasRef.current;
     if (!canvas) return;
@@ -2546,33 +2546,33 @@ export default function Home() {
     // 再描画（状態更新後に実行）
     // requestAnimationFrameを使用して、状態更新が完了した後に再描画
     requestAnimationFrame(() => {
-      if (inkCanvasRef.current && pageSize) {
-        const ctx = inkCanvasRef.current.getContext('2d');
-        if (ctx) {
-          const devicePixelRatio = window.devicePixelRatio || 1;
-          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-          ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
-          redrawStrokes(ctx, nextState.strokes, pageSize.width, pageSize.height);
-        }
+    if (inkCanvasRef.current && pageSize) {
+      const ctx = inkCanvasRef.current.getContext('2d');
+      if (ctx) {
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+        redrawStrokes(ctx, nextState.strokes, pageSize.width, pageSize.height);
       }
-      if (shapeCanvasRef.current && pageSize) {
-        const ctx = shapeCanvasRef.current.getContext('2d');
-        if (ctx) {
-          const devicePixelRatio = window.devicePixelRatio || 1;
-          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-          ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
-          redrawShapeAnnotations(ctx, nextState.shapes, pageSize.width, pageSize.height);
-        }
+    }
+    if (shapeCanvasRef.current && pageSize) {
+      const ctx = shapeCanvasRef.current.getContext('2d');
+      if (ctx) {
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
+        redrawShapeAnnotations(ctx, nextState.shapes, pageSize.width, pageSize.height);
       }
-      if (textCanvasRef.current && pageSize) {
-        const ctx = textCanvasRef.current.getContext('2d');
-        if (ctx) {
-          const devicePixelRatio = window.devicePixelRatio || 1;
-          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-          ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
-          redrawTextAnnotations(ctx, nextState.texts, pageSize.width, pageSize.height);
-        }
+    }
+    if (textCanvasRef.current && pageSize) {
+      const ctx = textCanvasRef.current.getContext('2d');
+      if (ctx) {
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
+        redrawTextAnnotations(ctx, nextState.texts, pageSize.width, pageSize.height);
       }
+    }
     });
   };
 
@@ -2604,33 +2604,33 @@ export default function Home() {
 
     // 再描画（状態更新後に確実に実行するため、setTimeoutを使用）
     setTimeout(() => {
-      if (inkCanvasRef.current && pageSize) {
-        const ctx = inkCanvasRef.current.getContext('2d');
-        if (ctx) {
-          const devicePixelRatio = window.devicePixelRatio || 1;
-          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-          ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
-          redrawStrokes(ctx, newStrokes, pageSize.width, pageSize.height);
-        }
+    if (inkCanvasRef.current && pageSize) {
+      const ctx = inkCanvasRef.current.getContext('2d');
+      if (ctx) {
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+        redrawStrokes(ctx, newStrokes, pageSize.width, pageSize.height);
       }
-      if (shapeCanvasRef.current && pageSize) {
-        const ctx = shapeCanvasRef.current.getContext('2d');
-        if (ctx) {
-          const devicePixelRatio = window.devicePixelRatio || 1;
-          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-          ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
+    }
+    if (shapeCanvasRef.current && pageSize) {
+      const ctx = shapeCanvasRef.current.getContext('2d');
+      if (ctx) {
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
           redrawShapeAnnotations(ctx, newShapes, pageSize.width, pageSize.height).catch(console.error);
-        }
       }
-      if (textCanvasRef.current && pageSize) {
-        const ctx = textCanvasRef.current.getContext('2d');
-        if (ctx) {
-          const devicePixelRatio = window.devicePixelRatio || 1;
-          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-          ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
-          redrawTextAnnotations(ctx, newTexts, pageSize.width, pageSize.height);
-        }
+    }
+    if (textCanvasRef.current && pageSize) {
+      const ctx = textCanvasRef.current.getContext('2d');
+      if (ctx) {
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
+        redrawTextAnnotations(ctx, newTexts, pageSize.width, pageSize.height);
       }
+    }
     }, 0);
   };
 
@@ -2666,18 +2666,18 @@ export default function Home() {
 
     // キャンバスを即座にクリア（状態更新を待たない）
     if (inkCanvasRef.current && pageSize) {
-      const ctx = inkCanvasRef.current.getContext('2d');
-      if (ctx) {
-        const devicePixelRatio = window.devicePixelRatio || 1;
+    const ctx = inkCanvasRef.current.getContext('2d');
+    if (ctx) {
+      const devicePixelRatio = window.devicePixelRatio || 1;
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+      ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
         ctx.restore();
         ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
         // 空の配列で再描画
         redrawStrokes(ctx, [], pageSize.width, pageSize.height);
         console.log('handleClear: inkCanvasをクリア');
-      }
+    }
     }
     if (textCanvasRef.current && pageSize) {
       const textCtx = textCanvasRef.current.getContext('2d');
@@ -3060,7 +3060,7 @@ export default function Home() {
       setIsExporting(false);
     }
   };
-  
+
   // 既存のhandleSaveAs関数（後方互換性のため残す）
   const handleSaveAsDirect = async () => {
     if (!pdfDoc) return;
@@ -3550,16 +3550,16 @@ export default function Home() {
               </button>
               {selectedPagesForDelete.size > 0 && (
                 <>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedPagesForDelete(new Set());
-                    }}
-                    className="px-4 py-2 bg-slate-400 hover:bg-slate-500 text-white rounded-lg"
-                    title="選択を解除"
-                  >
-                    選択解除
-                  </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedPagesForDelete(new Set());
+                  }}
+                  className="px-4 py-2 bg-slate-400 hover:bg-slate-500 text-white rounded-lg"
+                  title="選択を解除"
+                >
+                  選択解除
+                </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -3898,183 +3898,183 @@ export default function Home() {
             <div className="mb-4 flex gap-3 md:gap-4 items-center flex-wrap justify-between transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
               {/* 左側: ページ管理とナビゲーション */}
               <div className="flex gap-3 md:gap-4 items-center flex-wrap">
-                <button
-                  onClick={() => setShowThumbnailModal(true)}
-                  title="ページ一覧のサムネイルを全画面で表示します"
-                  className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-2 shadow-sm text-white border-indigo-600 shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
-                  style={{
-                    background: 'linear-gradient(to right, #4f46e5, #9333ea)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(to right, #4338ca, #7e22ce)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(to right, #4f46e5, #9333ea)';
-                  }}
-                >
-                  <MdList className="text-lg text-white" />
-                  ページ管理
-                </button>
-                <button
-                  onClick={goToPrevPage}
-                  disabled={currentPage === 1}
-                  title="前のページに移動します (←)"
-                  className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-cyan-500 shadow-md hover:scale-105 active:scale-95 ${
-                    currentPage === 1 ? 'cursor-not-allowed' : ''
-                  }`}
-                  style={{
-                    background: currentPage === 1
-                      ? '#e2e8f0'
-                      : 'linear-gradient(to right, #06b6d4, #3b82f6)',
-                    color: currentPage === 1 ? '#94a3b8' : 'white',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (currentPage !== 1) {
-                      e.currentTarget.style.background = 'linear-gradient(to right, #0891b2, #2563eb)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (currentPage !== 1) {
-                      e.currentTarget.style.background = 'linear-gradient(to right, #06b6d4, #3b82f6)';
-                    }
-                  }}
-                >
-                  <MdNavigateBefore className={`text-lg ${currentPage === 1 ? 'text-slate-400' : 'text-white'}`} />
-                  前へ
-                </button>
-                <span className="text-sm font-semibold bg-gradient-to-r from-slate-600 to-slate-700 bg-clip-text text-transparent px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
-                  ページ {currentPage} / {totalPages}
-                </span>
-                <button
-                  onClick={goToNextPage}
-                  disabled={currentPage === totalPages}
-                  title="次のページに移動します (→)"
-                  className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-cyan-500 shadow-md hover:scale-105 active:scale-95 ${
-                    currentPage === totalPages ? 'cursor-not-allowed' : ''
-                  }`}
-                  style={{
-                    background: currentPage === totalPages
-                      ? '#e2e8f0'
-                      : 'linear-gradient(to right, #06b6d4, #3b82f6)',
-                    color: currentPage === totalPages ? '#94a3b8' : 'white',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (currentPage !== totalPages) {
-                      e.currentTarget.style.background = 'linear-gradient(to right, #0891b2, #2563eb)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (currentPage !== totalPages) {
-                      e.currentTarget.style.background = 'linear-gradient(to right, #06b6d4, #3b82f6)';
-                    }
-                  }}
-                >
-                  次へ
-                  <MdNavigateNext className={`text-lg ${currentPage === totalPages ? 'text-slate-400' : 'text-white'}`} />
-                </button>
-                <span className="text-slate-300 mx-1">|</span>
-                <button
-                  onClick={() => setPageRotation((prev) => (prev + 90) % 360)}
-                  title="ページを90度回転します"
-                  className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm text-white border-emerald-500 shadow-md hover:scale-105 active:scale-95"
-                  style={{
-                    background: 'linear-gradient(to right, #10b981, #14b8a6)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(to right, #059669, #0d9488)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(to right, #10b981, #14b8a6)';
-                  }}
-                >
-                  <MdRotateRight className="text-lg" />
-                  回転 ({pageRotation}°)
-                </button>
-              </div>
-              
+            <button
+              onClick={() => setShowThumbnailModal(true)}
+              title="ページ一覧のサムネイルを全画面で表示します"
+              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-2 shadow-sm text-white border-indigo-600 shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
+              style={{
+                background: 'linear-gradient(to right, #4f46e5, #9333ea)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #4338ca, #7e22ce)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #4f46e5, #9333ea)';
+              }}
+            >
+              <MdList className="text-lg text-white" />
+              ページ管理
+            </button>
+            <button
+              onClick={goToPrevPage}
+              disabled={currentPage === 1}
+              title="前のページに移動します (←)"
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-cyan-500 shadow-md hover:scale-105 active:scale-95 ${
+                currentPage === 1 ? 'cursor-not-allowed' : ''
+              }`}
+              style={{
+                background: currentPage === 1
+                  ? '#e2e8f0'
+                  : 'linear-gradient(to right, #06b6d4, #3b82f6)',
+                color: currentPage === 1 ? '#94a3b8' : 'white',
+              }}
+              onMouseEnter={(e) => {
+                if (currentPage !== 1) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #0891b2, #2563eb)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (currentPage !== 1) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #06b6d4, #3b82f6)';
+                }
+              }}
+            >
+              <MdNavigateBefore className={`text-lg ${currentPage === 1 ? 'text-slate-400' : 'text-white'}`} />
+              前へ
+            </button>
+            <span className="text-sm font-semibold bg-gradient-to-r from-slate-600 to-slate-700 bg-clip-text text-transparent px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
+              ページ {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={goToNextPage}
+              disabled={currentPage === totalPages}
+              title="次のページに移動します (→)"
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-cyan-500 shadow-md hover:scale-105 active:scale-95 ${
+                currentPage === totalPages ? 'cursor-not-allowed' : ''
+              }`}
+              style={{
+                background: currentPage === totalPages
+                  ? '#e2e8f0'
+                  : 'linear-gradient(to right, #06b6d4, #3b82f6)',
+                color: currentPage === totalPages ? '#94a3b8' : 'white',
+              }}
+              onMouseEnter={(e) => {
+                if (currentPage !== totalPages) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #0891b2, #2563eb)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (currentPage !== totalPages) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #06b6d4, #3b82f6)';
+                }
+              }}
+            >
+              次へ
+              <MdNavigateNext className={`text-lg ${currentPage === totalPages ? 'text-slate-400' : 'text-white'}`} />
+            </button>
+            <span className="text-slate-300 mx-1">|</span>
+            <button
+              onClick={() => setPageRotation((prev) => (prev + 90) % 360)}
+              title="ページを90度回転します"
+              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm text-white border-emerald-500 shadow-md hover:scale-105 active:scale-95"
+              style={{
+                background: 'linear-gradient(to right, #10b981, #14b8a6)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #059669, #0d9488)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #10b981, #14b8a6)';
+              }}
+            >
+              <MdRotateRight className="text-lg" />
+              回転 ({pageRotation}°)
+            </button>
+        </div>
+
               {/* 右側: ズーム */}
               <div className="flex gap-3 items-center flex-wrap">
-                <span className="text-sm font-medium text-slate-700 flex items-center gap-1">
-                  <MdZoomOut className="text-base" />
-                  ズーム:
-                </span>
-                <button
-                  onClick={() => setScale(0.75)}
-                  title="表示倍率を75%に設定します"
+            <span className="text-sm font-medium text-slate-700 flex items-center gap-1">
+              <MdZoomOut className="text-base" />
+              ズーム:
+            </span>
+            <button
+              onClick={() => setScale(0.75)}
+              title="表示倍率を75%に設定します"
                   className={`px-3 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm border-violet-500 ${
-                    scale === 0.75 ? 'shadow-md' : ''
-                  }`}
-                  style={{
-                    background: scale === 0.75
-                      ? 'linear-gradient(to right, #8b5cf6, #a855f7)'
-                      : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
-                    color: scale === 0.75 ? 'white' : '#334155',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (scale === 0.75) {
-                      e.currentTarget.style.background = 'linear-gradient(to right, #7c3aed, #9333ea)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (scale === 0.75) {
-                      e.currentTarget.style.background = 'linear-gradient(to right, #8b5cf6, #a855f7)';
-                    }
-                  }}
-                >
-                  75%
-                </button>
-                <button
-                  onClick={() => setScale(1.0)}
-                  title="表示倍率を100%に設定します"
+                scale === 0.75 ? 'shadow-md' : ''
+              }`}
+              style={{
+                background: scale === 0.75
+                  ? 'linear-gradient(to right, #8b5cf6, #a855f7)'
+                  : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                color: scale === 0.75 ? 'white' : '#334155',
+              }}
+              onMouseEnter={(e) => {
+                if (scale === 0.75) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #7c3aed, #9333ea)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (scale === 0.75) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #8b5cf6, #a855f7)';
+                }
+              }}
+            >
+              75%
+            </button>
+            <button
+              onClick={() => setScale(1.0)}
+              title="表示倍率を100%に設定します"
                   className={`px-3 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm border-violet-500 ${
-                    scale === 1.0 ? 'shadow-md' : ''
-                  }`}
-                  style={{
-                    background: scale === 1.0
-                      ? 'linear-gradient(to right, #8b5cf6, #a855f7)'
-                      : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
-                    color: scale === 1.0 ? 'white' : '#334155',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (scale === 1.0) {
-                      e.currentTarget.style.background = 'linear-gradient(to right, #7c3aed, #9333ea)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (scale === 1.0) {
-                      e.currentTarget.style.background = 'linear-gradient(to right, #8b5cf6, #a855f7)';
-                    }
-                  }}
-                >
-                  100%
-                </button>
-                <button
-                  onClick={() => setScale(1.25)}
-                  title="表示倍率を125%に設定します"
+                scale === 1.0 ? 'shadow-md' : ''
+              }`}
+              style={{
+                background: scale === 1.0
+                  ? 'linear-gradient(to right, #8b5cf6, #a855f7)'
+                  : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                color: scale === 1.0 ? 'white' : '#334155',
+              }}
+              onMouseEnter={(e) => {
+                if (scale === 1.0) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #7c3aed, #9333ea)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (scale === 1.0) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #8b5cf6, #a855f7)';
+                }
+              }}
+            >
+              100%
+            </button>
+            <button
+              onClick={() => setScale(1.25)}
+              title="表示倍率を125%に設定します"
                   className={`px-3 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm border-violet-500 ${
-                    scale === 1.25 ? 'shadow-md' : ''
-                  }`}
-                  style={{
-                    background: scale === 1.25
-                      ? 'linear-gradient(to right, #8b5cf6, #a855f7)'
-                      : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
-                    color: scale === 1.25 ? 'white' : '#334155',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (scale === 1.25) {
-                      e.currentTarget.style.background = 'linear-gradient(to right, #7c3aed, #9333ea)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (scale === 1.25) {
-                      e.currentTarget.style.background = 'linear-gradient(to right, #8b5cf6, #a855f7)';
-                    }
-                  }}
-                >
-                  125%
-                </button>
+                scale === 1.25 ? 'shadow-md' : ''
+              }`}
+              style={{
+                background: scale === 1.25
+                  ? 'linear-gradient(to right, #8b5cf6, #a855f7)'
+                  : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                color: scale === 1.25 ? 'white' : '#334155',
+              }}
+              onMouseEnter={(e) => {
+                if (scale === 1.25) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #7c3aed, #9333ea)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (scale === 1.25) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #8b5cf6, #a855f7)';
+                }
+              }}
+            >
+              125%
+            </button>
               </div>
-            </div>
+          </div>
 
 
           {/* ツールバー */}
@@ -5190,14 +5190,14 @@ export default function Home() {
                         // 再描画（状態更新後に確実に実行するため、setTimeoutを使用）
                         setTimeout(() => {
                           if (inkCanvasRef.current && pageSize) {
-                            const ctx = inkCanvasRef.current.getContext('2d');
-                            if (ctx) {
-                              const devicePixelRatio = window.devicePixelRatio || 1;
-                              ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-                              ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
-                              redrawStrokes(ctx, newStrokes, pageSize.width, pageSize.height);
-                            }
+                          const ctx = inkCanvasRef.current.getContext('2d');
+                          if (ctx) {
+                            const devicePixelRatio = window.devicePixelRatio || 1;
+                            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+                            ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+                            redrawStrokes(ctx, newStrokes, pageSize.width, pageSize.height);
                           }
+                        }
                         }, 0);
                       }
                     }}
@@ -5987,24 +5987,24 @@ export default function Home() {
             setSignatureText('');
           }}
         >
-            <DialogHeader>
-              <DialogTitle>電子署名を追加</DialogTitle>
-              <DialogDescription>PDFに電子署名を追加します</DialogDescription>
+            <DialogHeader className="pb-4 border-b border-slate-200 mb-4">
+              <DialogTitle className="text-2xl font-bold text-slate-900 mb-2">電子署名を追加</DialogTitle>
+              <DialogDescription className="text-base text-slate-600">PDFに電子署名を追加します</DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  署名者名 <span className="text-red-500">*</span>
+                <label className="block text-base font-semibold text-slate-800 mb-2">
+                  署名者名 <span className="text-red-500 font-bold">*</span>
                 </label>
                 <Input
                   value={signatureName}
                   onChange={(e) => setSignatureName(e.target.value)}
                   placeholder="山田 太郎"
-                  className="w-full"
+                  className="w-full h-11 text-base border-2 border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg px-4 transition-all"
                 />
-              </div>
+      </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-base font-semibold text-slate-800 mb-2">
                   メールアドレス
                 </label>
                 <Input
@@ -6012,33 +6012,33 @@ export default function Home() {
                   value={signatureEmail}
                   onChange={(e) => setSignatureEmail(e.target.value)}
                   placeholder="example@company.com"
-                  className="w-full"
+                  className="w-full h-11 text-base border-2 border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg px-4 transition-all"
                 />
-              </div>
+    </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-base font-semibold text-slate-800 mb-2">
                   署名理由
                 </label>
                 <Input
                   value={signatureReason}
                   onChange={(e) => setSignatureReason(e.target.value)}
                   placeholder="承認"
-                  className="w-full"
+                  className="w-full h-11 text-base border-2 border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg px-4 transition-all"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-base font-semibold text-slate-800 mb-2">
                   署名場所
                 </label>
                 <Input
                   value={signatureLocation}
                   onChange={(e) => setSignatureLocation(e.target.value)}
                   placeholder="東京"
-                  className="w-full"
+                  className="w-full h-11 text-base border-2 border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg px-4 transition-all"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-base font-semibold text-slate-800 mb-2">
                   署名画像（オプション）
                 </label>
                 <input
@@ -6078,19 +6078,19 @@ export default function Home() {
                       reader.readAsDataURL(file);
                     }
                   }}
-                  className="w-full text-sm"
+                  className="w-full h-11 text-base border-2 border-slate-300 rounded-lg px-4 py-2 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer transition-all"
                 />
                 {signatureImage && (
-                  <div className="mt-2">
+                  <div className="mt-3 p-3 bg-slate-50 rounded-lg border-2 border-slate-200">
                     <img 
                       src={signatureImage} 
                       alt="署名画像" 
-                      className="max-w-full max-h-48 border rounded object-contain" 
+                      className="max-w-full max-h-48 border-2 border-slate-300 rounded-lg object-contain shadow-sm" 
                       style={{ maxWidth: '400px', maxHeight: '200px' }}
                     />
                     <button
                       onClick={() => setSignatureImage(null)}
-                      className="mt-1 text-xs text-red-600 hover:text-red-800"
+                      className="mt-2 px-3 py-1.5 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors shadow-sm"
                     >
                       画像を削除
                     </button>
@@ -6098,69 +6098,69 @@ export default function Home() {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-base font-semibold text-slate-800 mb-2">
                   署名テキスト（画像がない場合）
                 </label>
                 <Input
                   value={signatureText}
                   onChange={(e) => setSignatureText(e.target.value)}
                   placeholder="署名"
-                  className="w-full"
+                  className="w-full h-11 text-base border-2 border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg px-4 transition-all"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-base font-semibold text-slate-800 mb-3">
                   署名位置
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-slate-50">
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex items-center gap-3 p-3 border-2 border-slate-300 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-all shadow-sm">
                     <input
                       type="radio"
                       name="signaturePosition"
                       value="bottom-left"
                       checked={signaturePosition === 'bottom-left'}
                       onChange={(e) => setSignaturePosition(e.target.value as 'bottom-left')}
-                      className="w-4 h-4"
+                      className="w-5 h-5 text-blue-600"
                     />
-                    <span className="text-sm">左下</span>
+                    <span className="text-base font-medium text-slate-700">左下</span>
                   </label>
-                  <label className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-slate-50">
+                  <label className="flex items-center gap-3 p-3 border-2 border-slate-300 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-all shadow-sm">
                     <input
                       type="radio"
                       name="signaturePosition"
                       value="bottom-right"
                       checked={signaturePosition === 'bottom-right'}
                       onChange={(e) => setSignaturePosition(e.target.value as 'bottom-right')}
-                      className="w-4 h-4"
+                      className="w-5 h-5 text-blue-600"
                     />
-                    <span className="text-sm">右下</span>
+                    <span className="text-base font-medium text-slate-700">右下</span>
                   </label>
-                  <label className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-slate-50">
+                  <label className="flex items-center gap-3 p-3 border-2 border-slate-300 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-all shadow-sm">
                     <input
                       type="radio"
                       name="signaturePosition"
                       value="top-left"
                       checked={signaturePosition === 'top-left'}
                       onChange={(e) => setSignaturePosition(e.target.value as 'top-left')}
-                      className="w-4 h-4"
+                      className="w-5 h-5 text-blue-600"
                     />
-                    <span className="text-sm">左上</span>
+                    <span className="text-base font-medium text-slate-700">左上</span>
                   </label>
-                  <label className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-slate-50">
+                  <label className="flex items-center gap-3 p-3 border-2 border-slate-300 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-all shadow-sm">
                     <input
                       type="radio"
                       name="signaturePosition"
                       value="top-right"
                       checked={signaturePosition === 'top-right'}
                       onChange={(e) => setSignaturePosition(e.target.value as 'top-right')}
-                      className="w-4 h-4"
+                      className="w-5 h-5 text-blue-600"
                     />
-                    <span className="text-sm">右上</span>
+                    <span className="text-base font-medium text-slate-700">右上</span>
                   </label>
                 </div>
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="pt-4 border-t border-slate-200 mt-4">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -6173,6 +6173,7 @@ export default function Home() {
                   setSignatureText('');
                   setSignaturePosition('bottom-left');
                 }}
+                className="h-11 px-6 text-base font-semibold border-2 border-slate-300 hover:bg-slate-50"
               >
                 キャンセル
               </Button>
@@ -6273,47 +6274,47 @@ export default function Home() {
             setShowApprovalWorkflowDialog(false);
           }}
         >
-            <DialogHeader>
-              <DialogTitle>承認ワークフローを設定</DialogTitle>
-              <DialogDescription>複数の承認者を設定して順次承認を行います</DialogDescription>
+            <DialogHeader className="pb-4 border-b border-slate-200 mb-4">
+              <DialogTitle className="text-2xl font-bold text-slate-900 mb-2">承認ワークフローを設定</DialogTitle>
+              <DialogDescription className="text-base text-slate-600">複数の承認者を設定して順次承認を行います</DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="space-y-5">
               {approvalWorkflows.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="font-semibold text-slate-700">承認ワークフロー一覧</h3>
+                <div className="space-y-3">
+                  <h3 className="text-lg font-bold text-slate-800">承認ワークフロー一覧</h3>
                   {approvalWorkflows.map((workflow) => (
-                    <div key={workflow.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                      <div className="flex justify-between items-start mb-2">
+                    <div key={workflow.id} className="p-4 bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border-2 border-slate-300 shadow-md">
+                      <div className="flex justify-between items-start mb-3">
                         <div>
-                          <div className="font-medium text-slate-800">
+                          <div className="text-lg font-bold text-slate-900 mb-1">
                             ステップ {workflow.currentStep} / {workflow.approvers.length}
                           </div>
-                          <div className="text-sm text-slate-600">
+                          <div className="text-base font-semibold text-slate-700">
                             ステータス: {workflow.status === 'pending' ? '承認待ち' : workflow.status === 'approved' ? '承認済み' : workflow.status === 'rejected' ? '却下' : '完了'}
                           </div>
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-sm font-medium text-slate-600">
                           {workflow.createdAt.toLocaleDateString('ja-JP')}
                         </div>
                       </div>
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         {workflow.approvers.map((approver) => (
                           <div
                             key={approver.stepNumber}
-                            className={`text-sm p-2 rounded ${
+                            className={`text-base font-medium p-3 rounded-lg border-2 ${
                               approver.status === 'approved'
-                                ? 'bg-green-50 text-green-800'
+                                ? 'bg-green-100 text-green-900 border-green-300'
                                 : approver.status === 'rejected'
-                                ? 'bg-red-50 text-red-800'
+                                ? 'bg-red-100 text-red-900 border-red-300'
                                 : approver.stepNumber === workflow.currentStep
-                                ? 'bg-blue-50 text-blue-800'
-                                : 'bg-slate-100 text-slate-600'
+                                ? 'bg-blue-100 text-blue-900 border-blue-300'
+                                : 'bg-slate-200 text-slate-700 border-slate-300'
                             }`}
                           >
                             {approver.stepNumber}. {approver.approverName}
                             {approver.role && ` (${approver.role})`}
                             {approver.status === 'approved' && approver.approvedAt && (
-                              <span className="ml-2 text-xs">
+                              <span className="ml-2 text-sm font-semibold">
                                 ✓ {approver.approvedAt.toLocaleDateString('ja-JP')}
                               </span>
                             )}
@@ -6324,9 +6325,9 @@ export default function Home() {
                   ))}
                 </div>
               )}
-              <div className="border-t pt-4">
-                <h3 className="font-semibold text-slate-700 mb-3">新しい承認ワークフローを作成</h3>
-                <div className="space-y-2" id="approvers-list">
+              <div className="border-t-2 border-slate-300 pt-5">
+                <h3 className="text-lg font-bold text-slate-800 mb-4">新しい承認ワークフローを作成</h3>
+                <div className="space-y-3" id="approvers-list">
                   {/* 承認者リストは動的に追加 */}
                 </div>
                 <Button
@@ -6335,26 +6336,27 @@ export default function Home() {
                     const list = document.getElementById('approvers-list');
                     if (list) {
                       const div = document.createElement('div');
-                      div.className = 'flex gap-2 items-center p-2 bg-slate-50 rounded';
+                      div.className = 'flex gap-3 items-center p-3 bg-slate-50 rounded-lg border-2 border-slate-300';
                       div.innerHTML = `
-                        <input type="text" placeholder="承認者名" class="flex-1 px-2 py-1 border rounded text-sm" />
-                        <input type="text" placeholder="役職（オプション）" class="flex-1 px-2 py-1 border rounded text-sm" />
-                        <input type="email" placeholder="メール（オプション）" class="flex-1 px-2 py-1 border rounded text-sm" />
-                        <button class="px-2 py-1 bg-red-500 text-white rounded text-sm">削除</button>
+                        <input type="text" placeholder="承認者名" class="flex-1 h-11 px-4 text-base border-2 border-slate-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
+                        <input type="text" placeholder="役職（オプション）" class="flex-1 h-11 px-4 text-base border-2 border-slate-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
+                        <input type="email" placeholder="メール（オプション）" class="flex-1 h-11 px-4 text-base border-2 border-slate-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
+                        <button class="px-4 py-2 h-11 text-base font-semibold bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors shadow-sm">削除</button>
                       `;
                       list.appendChild(div);
                     }
                   }}
-                  className="mt-2"
+                  className="mt-3 h-11 px-6 text-base font-semibold border-2 border-slate-300 hover:bg-slate-50"
                 >
                   承認者を追加
                 </Button>
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="pt-4 border-t border-slate-200 mt-4">
               <Button
                 variant="outline"
                 onClick={() => setShowApprovalWorkflowDialog(false)}
+                className="h-11 px-6 text-base font-semibold border-2 border-slate-300 hover:bg-slate-50"
               >
                 閉じる
               </Button>
@@ -6403,6 +6405,7 @@ export default function Home() {
                   
                   setShowApprovalWorkflowDialog(false);
                 }}
+              className="h-11 px-6 text-base font-semibold bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg hover:shadow-xl transition-all"
               >
                 ワークフローを作成
               </Button>
@@ -6436,18 +6439,18 @@ export default function Home() {
             setSelectedPagesForDelete(new Set());
           }}
         >
-            <DialogHeader>
-              <DialogTitle>PDFを分割（選択したページから）</DialogTitle>
-              <DialogDescription>ページ管理で選択したページを範囲としてPDFを分割します</DialogDescription>
+            <DialogHeader className="pb-4 border-b border-slate-200 mb-4">
+              <DialogTitle className="text-2xl font-bold text-slate-900 mb-2">PDFを分割（選択したページから）</DialogTitle>
+              <DialogDescription className="text-base text-slate-600">ページ管理で選択したページを範囲としてPDFを分割します</DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-3">
+            <div className="space-y-5">
+              <div className="space-y-4">
                 {splitRangeInputs.map((input, index) => (
-                  <div key={index} className="space-y-2">
-                    <label className="block text-sm font-medium text-slate-700">
+                  <div key={index} className="space-y-3 p-4 bg-slate-50 rounded-lg border-2 border-slate-200">
+                    <label className="block text-base font-semibold text-slate-800">
                       範囲 {index + 1}（例: 1-3, 5, 7-9）
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-3">
                       <Input
                         type="text"
                         value={input}
@@ -6457,14 +6460,14 @@ export default function Home() {
                           setSplitRangeInputs(newInputs);
                         }}
                         placeholder="1-3, 5, 7-9"
-                        className="flex-1"
+                        className="flex-1 h-11 text-base border-2 border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg px-4 transition-all"
                       />
                       {splitRangeInputs.length > 1 && (
                         <button
                           onClick={() => {
                             setSplitRangeInputs(splitRangeInputs.filter((_, i) => i !== index));
                           }}
-                          className="px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                          className="px-4 py-2 h-11 text-base font-semibold bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm"
                         >
                           削除
                         </button>
@@ -6480,9 +6483,9 @@ export default function Home() {
                       });
                       const uniquePages = [...new Set(allPages)].sort((a, b) => a - b);
                       return (
-                        <div className="p-2 bg-slate-50 rounded border border-slate-200">
-                          <p className="text-xs text-slate-600">
-                            ページ: {uniquePages.join(', ')}
+                        <div className="p-3 bg-white rounded-lg border-2 border-blue-200 shadow-sm">
+                          <p className="text-sm font-medium text-blue-800">
+                            ページ: <span className="font-bold">{uniquePages.join(', ')}</span>
                           </p>
                         </div>
                       );
@@ -6494,16 +6497,18 @@ export default function Home() {
                   onClick={() => {
                     setSplitRangeInputs([...splitRangeInputs, '']);
                   }}
-                  className="w-full"
+                  className="w-full h-11 text-base font-semibold border-2 border-slate-300 hover:bg-slate-50"
                 >
                   範囲を追加
                 </Button>
-                <p className="text-xs text-slate-500">
-                  各範囲指定は1つのPDFファイルとして出力されます。例: "1-3, 5, 7-9" → 1つのPDF（1, 2, 3, 5, 7, 8, 9ページを含む）
-                </p>
+                <div className="p-3 bg-blue-50 rounded-lg border-2 border-blue-200">
+                  <p className="text-sm font-medium text-blue-800">
+                    各範囲指定は1つのPDFファイルとして出力されます。例: "1-3, 5, 7-9" → 1つのPDF（1, 2, 3, 5, 7, 8, 9ページを含む）
+                  </p>
+                </div>
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="pt-4 border-t border-slate-200 mt-4">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -6511,6 +6516,7 @@ export default function Home() {
                   setSplitRangeInputs(['']);
                   setSelectedPagesForDelete(new Set());
                 }}
+                className="h-11 px-6 text-base font-semibold border-2 border-slate-300 hover:bg-slate-50"
               >
                 キャンセル
               </Button>
@@ -6620,18 +6626,18 @@ export default function Home() {
             setSplitRangeInputs(['']);
           }}
         >
-            <DialogHeader>
-              <DialogTitle>PDFを分割</DialogTitle>
-              <DialogDescription>指定したページ範囲でPDFを分割します</DialogDescription>
+            <DialogHeader className="pb-4 border-b border-slate-200 mb-4">
+              <DialogTitle className="text-2xl font-bold text-slate-900 mb-2">PDFを分割</DialogTitle>
+              <DialogDescription className="text-base text-slate-600">指定したページ範囲でPDFを分割します</DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-3">
+            <div className="space-y-5">
+              <div className="space-y-4">
                 {splitRangeInputs.map((input, index) => (
-                  <div key={index} className="space-y-2">
-                    <label className="block text-sm font-medium text-slate-700">
+                  <div key={index} className="space-y-3 p-4 bg-slate-50 rounded-lg border-2 border-slate-200">
+                    <label className="block text-base font-semibold text-slate-800">
                       範囲 {index + 1}（例: 1-3, 5, 7-9）
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-3">
                       <Input
                         type="text"
                         value={input}
@@ -6641,14 +6647,14 @@ export default function Home() {
                           setSplitRangeInputs(newInputs);
                         }}
                         placeholder="1-3, 5, 7-9"
-                        className="flex-1"
+                        className="flex-1 h-11 text-base border-2 border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg px-4 transition-all"
                       />
                       {splitRangeInputs.length > 1 && (
                         <button
                           onClick={() => {
                             setSplitRangeInputs(splitRangeInputs.filter((_, i) => i !== index));
                           }}
-                          className="px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                          className="px-4 py-2 h-11 text-base font-semibold bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm"
                         >
                           削除
                         </button>
@@ -6664,9 +6670,9 @@ export default function Home() {
                       });
                       const uniquePages = [...new Set(allPages)].sort((a, b) => a - b);
                       return (
-                        <div className="p-2 bg-slate-50 rounded border border-slate-200">
-                          <p className="text-xs text-slate-600">
-                            ページ: {uniquePages.join(', ')}
+                        <div className="p-3 bg-white rounded-lg border-2 border-blue-200 shadow-sm">
+                          <p className="text-sm font-medium text-blue-800">
+                            ページ: <span className="font-bold">{uniquePages.join(', ')}</span>
                           </p>
                         </div>
                       );
@@ -6678,22 +6684,25 @@ export default function Home() {
                   onClick={() => {
                     setSplitRangeInputs([...splitRangeInputs, '']);
                   }}
-                  className="w-full"
+                  className="w-full h-11 text-base font-semibold border-2 border-slate-300 hover:bg-slate-50"
                 >
                   範囲を追加
                 </Button>
-                <p className="text-xs text-slate-500">
-                  各範囲指定は1つのPDFファイルとして出力されます。例: "1-3, 5, 7-9" → 1つのPDF（1, 2, 3, 5, 7, 8, 9ページを含む）
-                </p>
+                <div className="p-3 bg-blue-50 rounded-lg border-2 border-blue-200">
+                  <p className="text-sm font-medium text-blue-800">
+                    各範囲指定は1つのPDFファイルとして出力されます。例: "1-3, 5, 7-9" → 1つのPDF（1, 2, 3, 5, 7, 8, 9ページを含む）
+                  </p>
+                </div>
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="pt-4 border-t border-slate-200 mt-4">
               <Button
                 variant="outline"
                 onClick={() => {
                   setShowSplitDialog(false);
                   setSplitRangeInputs(['']);
                 }}
+                className="h-11 px-6 text-base font-semibold border-2 border-slate-300 hover:bg-slate-50"
               >
                 キャンセル
               </Button>
@@ -6768,6 +6777,7 @@ export default function Home() {
                   }
                 }}
                 disabled={splitRangeInputs.filter(input => input.trim()).length === 0}
+                className="h-11 px-6 text-base font-semibold bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 分割してダウンロード
               </Button>
