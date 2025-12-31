@@ -81,6 +81,8 @@ export default function Home() {
   const [draggedPage, setDraggedPage] = useState<number | null>(null); // ドラッグ中のページ番号
   const [dragOverPage, setDragOverPage] = useState<number | null>(null); // ドラッグオーバー中のページ番号
   const [expandedThumbnail, setExpandedThumbnail] = useState<number | null>(null); // 拡大表示中のサムネイル番号
+  const [expandedThumbnailImage, setExpandedThumbnailImage] = useState<string | null>(null); // 拡大表示用の画像（大きなスケールでレンダリング）
+  const [expandedThumbnailPosition, setExpandedThumbnailPosition] = useState<{ x: number; y: number } | null>(null); // 拡大表示モーダルの表示位置
   const [hasUnsavedPageOrder, setHasUnsavedPageOrder] = useState(false); // 未保存のページ順序変更があるかどうか
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -3981,7 +3983,23 @@ export default function Home() {
                       onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
-                        // ワンクリックでメイン画面のスライドを指定
+                        // 1クリックでメイン画面のスライドを指定（サムネイルは閉じない）
+                        if (pageOrder.length > 0) {
+                          const displayIndex = pageOrder.indexOf(pageNum);
+                          if (displayIndex >= 0) {
+                            setCurrentPage(displayIndex + 1);
+                          } else {
+                            setCurrentPage(pageNum);
+                          }
+                        } else {
+                          setCurrentPage(pageNum);
+                        }
+                        // サムネイルモーダルは閉じない
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        // ダブルクリックでメイン画面のスライドを指定してサムネイルを閉じる
                         if (pageOrder.length > 0) {
                           const displayIndex = pageOrder.indexOf(pageNum);
                           if (displayIndex >= 0) {
@@ -3994,14 +4012,87 @@ export default function Home() {
                         }
                         setShowThumbnailModal(false);
                       }}
-                      onDoubleClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        // ダブルクリックで拡大表示
-                        setExpandedThumbnail(pageNum);
-                      }}
-                      className="relative cursor-pointer"
+                      className="relative cursor-pointer group"
                     >
+                      {/* 拡大ボタン（ドラッグハンドルの下に配置） */}
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          // ボタンの位置を取得
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const buttonX = rect.left + rect.width / 2;
+                          const buttonY = rect.top + rect.height / 2;
+                          setExpandedThumbnailPosition({ x: buttonX, y: buttonY });
+                          
+                          // 拡大表示用の画像を生成（大きなスケールでレンダリング）
+                          if (pdfDoc) {
+                            try {
+                              const page = await pdfDoc.getPage(pageNum);
+                              const canvas = document.createElement('canvas');
+                              const ctx = canvas.getContext('2d');
+                              
+                              if (ctx) {
+                                // 拡大表示用のスケール（幅800px程度）
+                                const viewport = page.getViewport({ scale: 1.0 });
+                                const expandedScale = 800 / viewport.width;
+                                const expandedViewport = page.getViewport({ scale: expandedScale });
+                                
+                                canvas.width = expandedViewport.width;
+                                canvas.height = expandedViewport.height;
+
+                                // PDFをレンダリング
+                                const renderContext = {
+                                  canvasContext: ctx,
+                                  viewport: expandedViewport,
+                                  canvas: canvas,
+                                };
+
+                                await page.render(renderContext).promise;
+
+                                // 注釈を描画（注釈表示がONの場合）
+                                if (showThumbnailsWithAnnotations && docId) {
+                                  const actualPageNum = getActualPageNum(pageNum);
+                                  const savedStrokes = await loadAnnotations(docId, actualPageNum);
+                                  const savedTexts = await loadTextAnnotations(docId, actualPageNum);
+                                  const savedShapes = await loadShapeAnnotations(docId, actualPageNum);
+
+                                  // ストロークを描画
+                                  if (savedStrokes.length > 0) {
+                                    redrawStrokes(ctx, savedStrokes, expandedViewport.width, expandedViewport.height, false);
+                                  }
+
+                                  // テキスト注釈を描画
+                                  if (savedTexts.length > 0) {
+                                    redrawTextAnnotations(ctx, savedTexts, expandedViewport.width, expandedViewport.height, expandedScale);
+                                  }
+
+                                  // 図形注釈を描画
+                                  if (savedShapes.length > 0) {
+                                    await redrawShapeAnnotations(ctx, savedShapes, expandedViewport.width, expandedViewport.height);
+                                  }
+                                }
+
+                                const imageData = canvas.toDataURL('image/png');
+                                setExpandedThumbnailImage(imageData);
+                                setExpandedThumbnail(pageNum);
+                              }
+                            } catch (error) {
+                              console.error('拡大表示画像の生成エラー:', error);
+                              // フォールバック：サムネイル画像を使用
+                              setExpandedThumbnailImage(null);
+                              setExpandedThumbnail(pageNum);
+                            }
+                          } else {
+                            setExpandedThumbnailImage(null);
+                            setExpandedThumbnail(pageNum);
+                          }
+                        }}
+                        className="absolute top-10 right-2 p-1.5 bg-white/90 hover:bg-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                        title="拡大表示"
+                      >
+                        <MdZoomIn className="text-lg text-slate-700" />
+                      </button>
                       {showThumbnailsWithAnnotations ? (
                         thumbnailsWithAnnotations[pageNum] ? (
                           <img
@@ -4046,27 +4137,68 @@ export default function Home() {
       )}
 
       {/* 拡大表示モーダル */}
-      {expandedThumbnail && thumbnails[expandedThumbnail] && (
+      {expandedThumbnail && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[10004] p-4"
-          onClick={() => setExpandedThumbnail(null)}
+          className="fixed inset-0 bg-black bg-opacity-90 z-[10004] p-4"
+          onClick={() => {
+            setExpandedThumbnail(null);
+            setExpandedThumbnailImage(null);
+            setExpandedThumbnailPosition(null);
+          }}
+          style={{
+            display: 'flex',
+            alignItems: expandedThumbnailPosition ? 'flex-start' : 'center',
+            justifyContent: expandedThumbnailPosition ? 'flex-start' : 'center',
+          }}
         >
           <div 
             className="relative max-w-[90vw] max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
+            style={{
+              position: expandedThumbnailPosition ? 'absolute' : 'relative',
+              top: expandedThumbnailPosition 
+                ? `${Math.min(Math.max(expandedThumbnailPosition.y - 100, 20), typeof window !== 'undefined' ? window.innerHeight - 400 : 400)}px`
+                : undefined,
+              left: expandedThumbnailPosition 
+                ? `${Math.min(Math.max(expandedThumbnailPosition.x - 200, 20), typeof window !== 'undefined' ? window.innerWidth - 500 : 20)}px`
+                : undefined,
+              margin: expandedThumbnailPosition ? undefined : 'auto',
+            }}
           >
             <button
-              onClick={() => setExpandedThumbnail(null)}
+              onClick={() => {
+                setExpandedThumbnail(null);
+                setExpandedThumbnailImage(null);
+                setExpandedThumbnailPosition(null);
+              }}
               className="absolute top-2 right-2 p-2 bg-white/90 hover:bg-white rounded-full shadow-lg z-10"
               title="閉じる"
             >
               <MdClose className="text-2xl text-slate-800" />
             </button>
-            <img
-              src={thumbnails[expandedThumbnail]}
-              alt={`ページ ${expandedThumbnail} (拡大)`}
-              className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
-            />
+            {expandedThumbnailImage ? (
+              <img
+                src={expandedThumbnailImage}
+                alt={`ページ ${expandedThumbnail} (拡大${showThumbnailsWithAnnotations ? '・注釈付き' : ''})`}
+                className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+              />
+            ) : showThumbnailsWithAnnotations && thumbnailsWithAnnotations[expandedThumbnail] ? (
+              <img
+                src={thumbnailsWithAnnotations[expandedThumbnail]}
+                alt={`ページ ${expandedThumbnail} (拡大・注釈付き)`}
+                className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+              />
+            ) : thumbnails[expandedThumbnail] ? (
+              <img
+                src={thumbnails[expandedThumbnail]}
+                alt={`ページ ${expandedThumbnail} (拡大)`}
+                className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+              />
+            ) : (
+              <div className="py-20 text-center text-white text-lg">
+                読み込み中...
+              </div>
+            )}
             <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-4 py-2 rounded-lg">
               ページ {expandedThumbnail}
             </div>
