@@ -75,6 +75,8 @@ export default function Home() {
   const [showThumbnails, setShowThumbnails] = useState(false);
   const [showThumbnailModal, setShowThumbnailModal] = useState(false); // 全画面サムネイルモーダルの表示状態
   const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
+  const [thumbnailsWithAnnotations, setThumbnailsWithAnnotations] = useState<Record<number, string>>({}); // 注釈付きサムネイル
+  const [showThumbnailsWithAnnotations, setShowThumbnailsWithAnnotations] = useState(false); // 注釈付きサムネイルを表示するか
   const [pageOrder, setPageOrder] = useState<number[]>([]); // ページの表示順序
   const [draggedPage, setDraggedPage] = useState<number | null>(null); // ドラッグ中のページ番号
   const [dragOverPage, setDragOverPage] = useState<number | null>(null); // ドラッグオーバー中のページ番号
@@ -394,6 +396,11 @@ export default function Home() {
         setRedoStack([]);
         setPageSizes({});
         setTextItems([]);
+        setTextInputValue('');
+        setTextInputPosition(null);
+        setEditingTextId(null);
+        setShapeAnnotations([]);
+        setTextAnnotations([]);
       } catch (error) {
         console.error('画像変換エラー:', error);
         toast({
@@ -860,6 +867,11 @@ export default function Home() {
           setRedoStack([]);
           setPageSizes({});
           setTextItems([]);
+          setTextInputValue('');
+          setTextInputPosition(null);
+          setEditingTextId(null);
+          setShapeAnnotations([]);
+          setTextAnnotations([]);
           
           // フォームフィールドを抽出
           try {
@@ -1026,6 +1038,11 @@ export default function Home() {
         // 図形注釈を読み込み
         const savedShapes = await loadShapeAnnotations(docId, actualPageNum);
         setShapeAnnotations(savedShapes);
+        
+        // テキスト入力モーダルをクリア（編集中のテキストをリセット）
+        setTextInputValue('');
+        setTextInputPosition(null);
+        setEditingTextId(null);
 
         // 注釈を再描画（表示サイズで描画）
         const inkCtx = inkCanvas.getContext('2d');
@@ -1101,7 +1118,7 @@ export default function Home() {
     }
   }, [strokes, pageSize]);
 
-  // サムネイル生成
+  // サムネイル生成（注釈なし）
   const generateThumbnails = async () => {
     if (!pdfDoc) return;
 
@@ -1139,12 +1156,81 @@ export default function Home() {
     setThumbnails(newThumbnails);
   };
 
+  // 注釈付きサムネイル生成
+  const generateThumbnailsWithAnnotations = async () => {
+    if (!pdfDoc || !docId) return;
+
+    const newThumbnails: Record<number, string> = {};
+    
+    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+      try {
+        const page = await pdfDoc.getPage(pageNum);
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) continue;
+
+        // サムネイルサイズ（幅150px、高さはアスペクト比を保持）
+        const viewport = page.getViewport({ scale: 1.0 });
+        const thumbnailScale = 150 / viewport.width;
+        const thumbnailViewport = page.getViewport({ scale: thumbnailScale });
+        
+        canvas.width = thumbnailViewport.width;
+        canvas.height = thumbnailViewport.height;
+
+        // PDFをレンダリング
+        const renderContext = {
+          canvasContext: ctx,
+          viewport: thumbnailViewport,
+          canvas: canvas,
+        };
+
+        await page.render(renderContext).promise;
+
+        // 注釈を描画
+        const actualPageNum = getActualPageNum(pageNum);
+        const savedStrokes = await loadAnnotations(docId, actualPageNum);
+        const savedTexts = await loadTextAnnotations(docId, actualPageNum);
+        const savedShapes = await loadShapeAnnotations(docId, actualPageNum);
+
+        // ストロークを描画（PDFの上に重ねるため、クリアしない）
+        if (savedStrokes.length > 0) {
+          redrawStrokes(ctx, savedStrokes, thumbnailViewport.width, thumbnailViewport.height, false);
+        }
+
+        // テキスト注釈を描画（サムネイル用にフォントサイズをスケール）
+        if (savedTexts.length > 0) {
+          redrawTextAnnotations(ctx, savedTexts, thumbnailViewport.width, thumbnailViewport.height, thumbnailScale);
+        }
+
+        // 図形注釈を描画
+        if (savedShapes.length > 0) {
+          await redrawShapeAnnotations(ctx, savedShapes, thumbnailViewport.width, thumbnailViewport.height);
+        }
+
+        newThumbnails[pageNum] = canvas.toDataURL('image/png');
+      } catch (error) {
+        console.error(`ページ ${pageNum} の注釈付きサムネイル生成エラー:`, error);
+      }
+    }
+
+    setThumbnailsWithAnnotations(newThumbnails);
+  };
+
   // PDF読み込み時にサムネイルを生成
   useEffect(() => {
     if (pdfDoc && totalPages > 0) {
       generateThumbnails();
+      generateThumbnailsWithAnnotations();
     }
-  }, [pdfDoc, totalPages]);
+  }, [pdfDoc, totalPages, docId]);
+
+  // 注釈が変更されたときに注釈付きサムネイルを再生成
+  useEffect(() => {
+    if (pdfDoc && totalPages > 0 && docId && showThumbnailsWithAnnotations) {
+      generateThumbnailsWithAnnotations();
+    }
+  }, [strokes, textAnnotations, shapeAnnotations]);
 
   // ページ順序を初期化
   useEffect(() => {
@@ -1504,11 +1590,13 @@ export default function Home() {
         // テキスト全体のバウンディングボックスをハイライトとして描画
         // 矩形の4つの角をpointsとして追加
         // ハイライト範囲が少し上にはみ出さないように、y座標を少し下に調整
-        const yOffset = boundingBox.height * 0.05; // heightの5%分下げる
+        // ディセンダー（「り」などの下にはみ出す部分）を含めるため、heightを少し大きくする
+        const yOffset = boundingBox.height * 0.05; // heightの5%分下げる（上方向の調整）
+        const heightAdjustment = boundingBox.height * 0.15; // heightの15%分増やす（下方向の調整、ディセンダー対応）
         const normalizedX1 = boundingBox.x / pageSize.width;
         const normalizedY1 = (boundingBox.y + yOffset) / pageSize.height;
         const normalizedX2 = (boundingBox.x + boundingBox.width) / pageSize.width;
-        const normalizedY2 = (boundingBox.y + boundingBox.height) / pageSize.height;
+        const normalizedY2 = (boundingBox.y + boundingBox.height + heightAdjustment) / pageSize.height;
 
         const stroke: Stroke = {
           id: `stroke-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -2775,6 +2863,12 @@ export default function Home() {
 
     const normalizedX = textInputPosition.x / pageSize.width;
     const normalizedY = textInputPosition.y / pageSize.height;
+    
+    // テキスト入力フィールドの幅を取得（デフォルトは200px、または実際の幅）
+    const textInputWidth = textInputRef.current 
+      ? textInputRef.current.offsetWidth 
+      : 200;
+    const normalizedWidth = textInputWidth / pageSize.width;
 
     const newText: TextAnnotation = {
       id: editingTextId || generateTextId(),
@@ -2783,6 +2877,7 @@ export default function Home() {
       text: textInputValue,
       fontSize,
       color,
+      width: Math.max(0.1, Math.min(1, normalizedWidth)), // 最小10%、最大100%
     };
 
     let updatedTexts: TextAnnotation[];
@@ -3411,6 +3506,9 @@ export default function Home() {
                   setRedoStack([]);
                   setPageSizes({});
                   setTextItems([]);
+                  setTextInputValue('');
+                  setTextInputPosition(null);
+                  setEditingTextId(null);
                   
                   // 元のPDFバイトを保存（エクスポート用）
                   const arrayBuffer = await file.arrayBuffer();
@@ -3480,6 +3578,11 @@ export default function Home() {
                       setRedoStack([]);
                       setPageSizes({});
                       setTextItems([]);
+                      setTextInputValue('');
+                      setTextInputPosition(null);
+                      setEditingTextId(null);
+                      setShapeAnnotations([]);
+                      setTextAnnotations([]);
                       
                       // フォームフィールドを抽出
                       try {
@@ -3700,6 +3803,22 @@ export default function Home() {
             
             {/* ツールバー */}
             <div className="p-4 border-b border-slate-200 flex gap-2 flex-wrap items-center">
+              {/* 注釈表示切り替え */}
+              <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showThumbnailsWithAnnotations}
+                  onChange={(e) => {
+                    setShowThumbnailsWithAnnotations(e.target.checked);
+                    if (e.target.checked && Object.keys(thumbnailsWithAnnotations).length === 0) {
+                      generateThumbnailsWithAnnotations();
+                    }
+                  }}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="font-medium">注釈を表示</span>
+              </label>
+              <div className="w-px h-6 bg-slate-300"></div>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -3883,16 +4002,30 @@ export default function Home() {
                       }}
                       className="relative cursor-pointer"
                     >
-                      {thumbnails[pageNum] ? (
-                        <img
-                          src={thumbnails[pageNum]}
-                          alt={`ページ ${pageNum}`}
-                          className="w-full h-auto block rounded shadow-sm"
-                        />
+                      {showThumbnailsWithAnnotations ? (
+                        thumbnailsWithAnnotations[pageNum] ? (
+                          <img
+                            src={thumbnailsWithAnnotations[pageNum]}
+                            alt={`ページ ${pageNum} (注釈付き)`}
+                            className="w-full h-auto block rounded shadow-sm"
+                          />
+                        ) : (
+                          <div className="py-12 text-center text-slate-400 text-sm bg-slate-100 rounded">
+                            読み込み中...
+                          </div>
+                        )
                       ) : (
-                        <div className="py-12 text-center text-slate-400 text-sm bg-slate-100 rounded">
-                          読み込み中...
-                        </div>
+                        thumbnails[pageNum] ? (
+                          <img
+                            src={thumbnails[pageNum]}
+                            alt={`ページ ${pageNum}`}
+                            className="w-full h-auto block rounded shadow-sm"
+                          />
+                        ) : (
+                          <div className="py-12 text-center text-slate-400 text-sm bg-slate-100 rounded">
+                            読み込み中...
+                          </div>
+                        )
                       )}
                     </div>
                     
@@ -4615,15 +4748,31 @@ export default function Home() {
 
             {(tool === 'pen' || tool === 'highlight') && (
               <div className="flex gap-3 items-center flex-wrap">
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  色:
-                  <input
-                    type="color"
-                    value={color}
-                    onChange={(e) => setColor(e.target.value)}
-                    className="w-10 h-8 rounded border border-slate-300 cursor-pointer"
-                  />
-                </label>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <MdPalette className="text-lg text-purple-600" />
+                    色:
+                  </label>
+                  <div className="flex gap-1 items-center">
+                    {['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500'].map((presetColor) => (
+                      <button
+                        key={presetColor}
+                        onClick={() => setColor(presetColor)}
+                        className={`w-8 h-8 rounded border-2 transition-all hover:scale-110 ${
+                          color === presetColor ? 'border-slate-800 ring-2 ring-offset-1 ring-slate-400' : 'border-slate-300'
+                        }`}
+                        style={{ backgroundColor: presetColor }}
+                        title={presetColor}
+                      />
+                    ))}
+                    <input
+                      type="color"
+                      value={color}
+                      onChange={(e) => setColor(e.target.value)}
+                      className="w-10 h-8 rounded border border-slate-300 cursor-pointer ml-1"
+                    />
+                  </div>
+                </div>
                 {tool === 'pen' && (
                   <label className="flex items-center gap-2 text-sm text-slate-700">
                     太さ:
@@ -5185,12 +5334,15 @@ export default function Home() {
                     backgroundColor: 'white',
                   }}
                   autoFocus
-                  placeholder="テキストを入力（Enterで確定、Escでキャンセル）"
+                  placeholder="テキストを入力（Enterで確定、Shift+Enterで折り返し、Escでキャンセル）"
                   onFocus={(e) => {
                     // タッチデバイスの場合、タッチキーボードが自動的に表示される
                     // 特に何もする必要はない
                   }}
                 />
+                <div className="mt-1 text-xs text-slate-500 mb-1">
+                  💡 Shift+Enterで改行できます
+                </div>
                 <div className="mt-1 flex gap-2">
                   <Button
                     size="sm"
@@ -5893,7 +6045,7 @@ export default function Home() {
       {/* 音声入力モーダル */}
       {showVoiceInput && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-[10002] p-4"
+          className="fixed inset-0 bg-black bg-opacity-50 z-[10002]"
           onClick={() => {
             if (isListening) {
               stopVoiceInput();
@@ -5903,18 +6055,26 @@ export default function Home() {
           style={{
             display: 'flex',
             alignItems: textInputPosition ? 'flex-start' : 'center',
-            justifyContent: 'center',
-            paddingTop: textInputPosition 
-              ? `${Math.min(Math.max(textInputPosition.y + 150, 20), typeof window !== 'undefined' ? window.innerHeight - 400 : 400)}px`
-              : undefined,
+            justifyContent: textInputPosition ? 'flex-start' : 'center',
           }}
         >
           <div 
-            className="bg-white rounded-2xl shadow-2xl p-6 max-w-lg w-full"
+            className="rounded-2xl shadow-2xl p-6 max-w-lg w-full border-2 border-blue-300"
             onClick={(e) => e.stopPropagation()}
+            style={{
+              position: textInputPosition ? 'fixed' : 'relative',
+              top: textInputPosition 
+                ? `${Math.min(Math.max(textInputPosition.y + 80, 20), typeof window !== 'undefined' ? window.innerHeight - 400 : 400)}px`
+                : undefined,
+              left: textInputPosition 
+                ? `${Math.min(Math.max(textInputPosition.x + 250, 20), typeof window !== 'undefined' ? window.innerWidth - 500 : 20)}px`
+                : undefined,
+              margin: textInputPosition ? undefined : 'auto',
+              background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 50%, #7dd3fc 100%)',
+            }}
           >
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-slate-800">音声入力</h2>
+              <h2 className="text-xl font-bold text-slate-900 drop-shadow-sm">音声入力</h2>
               <button
                 onClick={() => {
                   if (isListening) {
@@ -5928,7 +6088,7 @@ export default function Home() {
                 <MdClose className="text-xl text-slate-600" />
               </button>
             </div>
-            <p className="text-sm text-slate-600 mb-4">マイクに向かって話してください</p>
+            <p className="text-sm text-slate-800 font-medium mb-4 drop-shadow-sm">マイクに向かって話してください</p>
             <div className="space-y-4">
               <div className="flex items-center justify-center py-8">
                 {isListening ? (

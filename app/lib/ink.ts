@@ -110,28 +110,32 @@ export function drawStroke(
 
 /**
  * 全ストロークを再描画
+ * @param clearCanvas trueの場合、キャンバスをクリアしてから描画（デフォルト: true）
  */
 export function redrawStrokes(
   ctx: CanvasRenderingContext2D,
   strokes: Stroke[],
   canvasWidth: number,
-  canvasHeight: number
+  canvasHeight: number,
+  clearCanvas: boolean = true
 ): void {
   // 現在のtransformを保存（devicePixelRatioなどを保持）
   const currentTransform = ctx.getTransform();
   
   // コンテキストの状態をリセット（前の描画の影響を完全にクリア）
-  // 実際のキャンバスサイズでクリア
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  
-  // transformを元に戻す（devicePixelRatioを保持）
-  // DOMMatrixから個別の値を取得してsetTransformに渡す
-  ctx.setTransform(
-    currentTransform.a, currentTransform.b,
-    currentTransform.c, currentTransform.d,
-    currentTransform.e, currentTransform.f
-  );
+  // 実際のキャンバスサイズでクリア（clearCanvasがtrueの場合のみ）
+  if (clearCanvas) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    
+    // transformを元に戻す（devicePixelRatioを保持）
+    // DOMMatrixから個別の値を取得してsetTransformに渡す
+    ctx.setTransform(
+      currentTransform.a, currentTransform.b,
+      currentTransform.c, currentTransform.d,
+      currentTransform.e, currentTransform.f
+    );
+  }
   
   // 各ストロークを描画（各ストロークは独立して描画される）
   for (const stroke of strokes) {

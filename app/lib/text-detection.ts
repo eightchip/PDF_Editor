@@ -56,15 +56,17 @@ export async function extractTextItems(
       // transform[5]はベースラインの位置を表すので、実際のテキストボックスの位置を計算
       // テキストは通常ベースラインより上に描画されるので、y座標を調整
       // ハイライト範囲が少し上にはみ出さないように、少し下に調整（heightの5%分下げる）
+      // ディセンダー（「り」などの下にはみ出す部分）を含めるため、heightを少し大きくする
       const x = viewportX;
-      const y = viewportY - height + (height * 0.05); // テキストの上端を計算（少し下に調整）
+      const adjustedHeight = height * 1.15; // ディセンダーを含めるため、heightを15%増やす
+      const y = viewportY - adjustedHeight + (adjustedHeight * 0.05); // テキストの上端を計算（少し下に調整）
 
       textItems.push({
         str: item.str,
         x,
         y,
         width,
-        height,
+        height: adjustedHeight, // 調整後のheightを使用
         transform,
       });
     }
