@@ -61,6 +61,10 @@ interface AnnotationsDB extends DBSchema {
     key: string; // `watermark_${text}`
     value: { text: string; timestamp: number };
   };
+  ocrResults: {
+    key: string; // `${docId}_${pageNumber}`
+    value: import('./ocr').OCRResult;
+  };
 }
 
 let dbInstance: IDBPDatabase<AnnotationsDB> | null = null;
@@ -74,7 +78,7 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
   }
 
   try {
-    dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 6, {
+    dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 7, {
       upgrade(db, oldVersion) {
         // 既存のオブジェクトストアが存在しない場合のみ作成
         if (!db.objectStoreNames.contains('annotations')) {
@@ -94,6 +98,9 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
         }
         if (!db.objectStoreNames.contains('watermarkHistory')) {
           db.createObjectStore('watermarkHistory');
+        }
+        if (!db.objectStoreNames.contains('ocrResults')) {
+          db.createObjectStore('ocrResults');
         }
       },
       // 既存のデータベースがより新しいバージョンの場合のエラーを処理
@@ -121,7 +128,7 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
         });
         
         // データベースを再作成
-        dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 6, {
+        dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 7, {
           upgrade(db) {
             db.createObjectStore('annotations');
             db.createObjectStore('textAnnotations');
@@ -401,5 +408,50 @@ export async function getAllWatermarkHistory(): Promise<string[]> {
   
   // 重複を除去
   return Array.from(new Set(sorted));
+}
+
+// OCR結果関連の関数
+export async function saveOCRResult(
+  docId: string,
+  pageNumber: number,
+  result: import('./ocr').OCRResult
+): Promise<void> {
+  const db = await getDB();
+  const key = `${docId}_${pageNumber}`;
+  await db.put('ocrResults', result, key);
+}
+
+export async function loadOCRResult(
+  docId: string,
+  pageNumber: number
+): Promise<import('./ocr').OCRResult | undefined> {
+  const db = await getDB();
+  const key = `${docId}_${pageNumber}`;
+  return await db.get('ocrResults', key);
+}
+
+export async function getAllOCRResults(
+  docId: string,
+  totalPages: number
+): Promise<Record<number, import('./ocr').OCRResult>> {
+  const results: Record<number, import('./ocr').OCRResult> = {};
+  
+  for (let page = 1; page <= totalPages; page++) {
+    const result = await loadOCRResult(docId, page);
+    if (result) {
+      results[page] = result;
+    }
+  }
+  
+  return results;
+}
+
+export async function deleteOCRResult(
+  docId: string,
+  pageNumber: number
+): Promise<void> {
+  const db = await getDB();
+  const key = `${docId}_${pageNumber}`;
+  await db.delete('ocrResults', key);
 }
 
