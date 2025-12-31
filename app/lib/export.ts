@@ -33,7 +33,13 @@ export async function exportAnnotatedPDFV2(
   shapeAnnotations?: Record<number, ShapeAnnotation[]>,
   formFields?: FormField[],
   formFieldValues?: Record<string, string | boolean | string[]>,
-  signatures?: Signature[]
+  signatures?: Signature[],
+  watermarkText?: string,
+  pageRotations?: Record<number, number>,
+  watermarkPattern?: 'center' | 'grid' | 'tile',
+  watermarkDensity?: number,
+  watermarkAngle?: number,
+  watermarkOpacity?: number
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.load(originalPdfBytes);
   const pages = pdfDoc.getPages();
@@ -73,6 +79,12 @@ export async function exportAnnotatedPDFV2(
     
     const pageSize = pageSizes[pageNumber];
     if (!pageSize) continue;
+
+    // ページ回転を適用
+    const rotation = pageRotations?.[pageNumber] || 0;
+    if (rotation !== 0) {
+      page.setRotation(rotation as 0 | 90 | 180 | 270);
+    }
 
     // ストロークを描画
     if (pageStrokes && pageStrokes.length > 0) {
@@ -418,6 +430,114 @@ export async function exportAnnotatedPDFV2(
             break;
           }
         }
+      }
+    }
+
+    // 透かしを描画
+    if (watermarkText && watermarkText.trim() !== '') {
+      try {
+        const pattern = watermarkPattern || 'center';
+        const density = watermarkDensity || 3;
+        const angle = watermarkAngle ?? 45; // 0度も有効な値として扱うため、??を使用
+        const opacity = watermarkOpacity ?? 0.5; // 濃度（0-1、デフォルト0.5）
+        
+        // 日本語対応のため、Canvasでテキストを画像化（指定角度で回転）
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          const fontSize = Math.min(pageSize.width, pageSize.height) * 0.1; // ページサイズの10%
+          ctx.font = `${fontSize}px Arial, sans-serif`;
+          const textMetrics = ctx.measureText(watermarkText);
+          const textWidth = textMetrics.width;
+          const textHeight = fontSize * 1.2;
+          
+          // 回転を考慮したキャンバスサイズ（指定角度回転時の対角線の長さ）
+          const diagonal = Math.sqrt(textWidth * textWidth + textHeight * textHeight);
+          const canvasSize = diagonal + 40; // 余白を追加
+          
+          canvas.width = canvasSize;
+          canvas.height = canvasSize;
+          
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          
+          // キャンバスの中央に移動して回転
+          ctx.save();
+          ctx.translate(canvasSize / 2, canvasSize / 2);
+          if (angle !== 0) {
+            ctx.rotate(angle * Math.PI / 180); // 指定角度で回転（0度の場合は回転しない）
+          }
+          
+          // テキストを描画（中央揃え、濃度を適用）
+          ctx.font = `${fontSize}px Arial, sans-serif`;
+          ctx.fillStyle = `rgba(128, 128, 128, ${opacity})`; // 濃度を適用
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(watermarkText, 0, 0);
+          ctx.restore();
+          
+          // CanvasをPNG画像として取得
+          const imageData = canvas.toDataURL('image/png');
+          const imageDataBase64 = imageData.split(',')[1];
+          const imageBytes = Uint8Array.from(atob(imageDataBase64), c => c.charCodeAt(0));
+          
+          // PDFに画像として埋め込み
+          const watermarkImage = await pdfDoc.embedPng(imageBytes);
+          
+          const imageWidth = canvasSize;
+          const imageHeight = canvasSize;
+          
+          // 配置パターンに応じて描画
+          if (pattern === 'center') {
+            // 中央1箇所
+            const centerX = pageSize.width / 2;
+            const centerY = pageSize.height / 2;
+            page.drawImage(watermarkImage, {
+              x: centerX - imageWidth / 2,
+              y: centerY - imageHeight / 2,
+              width: imageWidth,
+              height: imageHeight,
+              opacity: opacity, // 濃度を適用
+            });
+          } else if (pattern === 'grid') {
+            // グリッド状（均等配置、密度に応じて列数・行数を決定）
+            const cols = density;
+            const rows = density;
+            const spacingX = pageSize.width / (cols + 1);
+            const spacingY = pageSize.height / (rows + 1);
+            
+            for (let row = 1; row <= rows; row++) {
+              for (let col = 1; col <= cols; col++) {
+                const x = col * spacingX - imageWidth / 2;
+                const y = row * spacingY - imageHeight / 2;
+                page.drawImage(watermarkImage, {
+                  x,
+                  y,
+                  width: imageWidth,
+                  height: imageHeight,
+                  opacity: opacity, // 濃度を適用
+                });
+              }
+            }
+          } else if (pattern === 'tile') {
+            // タイル状（繰り返し配置、密度に応じて間隔を調整）
+            const spacingX = pageSize.width / density;
+            const spacingY = pageSize.height / density;
+            
+            for (let y = spacingY / 2; y < pageSize.height; y += spacingY) {
+              for (let x = spacingX / 2; x < pageSize.width; x += spacingX) {
+                page.drawImage(watermarkImage, {
+                  x: x - imageWidth / 2,
+                  y: y - imageHeight / 2,
+                  width: imageWidth,
+                  height: imageHeight,
+                  opacity: 0.3,
+                });
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('透かしの描画に失敗:', error);
       }
     }
   }

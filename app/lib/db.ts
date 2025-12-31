@@ -57,6 +57,10 @@ interface AnnotationsDB extends DBSchema {
     key: string; // `${docId}_${workflowId}`
     value: import('./signature').ApprovalWorkflow;
   };
+  watermarkHistory: {
+    key: string; // `watermark_${text}`
+    value: { text: string; timestamp: number };
+  };
 }
 
 let dbInstance: IDBPDatabase<AnnotationsDB> | null = null;
@@ -70,7 +74,7 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
   }
 
   try {
-    dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 5, {
+    dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 6, {
       upgrade(db, oldVersion) {
         // 既存のオブジェクトストアが存在しない場合のみ作成
         if (!db.objectStoreNames.contains('annotations')) {
@@ -87,6 +91,9 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
         }
         if (!db.objectStoreNames.contains('approvalWorkflows')) {
           db.createObjectStore('approvalWorkflows');
+        }
+        if (!db.objectStoreNames.contains('watermarkHistory')) {
+          db.createObjectStore('watermarkHistory');
         }
       },
       // 既存のデータベースがより新しいバージョンの場合のエラーを処理
@@ -114,13 +121,14 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
         });
         
         // データベースを再作成
-        dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 5, {
+        dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 6, {
           upgrade(db) {
             db.createObjectStore('annotations');
             db.createObjectStore('textAnnotations');
             db.createObjectStore('shapeAnnotations');
             db.createObjectStore('signatures');
             db.createObjectStore('approvalWorkflows');
+            db.createObjectStore('watermarkHistory');
           },
         });
       } catch (recreateError) {
@@ -370,5 +378,28 @@ export async function getAllApprovalWorkflows(docId: string): Promise<import('./
   }
   
   return workflows;
+}
+
+// 透かし履歴関連の関数
+export async function saveWatermarkHistory(text: string): Promise<void> {
+  if (!text || text.trim() === '') return;
+  const db = await getDB();
+  const key = `watermark_${text.trim()}`;
+  await db.put('watermarkHistory', { text: text.trim(), timestamp: Date.now() }, key);
+}
+
+export async function getAllWatermarkHistory(): Promise<string[]> {
+  const db = await getDB();
+  const tx = db.transaction('watermarkHistory', 'readonly');
+  const store = tx.objectStore('watermarkHistory');
+  const allValues = await store.getAll();
+  
+  // タイムスタンプでソート（新しい順）
+  const sorted = allValues
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .map(item => item.text);
+  
+  // 重複を除去
+  return Array.from(new Set(sorted));
 }
 

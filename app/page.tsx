@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { loadPDF, renderPage } from './lib/pdf';
 import { drawStroke, redrawStrokes, normalizePoint } from './lib/ink';
 import { saveAnnotations, loadAnnotations, deleteAnnotations, getAllAnnotations, saveTextAnnotations, loadTextAnnotations, deleteTextAnnotations, getAllTextAnnotations, saveShapeAnnotations, loadShapeAnnotations, deleteShapeAnnotations, getAllShapeAnnotations, type Stroke, type TextAnnotation, type ShapeAnnotation } from './lib/db';
@@ -13,7 +13,7 @@ import { extractTextItems, findNearestTextLine, findTextBoundingBox, smoothStrok
 import { convertImageToPDF } from './lib/image-to-pdf';
 import { extractFormFields, setFormFieldValues, calculateFormFields, setupCommonCalculations, type FormField } from './lib/forms';
 import { generateSignatureId, createApprovalWorkflow, approveStep, rejectStep, type Signature, type ApprovalWorkflow } from './lib/signature';
-import { saveSignature, getAllSignatures, deleteSignature, saveApprovalWorkflow, getAllApprovalWorkflows } from './lib/db';
+import { saveSignature, getAllSignatures, deleteSignature, saveApprovalWorkflow, getAllApprovalWorkflows, saveWatermarkHistory, getAllWatermarkHistory } from './lib/db';
 import { splitPDF, splitPDFByRanges, splitPDFByPageGroups } from './lib/pdf-split';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -71,7 +71,16 @@ export default function Home() {
   const [pageSizes, setPageSizes] = useState<Record<number, { width: number; height: number }>>({});
   const [isExporting, setIsExporting] = useState(false);
   const [originalFileName, setOriginalFileName] = useState<string | null>(null); // 元のファイル名を保持
-  const [pageRotation, setPageRotation] = useState(0); // 0, 90, 180, 270
+  const [pageRotations, setPageRotations] = useState<Record<number, number>>({}); // ページごとの回転角度（0, 90, 180, 270）
+  const [rotationMode, setRotationMode] = useState<'all' | 'current'>('all'); // 全ページ回転か現在のページのみか
+  const [showWatermarkDialog, setShowWatermarkDialog] = useState(false);
+  const [watermarkText, setWatermarkText] = useState('');
+  const [watermarkHistory, setWatermarkHistory] = useState<string[]>([]);
+  const [watermarkPattern, setWatermarkPattern] = useState<'center' | 'grid' | 'tile'>('center'); // 透かしの配置パターン
+  const [watermarkDensity, setWatermarkDensity] = useState(3); // 透かしの密度（グリッド/タイルの場合の列数・行数）
+  const [watermarkAngle, setWatermarkAngle] = useState(45); // 透かしの角度（度）
+  const [watermarkOpacity, setWatermarkOpacity] = useState(0.5); // 透かしの濃度（0-1、デフォルト0.5）
+  const [showWatermarkPreview, setShowWatermarkPreview] = useState(false); // 透かしプレビューの表示状態
   const [showThumbnails, setShowThumbnails] = useState(false);
   const [showThumbnailModal, setShowThumbnailModal] = useState(false); // 全画面サムネイルモーダルの表示状態
   const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
@@ -361,8 +370,14 @@ export default function Home() {
   const handleImageFileSelect = (file: File, addToCollection: boolean = false) => {
     console.log('handleImageFileSelect called:', file.name, 'addToCollection:', addToCollection, 'type:', file.type);
     if (addToCollection) {
-      // 画像またはPDFをコレクションに追加
+      // 画像またはPDFをコレクションに追加（重複チェック）
       setImageFiles(prev => {
+        // 既に同じファイルが存在するかチェック（名前とサイズで判定、lastModifiedはブラウザによって異なる場合があるため除外）
+        const isDuplicate = prev.some(f => f.name === file.name && f.size === file.size);
+        if (isDuplicate) {
+          console.log('ファイルは既にコレクションに存在します:', file.name, 'サイズ:', file.size);
+          return prev; // 重複している場合は追加しない
+        }
         const newFiles = [...prev, file];
         console.log('ファイルをコレクションに追加:', file.name, '合計:', newFiles.length);
         console.log('新しいファイル配列:', newFiles.map(f => f.name));
@@ -377,22 +392,29 @@ export default function Home() {
     // 既存の動作：単一画像を直接PDFに変換して読み込む
     const convertAndLoad = async () => {
       try {
+        console.log('画像をPDFに変換します:', file.name, file.type, file.size);
         const arrayBuffer = await convertImageToPDF(file, 0);
+        console.log('PDF変換完了:', arrayBuffer.byteLength, 'bytes');
+        
         const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
         const pdfFile = new File([blob], file.name.replace(/\.[^.]+$/, '.pdf'), { type: 'application/pdf' });
 
+        console.log('DocIdを生成します...');
         const id = await generateDocId(pdfFile);
+        console.log('DocId生成完了:', id);
         setDocId(id);
         
         setOriginalPdfBytes(arrayBuffer);
         setOriginalFileName(pdfFile.name); // 変換後のPDFファイル名を保存
         
+        console.log('PDFを読み込みます...');
         const doc = await loadPDF(pdfFile);
+        console.log('PDF読み込み完了:', doc.numPages, 'pages');
         setPdfDoc(doc);
         setTotalPages(doc.numPages);
         setCurrentPage(1);
         setScale(1.0);
-        setPageRotation(0); // 初期回転は0度
+        setPageRotations({}); // 初期回転は0度（空のオブジェクト）
         setStrokes([]);
         setUndoStack([]);
         setRedoStack([]);
@@ -820,13 +842,22 @@ export default function Home() {
       return;
     }
 
-    // 複数ファイルが選択された場合、すべてをコレクションに追加
+    // 複数ファイルが選択された場合、すべてをコレクションに追加（重複チェック）
     if (files.length > 1) {
       const validFiles = Array.from(files).filter(f => 
         f.type.startsWith('image/') || f.type === 'application/pdf'
       );
       if (validFiles.length > 0) {
-        setImageFiles(prev => [...prev, ...validFiles]);
+        setImageFiles(prev => {
+          // 重複を除外（名前とサイズで判定、lastModifiedはブラウザによって異なる場合があるため除外）
+          const newFiles = validFiles.filter(newFile => 
+            !prev.some(existingFile => 
+              existingFile.name === newFile.name && 
+              existingFile.size === newFile.size
+            )
+          );
+          return [...prev, ...newFiles];
+        });
         setShowImageManager(true);
         // inputをリセット
         e.target.value = '';
@@ -953,6 +984,77 @@ export default function Home() {
     }
   };
 
+  // 透かしをCanvasに描画する関数
+  const drawWatermarkOnCanvas = useCallback((ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) => {
+    if (!watermarkText || !watermarkText.trim() || !showWatermarkPreview) return;
+    
+    const pattern = watermarkPattern || 'center';
+    const density = watermarkDensity || 3;
+    const angle = watermarkAngle ?? 45; // 0度も有効な値として扱うため、??を使用
+    const opacity = watermarkOpacity ?? 0.5; // 濃度（0-1）
+    
+    const fontSize = Math.min(canvasWidth, canvasHeight) * 0.1;
+    ctx.font = `${fontSize}px Arial, sans-serif`;
+    const textMetrics = ctx.measureText(watermarkText);
+    const textWidth = textMetrics.width;
+    const textHeight = fontSize * 1.2;
+    
+    ctx.save();
+    ctx.globalAlpha = opacity; // 濃度を適用
+    ctx.fillStyle = `rgba(128, 128, 128, ${opacity})`; // 濃度を適用
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    if (pattern === 'center') {
+      // 中央1箇所
+      ctx.save();
+      ctx.translate(canvasWidth / 2, canvasHeight / 2);
+      if (angle !== 0) {
+        ctx.rotate(angle * Math.PI / 180);
+      }
+      ctx.fillText(watermarkText, 0, 0);
+      ctx.restore();
+    } else if (pattern === 'grid') {
+      // グリッド状
+      const cols = density;
+      const rows = density;
+      const spacingX = canvasWidth / (cols + 1);
+      const spacingY = canvasHeight / (rows + 1);
+      
+      for (let row = 1; row <= rows; row++) {
+        for (let col = 1; col <= cols; col++) {
+          const x = col * spacingX;
+          const y = row * spacingY;
+          ctx.save();
+          ctx.translate(x, y);
+          if (angle !== 0) {
+            ctx.rotate(angle * Math.PI / 180);
+          }
+          ctx.fillText(watermarkText, 0, 0);
+          ctx.restore();
+        }
+      }
+    } else if (pattern === 'tile') {
+      // タイル状
+      const spacingX = canvasWidth / density;
+      const spacingY = canvasHeight / density;
+      
+      for (let y = spacingY / 2; y < canvasHeight; y += spacingY) {
+        for (let x = spacingX / 2; x < canvasWidth; x += spacingX) {
+          ctx.save();
+          ctx.translate(x, y);
+          if (angle !== 0) {
+            ctx.rotate(angle * Math.PI / 180);
+          }
+          ctx.fillText(watermarkText, 0, 0);
+          ctx.restore();
+        }
+      }
+    }
+    
+    ctx.restore();
+  }, [watermarkText, showWatermarkPreview, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity]);
+
   // ページレンダリング
   const renderCurrentPage = async () => {
     if (!pdfDoc || !pdfCanvasRef.current || !inkCanvasRef.current) return;
@@ -964,8 +1066,9 @@ export default function Home() {
       const pdfCanvas = pdfCanvasRef.current;
       const inkCanvas = inkCanvasRef.current;
 
-      // PDFをレンダリング
-      const size = await renderPage(page, pdfCanvas, scale, pageRotation);
+      // PDFをレンダリング（現在のページの回転角度を取得）
+      const currentRotation = pageRotations[actualPageNum] || 0;
+      const size = await renderPage(page, pdfCanvas, scale, currentRotation);
       setPageSize(size);
       
       // ページサイズを記録（エクスポート用、scale=1.0でのサイズ）
@@ -1040,7 +1143,7 @@ export default function Home() {
         // 図形注釈を読み込み
         const savedShapes = await loadShapeAnnotations(docId, actualPageNum);
         setShapeAnnotations(savedShapes);
-        
+
         // テキスト入力モーダルをクリア（編集中のテキストをリセット）
         setTextInputValue('');
         setTextInputPosition(null);
@@ -1071,6 +1174,15 @@ export default function Home() {
             redrawShapeAnnotations(shapeCtx, savedShapes, size.width, size.height).catch(console.error);
           }
         }
+
+        // 透かしプレビューを描画
+        if (showWatermarkPreview && watermarkText && watermarkText.trim()) {
+          const inkCtx = inkCanvas.getContext('2d');
+          if (inkCtx) {
+            inkCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+            drawWatermarkOnCanvas(inkCtx, size.width, size.height);
+          }
+        }
       } else {
         // 新規PDF読み込み時もinkCanvasを初期化
         const inkCtx = inkCanvas.getContext('2d');
@@ -1098,7 +1210,7 @@ export default function Home() {
   // ページ変更時に再レンダリング
   useEffect(() => {
     renderCurrentPage();
-  }, [pdfDoc, currentPage, scale, docId, pageRotation]);
+      }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, drawWatermarkOnCanvas]);
 
   // strokesの状態変更時に再描画（ハイライトなどが追加/削除されたとき）
   useEffect(() => {
@@ -1116,9 +1228,13 @@ export default function Home() {
           ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
         }
         redrawStrokes(ctx, strokes, pageSize.width, pageSize.height);
+        // 透かしプレビューを描画
+        if (showWatermarkPreview && watermarkText && watermarkText.trim()) {
+          drawWatermarkOnCanvas(ctx, pageSize.width, pageSize.height);
+        }
       }
     }
-  }, [strokes, pageSize]);
+  }, [strokes, pageSize, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, drawWatermarkOnCanvas]);
 
   // サムネイル生成（注釈なし）
   const generateThumbnails = async () => {
@@ -1135,9 +1251,10 @@ export default function Home() {
         if (!ctx) continue;
 
         // サムネイルサイズ（幅150px、高さはアスペクト比を保持）
-        const viewport = page.getViewport({ scale: 1.0 });
+        const pageRotation = pageRotations[pageNum] || 0;
+        const viewport = page.getViewport({ scale: 1.0, rotation: pageRotation });
         const thumbnailScale = 150 / viewport.width;
-        const thumbnailViewport = page.getViewport({ scale: thumbnailScale });
+        const thumbnailViewport = page.getViewport({ scale: thumbnailScale, rotation: pageRotation });
         
         canvas.width = thumbnailViewport.width;
         canvas.height = thumbnailViewport.height;
@@ -1173,9 +1290,10 @@ export default function Home() {
         if (!ctx) continue;
 
         // サムネイルサイズ（幅150px、高さはアスペクト比を保持）
-        const viewport = page.getViewport({ scale: 1.0 });
+        const pageRotation = pageRotations[pageNum] || 0;
+        const viewport = page.getViewport({ scale: 1.0, rotation: pageRotation });
         const thumbnailScale = 150 / viewport.width;
-        const thumbnailViewport = page.getViewport({ scale: thumbnailScale });
+        const thumbnailViewport = page.getViewport({ scale: thumbnailScale, rotation: pageRotation });
         
         canvas.width = thumbnailViewport.width;
         canvas.height = thumbnailViewport.height;
@@ -1219,13 +1337,26 @@ export default function Home() {
     setThumbnailsWithAnnotations(newThumbnails);
   };
 
+  // 透かし履歴を読み込む
+  useEffect(() => {
+    const loadWatermarkHistory = async () => {
+      try {
+        const history = await getAllWatermarkHistory();
+        setWatermarkHistory(history);
+      } catch (error) {
+        console.error('透かし履歴の読み込みに失敗:', error);
+      }
+    };
+    loadWatermarkHistory();
+  }, []);
+
   // PDF読み込み時にサムネイルを生成
   useEffect(() => {
     if (pdfDoc && totalPages > 0) {
       generateThumbnails();
       generateThumbnailsWithAnnotations();
     }
-  }, [pdfDoc, totalPages, docId]);
+  }, [pdfDoc, totalPages, docId, pageRotations]);
 
   // 注釈が変更されたときに注釈付きサムネイルを再生成
   useEffect(() => {
@@ -2575,11 +2706,11 @@ export default function Home() {
     setUndoStack(prev => {
       if (prev.length === 0) return prev;
       const previousState = prev[prev.length - 1];
-      
-      // 状態を更新（同期的に）
-      setStrokes(previousState.strokes);
-      setShapeAnnotations(previousState.shapes);
-      setTextAnnotations(previousState.texts);
+    
+    // 状態を更新（同期的に）
+    setStrokes(previousState.strokes);
+    setShapeAnnotations(previousState.shapes);
+    setTextAnnotations(previousState.texts);
 
       // 保存
       const actualPageNum = getActualPageNum(currentPage);
@@ -2589,33 +2720,33 @@ export default function Home() {
 
       // 再描画（状態更新後に確実に実行するため、setTimeoutを使用）
       setTimeout(() => {
-        if (inkCanvasRef.current && pageSize) {
-          const ctx = inkCanvasRef.current.getContext('2d');
-          if (ctx) {
-            const devicePixelRatio = window.devicePixelRatio || 1;
-            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-            ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
-            redrawStrokes(ctx, previousState.strokes, pageSize.width, pageSize.height);
-          }
+      if (inkCanvasRef.current && pageSize) {
+        const ctx = inkCanvasRef.current.getContext('2d');
+        if (ctx) {
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+          redrawStrokes(ctx, previousState.strokes, pageSize.width, pageSize.height);
         }
-        if (shapeCanvasRef.current && pageSize) {
-          const ctx = shapeCanvasRef.current.getContext('2d');
-          if (ctx) {
-            const devicePixelRatio = window.devicePixelRatio || 1;
-            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-            ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
+      }
+      if (shapeCanvasRef.current && pageSize) {
+        const ctx = shapeCanvasRef.current.getContext('2d');
+        if (ctx) {
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
             redrawShapeAnnotations(ctx, previousState.shapes, pageSize.width, pageSize.height).catch(console.error);
-          }
         }
-        if (textCanvasRef.current && pageSize) {
-          const ctx = textCanvasRef.current.getContext('2d');
-          if (ctx) {
-            const devicePixelRatio = window.devicePixelRatio || 1;
-            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-            ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
-            redrawTextAnnotations(ctx, previousState.texts, pageSize.width, pageSize.height);
-          }
+      }
+      if (textCanvasRef.current && pageSize) {
+        const ctx = textCanvasRef.current.getContext('2d');
+        if (ctx) {
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
+          redrawTextAnnotations(ctx, previousState.texts, pageSize.width, pageSize.height);
         }
+      }
       }, 0);
       
       // 最後の要素を削除
@@ -2634,11 +2765,11 @@ export default function Home() {
     setRedoStack(prev => {
       if (prev.length === 0) return prev;
       const nextState = prev[prev.length - 1];
-      
-      // 状態を更新（同期的に）
-      setStrokes(nextState.strokes);
-      setShapeAnnotations(nextState.shapes);
-      setTextAnnotations(nextState.texts);
+    
+    // 状態を更新（同期的に）
+    setStrokes(nextState.strokes);
+    setShapeAnnotations(nextState.shapes);
+    setTextAnnotations(nextState.texts);
 
       // 保存
       const actualPageNum = getActualPageNum(currentPage);
@@ -2649,33 +2780,33 @@ export default function Home() {
       // 再描画（状態更新後に実行）
       // requestAnimationFrameを使用して、状態更新が完了した後に再描画
       requestAnimationFrame(() => {
-        if (inkCanvasRef.current && pageSize) {
-          const ctx = inkCanvasRef.current.getContext('2d');
-          if (ctx) {
-            const devicePixelRatio = window.devicePixelRatio || 1;
-            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-            ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
-            redrawStrokes(ctx, nextState.strokes, pageSize.width, pageSize.height);
-          }
-        }
-        if (shapeCanvasRef.current && pageSize) {
-          const ctx = shapeCanvasRef.current.getContext('2d');
-          if (ctx) {
-            const devicePixelRatio = window.devicePixelRatio || 1;
-            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-            ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
-            redrawShapeAnnotations(ctx, nextState.shapes, pageSize.width, pageSize.height);
-          }
-        }
-        if (textCanvasRef.current && pageSize) {
-          const ctx = textCanvasRef.current.getContext('2d');
-          if (ctx) {
-            const devicePixelRatio = window.devicePixelRatio || 1;
-            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-            ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
-            redrawTextAnnotations(ctx, nextState.texts, pageSize.width, pageSize.height);
-          }
-        }
+    if (inkCanvasRef.current && pageSize) {
+      const ctx = inkCanvasRef.current.getContext('2d');
+      if (ctx) {
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+        redrawStrokes(ctx, nextState.strokes, pageSize.width, pageSize.height);
+      }
+    }
+    if (shapeCanvasRef.current && pageSize) {
+      const ctx = shapeCanvasRef.current.getContext('2d');
+      if (ctx) {
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
+        redrawShapeAnnotations(ctx, nextState.shapes, pageSize.width, pageSize.height);
+      }
+    }
+    if (textCanvasRef.current && pageSize) {
+      const ctx = textCanvasRef.current.getContext('2d');
+      if (ctx) {
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
+        redrawTextAnnotations(ctx, nextState.texts, pageSize.width, pageSize.height);
+      }
+    }
       });
       
       // 最後の要素を削除
@@ -2770,18 +2901,18 @@ export default function Home() {
     // 状態をクリア（データベース削除後に実行）
     // 状態をクリアする前に、キャンバスをクリアしてから状態を更新
     if (inkCanvasRef.current && pageSize) {
-      const ctx = inkCanvasRef.current.getContext('2d');
-      if (ctx) {
-        const devicePixelRatio = window.devicePixelRatio || 1;
+    const ctx = inkCanvasRef.current.getContext('2d');
+    if (ctx) {
+      const devicePixelRatio = window.devicePixelRatio || 1;
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+      ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
         ctx.restore();
         ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
         // 空の配列で再描画
         redrawStrokes(ctx, [], pageSize.width, pageSize.height);
         console.log('handleClear: inkCanvasをクリア');
-      }
+    }
     }
     if (textCanvasRef.current && pageSize) {
       const textCtx = textCanvasRef.current.getContext('2d');
@@ -3034,7 +3165,7 @@ export default function Home() {
       // 署名を読み込む
       const allSignatures = docId ? await getAllSignatures(docId) : [];
       
-      // 注釈をPDFに焼き込む（フォームフィールドの値と署名も含む）
+      // 注釈をPDFに焼き込む（フォームフィールドの値と署名、透かし、ページ回転も含む）
       const pdfBytes = await exportAnnotatedPDFV2(
         originalPdfBytes,
         annotations,
@@ -3043,7 +3174,13 @@ export default function Home() {
         shapeAnnotations,
         formFields,
         formFieldValues,
-        allSignatures
+        allSignatures,
+        watermarkText || undefined,
+        pageRotations,
+        watermarkPattern,
+        watermarkDensity,
+        watermarkAngle,
+        watermarkOpacity
       );
 
       return pdfBytes;
@@ -3638,9 +3775,14 @@ export default function Home() {
               <div className="flex items-center justify-center gap-3">
                 <MdInsertDriveFile className="text-3xl text-blue-600" />
                 <span className="text-base font-semibold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                  ファイルを選択
+                  {originalFileName || 'ファイルを選択'}
                 </span>
               </div>
+              {originalFileName && (
+                <div className="mt-2 text-xs text-slate-500 text-center">
+                  選択中: {originalFileName}
+                </div>
+              )}
             </div>
           </label>
           <label 
@@ -4075,7 +4217,7 @@ export default function Home() {
 
                                 const imageData = canvas.toDataURL('image/png');
                                 setExpandedThumbnailImage(imageData);
-                                setExpandedThumbnail(pageNum);
+                        setExpandedThumbnail(pageNum);
                               }
                             } catch (error) {
                               console.error('拡大表示画像の生成エラー:', error);
@@ -4107,15 +4249,15 @@ export default function Home() {
                         )
                       ) : (
                         thumbnails[pageNum] ? (
-                          <img
-                            src={thumbnails[pageNum]}
-                            alt={`ページ ${pageNum}`}
-                            className="w-full h-auto block rounded shadow-sm"
-                          />
-                        ) : (
-                          <div className="py-12 text-center text-slate-400 text-sm bg-slate-100 rounded">
-                            読み込み中...
-                          </div>
+                        <img
+                          src={thumbnails[pageNum]}
+                          alt={`ページ ${pageNum}`}
+                          className="w-full h-auto block rounded shadow-sm"
+                        />
+                      ) : (
+                        <div className="py-12 text-center text-slate-400 text-sm bg-slate-100 rounded">
+                          読み込み中...
+                        </div>
                         )
                       )}
                     </div>
@@ -4189,11 +4331,11 @@ export default function Home() {
                 className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
               />
             ) : thumbnails[expandedThumbnail] ? (
-              <img
-                src={thumbnails[expandedThumbnail]}
-                alt={`ページ ${expandedThumbnail} (拡大)`}
-                className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
-              />
+            <img
+              src={thumbnails[expandedThumbnail]}
+              alt={`ページ ${expandedThumbnail} (拡大)`}
+              className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+            />
             ) : (
               <div className="py-20 text-center text-white text-lg">
                 読み込み中...
@@ -4408,9 +4550,28 @@ export default function Home() {
               <MdNavigateNext className={`text-lg ${currentPage === totalPages ? 'text-slate-400' : 'text-white'}`} />
             </button>
             <span className="text-slate-300 mx-1">|</span>
-            <button
-              onClick={() => setPageRotation((prev) => (prev + 90) % 360)}
-              title="ページを90度回転します"
+                <button
+              onClick={() => {
+                const actualPageNum = getActualPageNum(currentPage);
+                if (rotationMode === 'all') {
+                  // 全ページを回転
+                  setPageRotations(prev => {
+                    const newRotations: Record<number, number> = {};
+                    for (let i = 1; i <= totalPages; i++) {
+                      const currentRot = prev[i] || 0;
+                      newRotations[i] = (currentRot + 90) % 360;
+                    }
+                    return newRotations;
+                  });
+                } else {
+                  // 現在のページのみ回転
+                  setPageRotations(prev => {
+                    const currentRot = prev[actualPageNum] || 0;
+                    return { ...prev, [actualPageNum]: (currentRot + 90) % 360 };
+                  });
+                }
+              }}
+              title={`ページを90度回転します（${rotationMode === 'all' ? '全ページ' : '現在のページのみ'}）`}
               className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm text-white border-emerald-500 shadow-md hover:scale-105 active:scale-95"
               style={{
                 background: 'linear-gradient(to right, #10b981, #14b8a6)',
@@ -4423,8 +4584,17 @@ export default function Home() {
               }}
             >
               <MdRotateRight className="text-lg" />
-              回転 ({pageRotation}°)
+              回転 ({rotationMode === 'all' ? '全' : getActualPageNum(currentPage)}: {pageRotations[getActualPageNum(currentPage)] || 0}°)
             </button>
+            <select
+              value={rotationMode}
+              onChange={(e) => setRotationMode(e.target.value as 'all' | 'current')}
+              className="px-2 py-1 border rounded text-sm bg-white"
+              title="回転モードを選択"
+            >
+              <option value="all">全ページ</option>
+              <option value="current">現在のページ</option>
+            </select>
         </div>
 
               {/* 右側: ズーム */}
@@ -4881,7 +5051,7 @@ export default function Home() {
             {(tool === 'pen' || tool === 'highlight') && (
               <div className="flex gap-3 items-center flex-wrap">
                 <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                <label className="flex items-center gap-2 text-sm text-slate-700">
                     <MdPalette className="text-lg text-purple-600" />
                     色:
                   </label>
@@ -4897,12 +5067,12 @@ export default function Home() {
                         title={presetColor}
                       />
                     ))}
-                    <input
-                      type="color"
-                      value={color}
-                      onChange={(e) => setColor(e.target.value)}
+                  <input
+                    type="color"
+                    value={color}
+                    onChange={(e) => setColor(e.target.value)}
                       className="w-10 h-8 rounded border border-slate-300 cursor-pointer ml-1"
-                    />
+                  />
                   </div>
                 </div>
                 {tool === 'pen' && (
@@ -5151,6 +5321,32 @@ export default function Home() {
             >
               <MdContentCut className="text-base text-white" />
               PDF分割
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowWatermarkDialog(true);
+              }}
+              title="透かしを追加"
+              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-teal-500 shadow-md hover:scale-105 active:scale-95"
+              style={{
+                background: 'linear-gradient(to right, #14b8a6, #06b6d4)',
+                color: 'white',
+                pointerEvents: 'auto',
+                cursor: 'pointer',
+                zIndex: 10,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #0d9488, #0891b2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #14b8a6, #06b6d4)';
+              }}
+            >
+              <MdSecurity className="text-base text-white" />
+              透かし
             </button>
             <span className="text-slate-300 mx-1">|</span>
             <button
@@ -6040,6 +6236,7 @@ export default function Home() {
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10001] p-4"
           onClick={(e) => {
             console.log('モーダルオーバーレイがクリックされました');
+            setImageFiles([]);
             setShowImageManager(false);
           }}
         >
@@ -6057,7 +6254,10 @@ export default function Home() {
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-slate-800">ファイル管理 ({imageFiles.length}件)</h2>
               <button
-                onClick={() => setShowImageManager(false)}
+                onClick={() => {
+                  setImageFiles([]);
+                  setShowImageManager(false);
+                }}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
                 title="閉じる"
               >
@@ -6078,14 +6278,15 @@ export default function Home() {
                       key={index}
                       className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50"
                     >
-                      <div className="flex-shrink-0 w-16 h-16 bg-slate-100 rounded overflow-hidden flex items-center justify-center">
+                      <div className="flex-shrink-0 w-32 h-32 bg-slate-100 rounded overflow-hidden flex items-center justify-center">
                         {file.type === 'application/pdf' ? (
                           <MdInsertDriveFile className="text-3xl text-red-600" />
                         ) : (
                           <img
                             src={URL.createObjectURL(file)}
                             alt={`画像 ${index + 1}`}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
+                            style={{ maxWidth: '128px', maxHeight: '128px' }}
                           />
                         )}
                       </div>
@@ -7250,6 +7451,221 @@ export default function Home() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* 透かしダイアログ */}
+      <Dialog open={showWatermarkDialog} onOpenChange={(open) => {
+        if (open) {
+          setShowWatermarkDialog(true);
+        } else {
+          setShowWatermarkDialog(false);
+        }
+      }}>
+        <DialogContent
+          topPosition="top-[15%]"
+          className="max-w-md"
+          style={{
+            zIndex: 10001,
+            left: '50%',
+            top: '15%',
+            transform: 'translateX(-50%) translateY(0)',
+            background: 'linear-gradient(135deg, #ccfbf1 0%, #99f6e4 50%, #5eead4 100%)',
+          }}
+          onClose={() => {
+            setShowWatermarkDialog(false);
+            setWatermarkText('');
+          }}
+        >
+          <DialogHeader className="pb-4 border-b border-teal-200 mb-4">
+            <DialogTitle className="text-2xl font-bold text-slate-900 mb-2">透かしを追加</DialogTitle>
+            <DialogDescription className="text-base text-slate-600">PDFに透かし文字を追加します</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">透かし文字</label>
+              <Input
+                type="text"
+                value={watermarkText}
+                onChange={(e) => setWatermarkText(e.target.value)}
+                placeholder="例: 機密、承認済み、下書き"
+                className="w-full"
+              />
+            </div>
+            {watermarkHistory.length > 0 && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">履歴から選択</label>
+                <div className="flex flex-wrap gap-2">
+                  {watermarkHistory.slice(0, 10).map((text, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => setWatermarkText(text)}
+                      className="px-3 py-1.5 text-sm bg-white border-2 border-slate-300 rounded-lg hover:bg-teal-50 hover:border-teal-400 transition-all shadow-sm"
+                    >
+                      {text}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-semibold text-slate-800 mb-2">配置パターン</label>
+              <select
+                value={watermarkPattern}
+                onChange={(e) => setWatermarkPattern(e.target.value as 'center' | 'grid' | 'tile')}
+                className="w-full px-4 py-2.5 text-base border-2 border-slate-300 rounded-lg bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-200"
+              >
+                <option value="center">中央1箇所</option>
+                <option value="grid">グリッド状（均等配置）</option>
+                <option value="tile">タイル状（繰り返し配置）</option>
+              </select>
+            </div>
+            {(watermarkPattern === 'grid' || watermarkPattern === 'tile') && (
+              <div className="p-4 bg-white/60 rounded-lg border-2 border-slate-200">
+                <label className="block text-sm font-semibold text-slate-800 mb-3">
+                  密度（{watermarkPattern === 'grid' ? '列数・行数' : '間隔'}）: {watermarkDensity}
+                </label>
+                <input
+                  type="range"
+                  min="2"
+                  max="10"
+                  value={watermarkDensity}
+                  onChange={(e) => setWatermarkDensity(parseInt(e.target.value))}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-500"
+                />
+                <div className="flex justify-between text-xs text-slate-600 mt-2 font-medium">
+                  <span>低密度</span>
+                  <span>高密度</span>
+                </div>
+              </div>
+            )}
+            <div className="p-4 bg-white/60 rounded-lg border-2 border-slate-200">
+              <label className="block text-sm font-semibold text-slate-800 mb-3">配置角度: {watermarkAngle}°</label>
+              <div className="flex items-center gap-4 mb-3">
+                <input
+                  type="range"
+                  min="0"
+                  max="360"
+                  step="15"
+                  value={watermarkAngle}
+                  onChange={(e) => setWatermarkAngle(parseInt(e.target.value))}
+                  className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-500"
+                />
+                <Input
+                  type="number"
+                  min="0"
+                  max="360"
+                  value={watermarkAngle}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 0;
+                    setWatermarkAngle(Math.max(0, Math.min(360, val)));
+                  }}
+                  className="w-20 px-3 py-2 text-base border-2 border-slate-300 rounded-lg bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-200"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => (
+                  <button
+                    key={angle}
+                    type="button"
+                    onClick={() => setWatermarkAngle(angle)}
+                    className={`px-4 py-2 text-sm font-semibold border-2 rounded-lg transition-all shadow-sm ${
+                      watermarkAngle === angle
+                        ? 'bg-teal-500 text-white border-teal-500 shadow-md'
+                        : 'bg-white border-slate-300 hover:bg-teal-50 hover:border-teal-400'
+                    }`}
+                  >
+                    {angle}°
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="p-4 bg-white/60 rounded-lg border-2 border-slate-200">
+              <label className="block text-sm font-semibold text-slate-800 mb-3">
+                濃度: {Math.round(watermarkOpacity * 100)}%
+              </label>
+              <div className="flex items-center gap-4 mb-3">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={watermarkOpacity * 100}
+                  onChange={(e) => setWatermarkOpacity(parseInt(e.target.value) / 100)}
+                  className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-500"
+                />
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={Math.round(watermarkOpacity * 100)}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 0;
+                    setWatermarkOpacity(Math.max(0, Math.min(100, val)) / 100);
+                  }}
+                  className="w-20 px-3 py-2 text-base border-2 border-slate-300 rounded-lg bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-200"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((percent) => (
+                  <button
+                    key={percent}
+                    type="button"
+                    onClick={() => setWatermarkOpacity(percent / 100)}
+                    className={`px-3 py-1.5 text-xs font-semibold border-2 rounded-lg transition-all shadow-sm ${
+                      Math.round(watermarkOpacity * 100) === percent
+                        ? 'bg-teal-500 text-white border-teal-500 shadow-md'
+                        : 'bg-white border-slate-300 hover:bg-teal-50 hover:border-teal-400'
+                    }`}
+                  >
+                    {percent}%
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg border-2 border-slate-200">
+              <input
+                type="checkbox"
+                id="watermark-preview"
+                checked={showWatermarkPreview}
+                onChange={(e) => setShowWatermarkPreview(e.target.checked)}
+                className="w-5 h-5 text-teal-600 border-2 border-slate-300 rounded focus:ring-2 focus:ring-teal-200"
+              />
+              <label htmlFor="watermark-preview" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                プレビューを表示
+              </label>
+            </div>
+          </div>
+          <DialogFooter className="pt-4 border-t border-teal-200 mt-4">
+            <Button
+              onClick={() => {
+                setShowWatermarkDialog(false);
+                setWatermarkText('');
+              }}
+              variant="outline"
+              className="h-11 px-6 text-base font-semibold border-2 border-slate-300 hover:bg-slate-50"
+            >
+              キャンセル
+            </Button>
+            <Button
+              onClick={async () => {
+                if (watermarkText.trim()) {
+                  await saveWatermarkHistory(watermarkText.trim());
+                  const history = await getAllWatermarkHistory();
+                  setWatermarkHistory(history);
+                  toast({
+                    title: "成功",
+                    description: "透かしを設定しました。エクスポート時に反映されます。",
+                  });
+                }
+                setShowWatermarkDialog(false);
+              }}
+              className="h-11 px-6 text-base font-semibold bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white shadow-lg hover:shadow-xl transition-all"
+            >
+              設定
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
     </>
   );
