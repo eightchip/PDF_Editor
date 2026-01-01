@@ -86,13 +86,13 @@ export async function exportAnnotatedPDFV2(
       // pdf-libのRotation型は0 | 90 | 180 | 270のリテラル型
       let validRotation: Rotation;
       if (rotation === 90) {
-        validRotation = 90 as Rotation;
+        validRotation = 90 as unknown as Rotation;
       } else if (rotation === 180) {
-        validRotation = 180 as Rotation;
+        validRotation = 180 as unknown as Rotation;
       } else if (rotation === 270) {
-        validRotation = 270 as Rotation;
+        validRotation = 270 as unknown as Rotation;
       } else {
-        validRotation = 0 as Rotation;
+        validRotation = 0 as unknown as Rotation;
       }
       page.setRotation(validRotation);
     }
