@@ -57,7 +57,15 @@ const DialogContent = React.forwardRef<
           contentRef.current.removeAttribute('data-aria-hidden');
           // 表示を確実にするためのスタイルを直接設定（!importantを使用）
           contentRef.current.style.setProperty('pointer-events', 'auto', 'important');
-          contentRef.current.style.setProperty('display', 'grid', 'important');
+          // classNameに!flexが含まれている場合は、flexレイアウトを使用
+          const hasFlexClass = contentRef.current.className?.includes('!flex');
+          if (hasFlexClass) {
+            contentRef.current.style.setProperty('display', 'flex', 'important');
+            contentRef.current.style.setProperty('flex-direction', 'column', 'important');
+            contentRef.current.style.setProperty('overflow', 'hidden', 'important');
+          } else {
+            contentRef.current.style.setProperty('display', 'grid', 'important');
+          }
           contentRef.current.style.setProperty('visibility', 'visible', 'important');
           contentRef.current.style.setProperty('opacity', '1', 'important');
           contentRef.current.style.setProperty('position', 'fixed', 'important');

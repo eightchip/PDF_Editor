@@ -231,6 +231,8 @@ export default function Home() {
   const [ocrSearchQuery, setOcrSearchQuery] = useState(''); // OCR検索クエリ
   const [editingOcrPage, setEditingOcrPage] = useState<number | null>(null); // 編集中のOCRページ番号
   const [editingOcrText, setEditingOcrText] = useState(''); // 編集中のOCRテキスト
+  const [currentOcrResultPage, setCurrentOcrResultPage] = useState(1); // 現在表示しているOCR結果のページ番号（検索結果内のインデックス）
+  const [ocrPageRangeInput, setOcrPageRangeInput] = useState(''); // ページ指定入力（例: "1, 3, 5-7"）
   const [splitRangeInputs, setSplitRangeInputs] = useState<string[]>(['']); // PDF分割の範囲入力の配列（例: ["1-3, 5, 7-9", "11-13, 15, 17-19"]）
   const [showSplitDialogFromThumbnail, setShowSplitDialogFromThumbnail] = useState(false); // ページ管理モーダルから開いたPDF分割ダイアログ
   
@@ -296,6 +298,19 @@ export default function Home() {
   useEffect(() => {
     console.log('showSplitDialog changed:', showSplitDialog);
   }, [showSplitDialog]);
+
+  // OCR結果が更新されたら、最初のページを表示
+  useEffect(() => {
+    if (Object.keys(ocrResults).length > 0 && showOCRDialog) {
+      setCurrentOcrResultPage(1);
+    }
+  }, [ocrResults, showOCRDialog]);
+
+  // 検索クエリが変更されたら、最初のページを表示
+  useEffect(() => {
+    setCurrentOcrResultPage(1);
+  }, [ocrSearchQuery]);
+
 
   // 自動オープン機能は無効化（手書きボタンのクリックでのみモーダルを開く）
   // テキスト入力フィールドにフォーカスしたときに自動的に手書きモーダルを開く機能は、
@@ -2716,6 +2731,9 @@ export default function Home() {
         title: "成功",
         description: `${pagesToProcess.length}ページのOCR処理が完了しました`,
       });
+
+      // OCR結果が読み込まれたら、最初のページを表示
+      setCurrentOcrResultPage(1);
     } catch (error) {
       console.error('OCR処理エラー:', error);
       toast({
@@ -2737,6 +2755,60 @@ export default function Home() {
   // 全ページのOCR処理
   const handleOCRAllPages = () => {
     handleOCR([]);
+  };
+
+  // 指定ページのOCR処理
+  const handleOCRSpecifiedPages = () => {
+    if (!ocrPageRangeInput.trim()) {
+      toast({
+        title: "エラー",
+        description: "ページ範囲を入力してください（例: 1, 3, 5-7）",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const pageRanges = parsePageRanges(ocrPageRangeInput, totalPages);
+      if (pageRanges.length === 0) {
+        toast({
+          title: "エラー",
+          description: "有効なページ範囲を入力してください（例: 1, 3, 5-7）",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // ページ範囲をページ番号の配列に変換
+      const pageNumbers: number[] = [];
+      for (const range of pageRanges) {
+        for (let page = range.start; page <= range.end; page++) {
+          if (page >= 1 && page <= totalPages && !pageNumbers.includes(page)) {
+            pageNumbers.push(page);
+          }
+        }
+      }
+
+      if (pageNumbers.length === 0) {
+        toast({
+          title: "エラー",
+          description: "有効なページ番号が見つかりませんでした",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // ページ番号をソート
+      pageNumbers.sort((a, b) => a - b);
+
+      handleOCR(pageNumbers);
+    } catch (error) {
+      toast({
+        title: "エラー",
+        description: `ページ範囲の解析に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+        variant: "destructive",
+      });
+    }
   };
 
   // ドラッグ開始
@@ -7403,109 +7475,168 @@ export default function Home() {
         }}
       >
         <DialogContent 
-          topPosition="top-[15%]"
-          className="max-w-3xl max-h-[90vh] overflow-y-auto"
+          topPosition="top-[1%]"
+          className="!flex !flex-col"
           style={{
             zIndex: 10001,
             left: '50%',
-            top: '15%',
+            top: '1%',
             transform: 'translateX(-50%) translateY(0)',
             background: 'linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 50%, #ddd6fe 100%)',
             border: '4px solid #a855f7',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          }}
+            display: 'flex',
+            flexDirection: 'column',
+            padding: 0,
+            overflow: 'hidden',
+            width: '90vw',
+            maxWidth: '90vw',
+            height: '98vh',
+            maxHeight: '98vh',
+          } as React.CSSProperties & { display: 'flex' }}
           onClose={() => {
             setShowOCRDialog(false);
           }}
         >
-          <DialogHeader className="pb-4 border-b-4 border-purple-300 mb-4 bg-white rounded-t-lg p-6 shadow-lg">
-            <DialogTitle className="text-3xl font-extrabold text-purple-900 mb-3 drop-shadow-md">OCR（光学文字認識）</DialogTitle>
-            <DialogDescription className="text-lg text-purple-800 font-semibold">PDFページからテキストを抽出します</DialogDescription>
+          <DialogHeader className="pb-2 border-b-2 border-purple-300 mb-0 bg-white rounded-t-lg p-3 shadow-lg flex-shrink-0">
+            <DialogTitle className="text-xl font-bold text-purple-900 mb-1">OCR（光学文字認識）</DialogTitle>
+            <DialogDescription className="text-sm text-purple-800">PDFページからテキストを抽出します</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 mt-4 p-6">
-            <div className="p-5 bg-white rounded-lg border-3 border-purple-300 shadow-lg" style={{ borderWidth: '3px' }}>
-              <label className="block text-base font-extrabold text-purple-900 mb-3">
-                OCR言語
-              </label>
-              <select
-                value={ocrLanguage}
-                onChange={(e) => setOcrLanguage(e.target.value)}
-                disabled={isProcessingOCR}
-                className="w-full px-4 py-3 text-base border-3 border-purple-400 rounded-lg bg-white focus:border-purple-600 focus:ring-4 focus:ring-purple-200 font-semibold"
-                style={{ borderWidth: '3px' }}
-              >
-                <option value="jpn+eng">日本語 + 英語</option>
-                <option value="jpn">日本語のみ</option>
-                <option value="eng">英語のみ</option>
-              </select>
+          <div className="flex-1 space-y-2 mt-2 p-3 flex flex-col">
+            <div className="p-2 bg-white rounded-lg border-2 border-purple-300 shadow-sm" style={{ borderWidth: '2px' }}>
+              <div className="flex items-center gap-3">
+                <label className="text-xs font-semibold text-purple-900 whitespace-nowrap">
+                  OCR言語:
+                </label>
+                <select
+                  value={ocrLanguage}
+                  onChange={(e) => setOcrLanguage(e.target.value)}
+                  disabled={isProcessingOCR}
+                  className="flex-1 px-2 py-1 text-sm border-2 border-purple-400 rounded bg-white focus:border-purple-600 focus:ring-2 focus:ring-purple-200 font-medium"
+                  style={{ borderWidth: '2px' }}
+                >
+                  <option value="jpn+eng">日本語 + 英語</option>
+                  <option value="jpn">日本語のみ</option>
+                  <option value="eng">英語のみ</option>
+                </select>
+              </div>
             </div>
 
             {ocrProgress && (
-              <div className="p-5 bg-purple-200 rounded-lg border-3 border-purple-400 shadow-lg" style={{ borderWidth: '3px' }}>
-                <p className="text-base font-extrabold text-purple-900 mb-3">
+              <div className="p-2 bg-purple-200 rounded-lg border-2 border-purple-400 shadow-sm" style={{ borderWidth: '2px' }}>
+                <p className="text-xs font-semibold text-purple-900 mb-1">
                   OCR処理中: {ocrProgress.current} / {ocrProgress.total} ページ
                 </p>
-                <div className="w-full bg-purple-300 rounded-full h-4 shadow-inner">
+                <div className="w-full bg-purple-300 rounded-full h-2 shadow-inner">
                   <div 
-                    className="bg-gradient-to-r from-purple-600 to-purple-800 h-4 rounded-full shadow-lg transition-all duration-300" 
+                    className="bg-gradient-to-r from-purple-600 to-purple-800 h-2 rounded-full transition-all duration-300" 
                     style={{ width: `${(ocrProgress.current / ocrProgress.total) * 100}%` }} 
                   />
                 </div>
               </div>
             )}
 
-            <div className="p-5 bg-white rounded-lg border-3 border-purple-300 shadow-lg" style={{ borderWidth: '3px' }}>
-              <div className="flex gap-3 mb-4">
+            <div className="p-2 bg-white rounded-lg border-2 border-purple-300 shadow-sm" style={{ borderWidth: '2px' }}>
+              <div className="flex gap-2 mb-2">
                 <Button
                   onClick={handleOCRCurrentPage}
                   disabled={isProcessingOCR || !pdfDoc}
-                  className="flex-1 h-14 px-6 text-lg font-extrabold bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white shadow-xl hover:shadow-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed border-3 border-purple-500"
-                  style={{ borderWidth: '3px' }}
+                  className="flex-1 h-8 px-3 text-xs font-semibold bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-purple-500"
                 >
                   現在のページをOCR
                 </Button>
                 <Button
                   onClick={handleOCRAllPages}
                   disabled={isProcessingOCR || !pdfDoc}
-                  className="flex-1 h-14 px-6 text-lg font-extrabold bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white shadow-xl hover:shadow-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed border-3 border-purple-500"
-                  style={{ borderWidth: '3px' }}
+                  className="flex-1 h-8 px-3 text-xs font-semibold bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-purple-500"
                 >
                   全ページをOCR
                 </Button>
               </div>
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="text"
+                  placeholder="ページ指定（例: 1, 3, 5-7）"
+                  value={ocrPageRangeInput}
+                  onChange={(e) => setOcrPageRangeInput(e.target.value)}
+                  disabled={isProcessingOCR || !pdfDoc}
+                  className="flex-1 h-8 text-xs border-2 border-purple-400 rounded bg-white focus:border-purple-600 focus:ring-2 focus:ring-purple-200"
+                  style={{ borderWidth: '2px' }}
+                />
+                <Button
+                  onClick={handleOCRSpecifiedPages}
+                  disabled={isProcessingOCR || !pdfDoc || !ocrPageRangeInput.trim()}
+                  className="h-8 px-3 text-xs font-semibold bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-purple-500"
+                >
+                  指定ページをOCR
+                </Button>
+              </div>
             </div>
 
-            {Object.keys(ocrResults).length > 0 && (
-              <div className="p-5 bg-white rounded-lg border-3 border-purple-300 shadow-lg" style={{ borderWidth: '3px' }}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-extrabold text-purple-900">OCR結果</h3>
-                  <div className="flex gap-2">
+            {Object.keys(ocrResults).length > 0 && (() => {
+              // 検索クエリに基づいてフィルタリングされたOCR結果を取得
+              const filteredResults = Object.entries(ocrResults)
+                .sort(([a], [b]) => parseInt(a) - parseInt(b)) // ページ番号でソート
+                .filter(([_, result]) => {
+                  if (!ocrSearchQuery.trim()) return true;
+                  return result.text.toLowerCase().includes(ocrSearchQuery.toLowerCase());
+                });
+              
+              const totalFilteredPages = filteredResults.length;
+              const currentIndex = Math.max(0, Math.min(currentOcrResultPage - 1, totalFilteredPages - 1));
+              const currentResult = filteredResults[currentIndex];
+              
+              return (
+              <div className="p-2 bg-white rounded-lg border-2 border-purple-300 shadow-sm" style={{ borderWidth: '2px' }}>
+                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-purple-900">OCR結果</h3>
+                    <span className="text-xs text-purple-700 font-medium bg-purple-100 px-2 py-0.5 rounded-full">
+                      {totalFilteredPages}ページ
+                    </span>
+                  </div>
+                  <div className="flex gap-2 items-center">
                     <Input
                       type="text"
-                      placeholder="テキストを検索..."
+                      placeholder="検索..."
                       value={ocrSearchQuery}
                       onChange={(e) => setOcrSearchQuery(e.target.value)}
-                      className="w-64 h-10 text-sm border-2 border-purple-300 focus:border-purple-500"
+                      className="w-48 h-7 text-xs border border-purple-300 focus:border-purple-500"
                     />
+                    {ocrSearchQuery.trim() && (
+                      <span className="text-xs text-purple-600 font-medium whitespace-nowrap">
+                        {totalFilteredPages}件
+                      </span>
+                    )}
                   </div>
                 </div>
-                <div className="max-h-96 overflow-y-auto space-y-3">
-                  {Object.entries(ocrResults)
-                    .filter(([_, result]) => {
-                      if (!ocrSearchQuery.trim()) return true;
-                      return result.text.toLowerCase().includes(ocrSearchQuery.toLowerCase());
-                    })
-                    .map(([pageNum, result]) => (
-                      <div key={pageNum} className="p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-base font-bold text-purple-900">ページ {pageNum}</h4>
-                          <div className="flex gap-2">
+                {currentResult ? (
+                  <div className="space-y-2">
+                    {(() => {
+                      const [pageNum, result] = currentResult;
+                      return (
+                      <div key={pageNum} className="p-2 bg-purple-50 rounded border border-purple-200 hover:bg-purple-100 transition-colors max-w-full overflow-hidden">
+                        <div className="flex items-center justify-between mb-1">
+                          <button
+                            onClick={() => {
+                              setCurrentPage(parseInt(pageNum));
+                              toast({
+                                title: "ページ移動",
+                                description: `ページ ${pageNum} に移動しました`,
+                              });
+                            }}
+                            className="text-xs font-semibold text-purple-900 hover:text-purple-700 hover:underline cursor-pointer"
+                          >
+                            ページ {pageNum}
+                          </button>
+                          <div className="flex gap-1 items-center">
+                            <span className="text-xs text-purple-700">信頼度: {result.confidence.toFixed(1)}%</span>
                             <button
                               onClick={() => {
                                 setEditingOcrPage(parseInt(pageNum));
                                 setEditingOcrText(result.text);
                               }}
-                              className="px-3 py-1 text-xs font-semibold bg-blue-500 text-white rounded hover:bg-blue-600"
+                              className="px-2 py-0.5 text-xs font-medium bg-blue-500 text-white rounded hover:bg-blue-600"
                             >
                               編集
                             </button>
@@ -7522,22 +7653,22 @@ export default function Home() {
                                   });
                                 }
                               }}
-                              className="px-3 py-1 text-xs font-semibold bg-red-500 text-white rounded hover:bg-red-600"
+                              className="px-2 py-0.5 text-xs font-medium bg-red-500 text-white rounded hover:bg-red-600"
                             >
                               削除
                             </button>
                           </div>
                         </div>
-                        <p className="text-sm text-purple-800 mb-2">信頼度: {result.confidence.toFixed(1)}%</p>
                         {editingOcrPage === parseInt(pageNum) ? (
-                          <div className="space-y-2">
+                          <div className="space-y-1">
                             <textarea
                               value={editingOcrText}
                               onChange={(e) => setEditingOcrText(e.target.value)}
-                              className="w-full text-sm text-purple-900 bg-white p-3 rounded border-2 border-purple-400 min-h-32"
-                              rows={5}
+                              className="w-full text-sm text-purple-900 bg-white p-2 rounded border border-purple-400 min-h-64 max-h-64 resize-none overflow-y-auto"
+                              rows={16}
+                              style={{ maxHeight: '16rem', overflowY: 'auto', wordBreak: 'break-word', overflowWrap: 'break-word' }}
                             />
-                            <div className="flex gap-2">
+                            <div className="flex gap-1">
                               <button
                                 onClick={async () => {
                                   if (docId) {
@@ -7554,7 +7685,7 @@ export default function Home() {
                                     });
                                   }
                                 }}
-                                className="px-3 py-1 text-xs font-semibold bg-green-500 text-white rounded hover:bg-green-600"
+                                className="px-2 py-1 text-xs font-medium bg-green-500 text-white rounded hover:bg-green-600"
                               >
                                 保存
                               </button>
@@ -7563,15 +7694,25 @@ export default function Home() {
                                   setEditingOcrPage(null);
                                   setEditingOcrText('');
                                 }}
-                                className="px-3 py-1 text-xs font-semibold bg-gray-500 text-white rounded hover:bg-gray-600"
+                                className="px-2 py-1 text-xs font-medium bg-gray-500 text-white rounded hover:bg-gray-600"
                               >
                                 キャンセル
                               </button>
                             </div>
                           </div>
                         ) : (
-                          <div className="text-sm text-purple-900 bg-white p-3 rounded border border-purple-200 max-h-32 overflow-y-auto whitespace-pre-wrap">
-                            {result.text || '(テキストが見つかりませんでした)'}
+                          <div className="text-sm text-purple-900 bg-white p-2 rounded border border-purple-200 max-h-64 overflow-y-auto overflow-x-hidden whitespace-pre-wrap leading-relaxed break-words" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+                            {ocrSearchQuery.trim() ? (
+                              result.text.split(new RegExp(`(${ocrSearchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')).map((part, idx) => 
+                                part.toLowerCase() === ocrSearchQuery.toLowerCase() ? (
+                                  <mark key={idx} className="bg-yellow-300 text-purple-900 font-semibold">{part}</mark>
+                                ) : (
+                                  <span key={idx}>{part}</span>
+                                )
+                              )
+                            ) : (
+                              result.text || '(テキストが見つかりませんでした)'
+                            )}
                           </div>
                         )}
                         {result.words.length > 0 && (
@@ -7590,26 +7731,73 @@ export default function Home() {
                           </details>
                         )}
                       </div>
-                    ))}
-                  {Object.keys(ocrResults).length > 0 && Object.entries(ocrResults).filter(([_, result]) => {
-                    if (!ocrSearchQuery.trim()) return true;
-                    return result.text.toLowerCase().includes(ocrSearchQuery.toLowerCase());
-                  }).length === 0 && (
-                    <p className="text-center text-purple-600 py-4">検索結果がありません</p>
-                  )}
-                </div>
+                      );
+                    })()}
+                    {/* ページナビゲーションボタン */}
+                    <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-purple-200">
+                      <button
+                        onClick={() => {
+                          if (currentOcrResultPage > 1) {
+                            setCurrentOcrResultPage(currentOcrResultPage - 1);
+                          }
+                        }}
+                        disabled={currentOcrResultPage === 1}
+                        className={`px-3 py-1.5 border rounded text-xs font-medium transition-all flex items-center gap-1 ${
+                          currentOcrResultPage === 1
+                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed border-gray-300'
+                            : 'bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white border-purple-500 shadow-sm hover:shadow-md'
+                        }`}
+                      >
+                        <MdNavigateBefore className="text-sm" />
+                        前へ
+                      </button>
+                      <span className="text-xs font-semibold text-purple-900 px-3 py-1.5 bg-purple-50 rounded border border-purple-200">
+                        ページ {currentOcrResultPage} / {totalFilteredPages}
+                      </span>
+                      <button
+                        onClick={() => {
+                          if (currentOcrResultPage < totalFilteredPages) {
+                            setCurrentOcrResultPage(currentOcrResultPage + 1);
+                          }
+                        }}
+                        disabled={currentOcrResultPage >= totalFilteredPages}
+                        className={`px-3 py-1.5 border rounded text-xs font-medium transition-all flex items-center gap-1 ${
+                          currentOcrResultPage >= totalFilteredPages
+                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed border-gray-300'
+                            : 'bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white border-purple-500 shadow-sm hover:shadow-md'
+                        }`}
+                      >
+                        次へ
+                        <MdNavigateNext className="text-sm" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-purple-600 font-semibold text-lg mb-2">検索結果がありません</p>
+                    <p className="text-purple-500 text-sm">「{ocrSearchQuery}」に一致するテキストが見つかりませんでした</p>
+                  </div>
+                )}
+              </div>
+              );
+            })()}
+            {Object.keys(ocrResults).length === 0 && (
+              <div className="p-2 bg-white rounded-lg border-2 border-purple-300 shadow-sm" style={{ borderWidth: '2px' }}>
+                <p className="text-center text-purple-600 py-4">OCR結果がありません。上記のボタンからOCRを実行してください。</p>
               </div>
             )}
           </div>
-          <DialogFooter className="pt-6 border-t-4 border-purple-400 mt-6 bg-white rounded-b-lg p-6 shadow-lg">
+          <DialogFooter className="pt-2 border-t-2 border-purple-400 mt-0 bg-white rounded-b-lg p-2 shadow-lg flex-shrink-0 relative z-10">
             <Button
               variant="outline"
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 setShowOCRDialog(false);
               }}
               disabled={isProcessingOCR}
-              className="h-14 px-8 text-lg font-extrabold border-3 border-purple-400 hover:bg-purple-100 hover:border-purple-600 shadow-lg"
-              style={{ borderWidth: '3px' }}
+              className="h-8 px-4 text-xs font-semibold border border-purple-400 hover:bg-purple-100 hover:border-purple-600 shadow-sm relative z-20"
+              style={{ pointerEvents: 'auto' }}
             >
               閉じる
             </Button>
