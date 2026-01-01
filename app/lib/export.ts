@@ -1,4 +1,4 @@
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, rgb, type Rotation } from 'pdf-lib';
 import type { Stroke, TextAnnotation, ShapeAnnotation } from './db';
 import { setFormFieldValues, calculateFormFields, type FormField } from './forms';
 import { addSignatureToPDF, type Signature } from './signature';
@@ -83,7 +83,11 @@ export async function exportAnnotatedPDFV2(
     // ページ回転を適用
     const rotation = pageRotations?.[pageNumber] || 0;
     if (rotation !== 0) {
-      page.setRotation(rotation as 0 | 90 | 180 | 270);
+      // pdf-libのRotation型は0 | 90 | 180 | 270のリテラル型
+      const validRotation: Rotation = (rotation === 90 || rotation === 180 || rotation === 270) 
+        ? (rotation as 90 | 180 | 270)
+        : 0;
+      page.setRotation(validRotation);
     }
 
     // ストロークを描画
