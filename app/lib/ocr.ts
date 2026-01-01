@@ -33,14 +33,15 @@ export async function performOCR(
     const imageData = canvas.toDataURL('image/png');
     
     // OCR処理を実行
-    const { data } = await worker.recognize(imageData);
+    const result = await worker.recognize(imageData);
+    const data = result.data;
     
     // ワーカーを終了
     await worker.terminate();
     
     // 単語レベルの情報を取得
     // data.wordsが存在するか確認
-    const words = (data.words || []).map(word => ({
+    const words = ((data as any).words || []).map((word: any) => ({
       text: word.text || '',
       bbox: {
         x0: word.bbox?.x0 || 0,
@@ -90,9 +91,10 @@ export async function performOCROnPDFPage(
   const renderContext = {
     canvasContext: context,
     viewport: viewport,
+    canvas: canvas,
   };
   
-  await pdfPage.render(renderContext).promise;
+  await pdfPage.render(renderContext as any).promise;
   
   // OCR処理を実行
   return await performOCR(canvas, language);
