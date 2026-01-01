@@ -84,10 +84,17 @@ export async function exportAnnotatedPDFV2(
     const rotation = pageRotations?.[pageNumber] || 0;
     if (rotation !== 0) {
       // pdf-libのRotation型は0 | 90 | 180 | 270のリテラル型
-      const validRotation: Rotation = (rotation === 90 || rotation === 180 || rotation === 270) 
-        ? (rotation as 90 | 180 | 270)
-        : 0;
-      page.setRotation(validRotation);
+      let validRotation: Rotation = 0;
+      if (rotation === 90) {
+        validRotation = 90;
+      } else if (rotation === 180) {
+        validRotation = 180;
+      } else if (rotation === 270) {
+        validRotation = 270;
+      }
+      if (validRotation !== 0) {
+        page.setRotation(validRotation);
+      }
     }
 
     // ストロークを描画
