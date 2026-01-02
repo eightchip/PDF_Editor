@@ -153,8 +153,8 @@ export async function renderTextLayer(
       span.style.cursor = 'text';
       span.style.userSelect = 'text';
       span.style.webkitUserSelect = 'text';
-      span.style.mozUserSelect = 'text';
-      span.style.msUserSelect = 'text';
+      span.style.setProperty('-moz-user-select', 'text');
+      span.style.setProperty('-ms-user-select', 'text');
       span.style.whiteSpace = 'pre';
       span.style.lineHeight = '1';
       span.style.transformOrigin = '0% 0%';
