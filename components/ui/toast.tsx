@@ -16,9 +16,22 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      "fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
+      "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999] flex max-h-screen w-auto max-w-[90vw] flex-col p-0 pointer-events-none",
       className
     )}
+    style={{
+      position: 'fixed',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      zIndex: 9999,
+      margin: 0,
+      padding: 0,
+      right: 'auto',
+      bottom: 'auto',
+      width: 'auto',
+      maxWidth: '90vw',
+    }}
     {...props}
   />
 ))
@@ -32,6 +45,8 @@ const toastVariants = cva(
         default: "border bg-background text-foreground",
         destructive:
           "destructive group border-destructive bg-destructive text-destructive-foreground",
+        success:
+          "border-green-500 bg-green-100 text-green-900 border-2 shadow-lg",
       },
     },
     defaultVariants: {
@@ -48,7 +63,8 @@ const Toast = React.forwardRef<
   return (
     <ToastPrimitives.Root
       ref={ref}
-      className={cn(toastVariants({ variant }), className)}
+      className={cn(toastVariants({ variant }), "list-none", className)}
+      style={{ listStyle: 'none', listStyleType: 'none' }}
       {...props}
     />
   )
@@ -94,7 +110,8 @@ const ToastTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Title
     ref={ref}
-    className={cn("text-sm font-semibold", className)}
+    className={cn("text-sm font-semibold list-none", className)}
+    style={{ listStyle: 'none', listStyleType: 'none' }}
     {...props}
   />
 ))

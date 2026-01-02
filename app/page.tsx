@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { loadPDF, renderPage } from './lib/pdf';
+import { loadPDF, renderPage, renderTextLayer } from './lib/pdf';
 import { drawStroke, redrawStrokes, normalizePoint } from './lib/ink';
 import { saveAnnotations, loadAnnotations, deleteAnnotations, getAllAnnotations, saveTextAnnotations, loadTextAnnotations, deleteTextAnnotations, getAllTextAnnotations, saveShapeAnnotations, loadShapeAnnotations, deleteShapeAnnotations, getAllShapeAnnotations, type Stroke, type TextAnnotation, type ShapeAnnotation } from './lib/db';
 import { generateDocId } from './lib/id';
@@ -12,8 +12,9 @@ import { drawShapeAnnotation, redrawShapeAnnotations, generateShapeId } from './
 import { extractTextItems, findNearestTextLine, findTextBoundingBox, smoothStroke, type TextItem } from './lib/text-detection';
 import { convertImageToPDF } from './lib/image-to-pdf';
 import { extractFormFields, setFormFieldValues, calculateFormFields, setupCommonCalculations, type FormField } from './lib/forms';
-import { generateSignatureId, createApprovalWorkflow, approveStep, rejectStep, type Signature, type ApprovalWorkflow } from './lib/signature';
-import { saveSignature, getAllSignatures, deleteSignature, saveApprovalWorkflow, getAllApprovalWorkflows, saveWatermarkHistory, getAllWatermarkHistory, saveOCRResult, loadOCRResult, getAllOCRResults, deleteOCRResult } from './lib/db';
+import { generateSignatureId, type Signature } from './lib/signature';
+import { saveSignature, getAllSignatures, deleteSignature, saveWatermarkHistory, getAllWatermarkHistory, saveOCRResult, loadOCRResult, getAllOCRResults, deleteOCRResult, saveTableOfContents, loadTableOfContents } from './lib/db';
+import { generateTableOfContents, type TableOfContentsEntry } from './lib/table-of-contents';
 import { splitPDF, splitPDFByRanges, splitPDFByPageGroups } from './lib/pdf-split';
 import { performOCROnPDFPage, type OCRResult } from './lib/ocr';
 import { useToast } from '@/hooks/use-toast';
@@ -29,7 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button"; // Dialog内でのみ使用
-import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections, MdDragHandle, MdLock, MdSecurity, MdCheckCircle, MdInfo, MdLocalOffer, MdAssignment, MdContentCut } from 'react-icons/md';
+import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections, MdDragHandle, MdLock, MdSecurity, MdCheckCircle, MdInfo, MdLocalOffer, MdAssignment, MdContentCut, MdMenuBook, MdFileCopy } from 'react-icons/md';
 import { QRCodeSVG } from 'qrcode.react';
 // PDF.jsの型は動的インポートで取得
 
@@ -220,10 +221,15 @@ export default function Home() {
   const [signatureImage, setSignatureImage] = useState<string | null>(null); // Base64画像
   const [signatureText, setSignatureText] = useState(''); // テキスト署名
   const [signaturePosition, setSignaturePosition] = useState<'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'>('bottom-left'); // 署名位置
-  const [approvalWorkflows, setApprovalWorkflows] = useState<ApprovalWorkflow[]>([]);
-  const [showApprovalWorkflowDialog, setShowApprovalWorkflowDialog] = useState(false);
   const [showSplitDialog, setShowSplitDialog] = useState(false); // PDF分割ダイアログ
   const [showOCRDialog, setShowOCRDialog] = useState(false); // OCRダイアログ
+  const [showTableOfContentsDialog, setShowTableOfContentsDialog] = useState(false); // 目次ダイアログ
+  const [tableOfContents, setTableOfContents] = useState<TableOfContentsEntry[]>([]); // 目次データ
+  const [isGeneratingTOC, setIsGeneratingTOC] = useState(false); // 目次生成中フラグ
+  const [editingTOCIndex, setEditingTOCIndex] = useState<number | null>(null); // 編集中の目次エントリのインデックス
+  const [editingTOCTitle, setEditingTOCTitle] = useState<string>(''); // 編集中の見出しタイトル
+  const [textSelectionEnabled, setTextSelectionEnabled] = useState(false); // テキスト選択モード
+  const [expandedLevels, setExpandedLevels] = useState<Set<number>>(new Set([1, 2, 3, 4])); // 展開されている階層レベル
   const [ocrResults, setOcrResults] = useState<Record<number, OCRResult>>({}); // OCR結果（ページ番号をキーとする）
   const [isProcessingOCR, setIsProcessingOCR] = useState(false); // OCR処理中かどうか
   const [ocrProgress, setOcrProgress] = useState<{ current: number; total: number } | null>(null); // OCR進捗
@@ -238,14 +244,14 @@ export default function Home() {
   
   // ダイアログが開いているときにbodyのpointer-eventsを有効化
   useEffect(() => {
-    if (showSignatureDialog || showApprovalWorkflowDialog || showSplitDialog || showOCRDialog) {
+    if (showSignatureDialog || showSplitDialog || showOCRDialog) {
       // ダイアログが開いているときはbodyのpointer-eventsをautoに設定
       document.body.style.pointerEvents = 'auto';
     } else {
       // ダイアログが閉じているときは元に戻す（必要に応じて）
       // document.body.style.pointerEvents = '';
     }
-  }, [showSignatureDialog, showApprovalWorkflowDialog, showSplitDialog, showOCRDialog]);
+  }, [showSignatureDialog, showSplitDialog, showOCRDialog]);
 
   // Undo/Redo（strokes、shapes、textAnnotationsの全てを含む）
   type UndoState = {
@@ -261,6 +267,7 @@ export default function Home() {
   const inkCanvasRef = useRef<HTMLCanvasElement>(null);
   const textCanvasRef = useRef<HTMLCanvasElement>(null);
   const shapeCanvasRef = useRef<HTMLCanvasElement>(null);
+  const textLayerRef = useRef<HTMLDivElement>(null); // テキストレイヤー用
   const containerRef = useRef<HTMLDivElement>(null);
   const isDrawingRef = useRef(false);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
@@ -290,10 +297,6 @@ export default function Home() {
   useEffect(() => {
     console.log('showSignatureDialog changed:', showSignatureDialog);
   }, [showSignatureDialog]);
-
-  useEffect(() => {
-    console.log('showApprovalWorkflowDialog changed:', showApprovalWorkflowDialog);
-  }, [showApprovalWorkflowDialog]);
 
   useEffect(() => {
     console.log('showSplitDialog changed:', showSplitDialog);
@@ -597,6 +600,7 @@ export default function Home() {
         description: existingPdfBytes 
           ? `元のPDFに${imageFiles.length}枚の画像を追加しました`
           : `${imageFiles.length}枚の画像を結合しました`,
+        variant: "success",
       });
     } catch (error) {
       console.error('画像結合エラー:', error);
@@ -815,6 +819,7 @@ export default function Home() {
         toast({
           title: "成功",
           description: `ファイルをコレクションに追加しました（画像: ${imageCount}枚、PDF: ${pdfCount}件、合計: ${length}件）`,
+          variant: "success",
         });
       }, 100);
       return () => clearTimeout(timer);
@@ -958,14 +963,11 @@ export default function Home() {
             setFormFieldValues({});
           }
           
-          // 署名と承認ワークフローを読み込む
+          // 署名を読み込む
           if (id) {
             try {
               const loadedSignatures = await getAllSignatures(id);
               setSignatures(loadedSignatures);
-              
-              const loadedWorkflows = await getAllApprovalWorkflows(id);
-              setApprovalWorkflows(loadedWorkflows);
               
               // OCR結果を読み込む
               const loadedOcrResults = await getAllOCRResults(id, doc.numPages);
@@ -1085,6 +1087,12 @@ export default function Home() {
       const currentRotation = pageRotations[actualPageNum] || 0;
       const size = await renderPage(page, pdfCanvas, scale, currentRotation);
       setPageSize(size);
+
+      // テキストレイヤーを生成（テキスト選択可能にする）
+      if (textLayerRef.current) {
+        const viewport = page.getViewport({ scale, rotation: currentRotation });
+        await renderTextLayer(page, textLayerRef.current, viewport);
+      }
       
       // ページサイズを記録（エクスポート用、scale=1.0でのサイズ）
       if (scale === 1.0) {
@@ -1093,8 +1101,8 @@ export default function Home() {
         setPageSizes(prev => ({ ...prev, [actualPageNum]: size }));
       }
 
-      // テキストを抽出（スナップ機能用）
-      if (snapToTextEnabled) {
+      // テキストを抽出（スナップ機能用、またはテキスト選択モード用）
+      if (snapToTextEnabled || textSelectionEnabled) {
         try {
           const items = await extractTextItems(page, scale);
           setTextItems(items);
@@ -1225,7 +1233,7 @@ export default function Home() {
   // ページ変更時に再レンダリング
   useEffect(() => {
     renderCurrentPage();
-      }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, drawWatermarkOnCanvas]);
+      }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, drawWatermarkOnCanvas, snapToTextEnabled, textSelectionEnabled]);
 
   // strokesの状態変更時に再描画（ハイライトなどが追加/削除されたとき）
   useEffect(() => {
@@ -1495,7 +1503,86 @@ export default function Home() {
 
   // 描画開始
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!pageSize) return;
+    console.log('handlePointerDown: 呼び出されました', { textSelectionEnabled, tool, pageSize: !!pageSize });
+    
+    if (!pageSize) {
+      console.log('handlePointerDown: pageSizeがありません');
+      return;
+    }
+
+    // テキスト選択モードが有効な場合、シングルクリックでテキスト範囲を検出してコピー
+    if (textSelectionEnabled) {
+      console.log('テキスト選択: 処理開始');
+      const target = e.currentTarget;
+      const rect = target.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      console.log('テキスト選択: クリック検出', { x, y, textItemsCount: textItems.length, textSelectionEnabled });
+      
+      if (textItems.length > 0) {
+        const boundingBox = findTextBoundingBox(textItems, x, y, 30);
+        console.log('テキスト選択: バウンディングボックス', boundingBox);
+        
+        if (boundingBox) {
+          // テキスト範囲内のすべてのテキストアイテムを取得
+          const selectedTextItems = textItems.filter(item => {
+            return item.x >= boundingBox.x - 5 &&
+                   item.x + item.width <= boundingBox.x + boundingBox.width + 5 &&
+                   item.y >= boundingBox.y - 5 &&
+                   item.y + item.height <= boundingBox.y + boundingBox.height + 5;
+          });
+          
+          console.log('テキスト選択: 選択されたアイテム数', selectedTextItems.length);
+          
+          // テキストを結合（行ごとに整理）
+          const selectedText = selectedTextItems
+            .sort((a, b) => {
+              // Y座標でソート（上から下へ）
+              if (Math.abs(a.y - b.y) > 5) return a.y - b.y;
+              // 同じ行ならX座標でソート（左から右へ）
+              return a.x - b.x;
+            })
+            .map(item => item.str)
+            .join('');
+          
+          console.log('テキスト選択: 抽出されたテキスト', selectedText);
+          
+          if (selectedText) {
+            // クリップボードにコピー
+            navigator.clipboard.writeText(selectedText).then(() => {
+              console.log('テキスト選択: クリップボードにコピー成功');
+              toast({
+                title: `テキストをコピーしました`,
+                description: `"${selectedText.replace(/^1\.\s*/, '').substring(0, 50)}${selectedText.length > 50 ? '...' : ''}"`,
+                variant: "success",
+              });
+            }).catch(err => {
+              console.error('クリップボードへのコピーに失敗:', err);
+              toast({
+                title: "エラー",
+                description: "テキストのコピーに失敗しました",
+                variant: "destructive",
+              });
+            });
+            
+            // 目次編集中の場合は、自動的に入力フィールドに設定
+            if (editingTOCIndex !== null) {
+              setEditingTOCTitle(selectedText);
+            }
+          } else {
+            console.log('テキスト選択: 抽出されたテキストが空です');
+          }
+        } else {
+          console.log('テキスト選択: バウンディングボックスが見つかりませんでした');
+        }
+      } else {
+        console.log('テキスト選択: textItemsが空です');
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      return; // テキスト選択処理後は他の処理をスキップ
+    }
 
     // 選択ツールの場合は最初に処理（他のツールの描画を防ぐため）
     // 重要: 選択ツールの場合は絶対に描画状態を設定しない
@@ -1723,6 +1810,72 @@ export default function Home() {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+
+    // テキスト選択モードが有効な場合、シングルクリックでテキスト範囲を検出してコピー
+    if (textSelectionEnabled && !tool) {
+      console.log('テキスト選択: クリック検出', { x, y, textItemsCount: textItems.length });
+      
+      if (textItems.length > 0) {
+        const boundingBox = findTextBoundingBox(textItems, x, y, 30);
+        console.log('テキスト選択: バウンディングボックス', boundingBox);
+        
+        if (boundingBox) {
+          // テキスト範囲内のすべてのテキストアイテムを取得
+          const selectedTextItems = textItems.filter(item => {
+            return item.x >= boundingBox.x - 5 &&
+                   item.x + item.width <= boundingBox.x + boundingBox.width + 5 &&
+                   item.y >= boundingBox.y - 5 &&
+                   item.y + item.height <= boundingBox.y + boundingBox.height + 5;
+          });
+          
+          console.log('テキスト選択: 選択されたアイテム数', selectedTextItems.length);
+          
+          // テキストを結合（行ごとに整理）
+          const selectedText = selectedTextItems
+            .sort((a, b) => {
+              // Y座標でソート（上から下へ）
+              if (Math.abs(a.y - b.y) > 5) return a.y - b.y;
+              // 同じ行ならX座標でソート（左から右へ）
+              return a.x - b.x;
+            })
+            .map(item => item.str)
+            .join('');
+          
+          console.log('テキスト選択: 抽出されたテキスト', selectedText);
+          
+          if (selectedText) {
+            // クリップボードにコピー
+            navigator.clipboard.writeText(selectedText).then(() => {
+              console.log('テキスト選択: クリップボードにコピー成功');
+              toast({
+                title: `テキストをコピーしました`,
+                description: `"${selectedText.replace(/^1\.\s*/, '').substring(0, 50)}${selectedText.length > 50 ? '...' : ''}"`,
+                variant: "success",
+              });
+            }).catch(err => {
+              console.error('クリップボードへのコピーに失敗:', err);
+              toast({
+                title: "エラー",
+                description: "テキストのコピーに失敗しました",
+                variant: "destructive",
+              });
+            });
+            
+            // 目次編集中の場合は、自動的に入力フィールドに設定
+            if (editingTOCIndex !== null) {
+              setEditingTOCTitle(selectedText);
+            }
+          } else {
+            console.log('テキスト選択: 抽出されたテキストが空です');
+          }
+        } else {
+          console.log('テキスト選択: バウンディングボックスが見つかりませんでした');
+        }
+      } else {
+        console.log('テキスト選択: textItemsが空です');
+      }
+      return; // テキスト選択処理後は他の処理をスキップ
+    }
 
     // ハイライトツールの場合
     if (tool === 'highlight') {
@@ -2505,6 +2658,7 @@ export default function Home() {
       toast({
         title: "成功",
         description: `${pageNumbers.length}ページを削除しました`,
+        variant: "success",
       });
 
       setSelectedPagesForDelete(new Set());
@@ -2554,6 +2708,149 @@ export default function Home() {
 
     const pagesToDelete = Array.from(selectedPagesForDelete);
     await deletePages(pagesToDelete);
+  };
+
+  // 選択したページをコピー（現在のPDFに追加）
+  const copySelectedPages = async () => {
+    if (selectedPagesForDelete.size === 0) {
+      toast({
+        title: "通知",
+        description: "コピーするページを選択してください",
+      });
+      return;
+    }
+
+    if (!pdfDoc || !originalPdfBytes || !docId) {
+      toast({
+        title: "エラー",
+        description: "PDFが読み込まれていません",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { PDFDocument } = await import('pdf-lib');
+      
+      // 既存のPDFを読み込み
+      const pdfDocLib = await PDFDocument.load(originalPdfBytes);
+      const currentPageCount = pdfDocLib.getPageCount();
+      
+      // 選択したページをソート
+      const selectedPages = Array.from(selectedPagesForDelete).sort((a, b) => a - b);
+      
+      // 選択したページが存在するか確認
+      for (const pageNum of selectedPages) {
+        if (pageNum < 1 || pageNum > currentPageCount) {
+          toast({
+            title: "エラー",
+            description: `ページ ${pageNum} は存在しません`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      // 選択したページの最大ページ番号を取得（次のページに挿入するため）
+      const maxSelectedPage = Math.max(...selectedPages);
+      const insertAfterPage = maxSelectedPage; // このページの後に挿入
+
+      // 選択したページをコピー
+      const pagesToCopy = selectedPages.map(pageNum => pageNum - 1); // pdf-libは0ベース
+      const copiedPages = await pdfDocLib.copyPages(pdfDocLib, pagesToCopy);
+
+      // 挿入位置を決定（最大選択ページの次、0ベース）
+      // insertPageは指定したインデックスの位置に挿入するので、insertAfterPage（0ベース）を指定すればその位置に挿入される
+      // 複数ページを挿入する場合は、順番に挿入し、インデックスを増やしていく
+      let insertIndex = insertAfterPage; // 0ベースで、insertAfterPageの次に挿入
+
+      // ページを順番に挿入（インデックスを増やしながら）
+      for (let i = 0; i < copiedPages.length; i++) {
+        pdfDocLib.insertPage(insertIndex, copiedPages[i]);
+        insertIndex++; // 次のページは1つ後ろに挿入
+      }
+
+      // 新しいページ数を取得
+      const newPageCount = pdfDocLib.getPageCount();
+
+      // コピーしたページの注釈もコピー
+      const newPageNumbers: number[] = [];
+      for (let i = 0; i < selectedPages.length; i++) {
+        const originalPageNum = selectedPages[i];
+        const newPageNum = insertAfterPage + i + 1; // 挿入後の新しいページ番号
+        newPageNumbers.push(newPageNum);
+
+        // 元のページの注釈を読み込んで新しいページ番号で保存
+        const strokes = await loadAnnotations(docId, originalPageNum);
+        const texts = await loadTextAnnotations(docId, originalPageNum);
+        const shapes = await loadShapeAnnotations(docId, originalPageNum);
+
+        // 新しいページ番号で保存
+        await saveAnnotations(docId, newPageNum, strokes);
+        await saveTextAnnotations(docId, newPageNum, texts);
+        await saveShapeAnnotations(docId, newPageNum, shapes);
+      }
+
+      // 挿入位置より後のページの注釈を再マッピング（ページ番号がずれるため）
+      for (let oldPageNum = insertAfterPage + 1; oldPageNum <= currentPageCount; oldPageNum++) {
+        const newPageNum = oldPageNum + selectedPages.length;
+        
+        // 注釈を読み込んで新しいページ番号で保存
+        const strokes = await loadAnnotations(docId, oldPageNum);
+        const texts = await loadTextAnnotations(docId, oldPageNum);
+        const shapes = await loadShapeAnnotations(docId, oldPageNum);
+        
+        // 新しいページ番号で保存
+        await saveAnnotations(docId, newPageNum, strokes);
+        await saveTextAnnotations(docId, newPageNum, texts);
+        await saveShapeAnnotations(docId, newPageNum, shapes);
+        
+        // 古いページ番号の注釈を削除
+        await deleteAnnotations(docId, oldPageNum);
+        await deleteTextAnnotations(docId, oldPageNum);
+        await deleteShapeAnnotations(docId, oldPageNum);
+      }
+
+      // 新しいPDFを保存
+      const pdfBytes = await pdfDocLib.save();
+      const arrayBuffer = pdfBytes.buffer as ArrayBuffer;
+      
+      // 新しいPDFファイルを作成
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const pdfFile = new File([blob], originalFileName || 'edited.pdf', { type: 'application/pdf' });
+
+      // PDFを再読み込み
+      const newDoc = await loadPDF(pdfFile);
+      setPdfDoc(newDoc);
+      setTotalPages(newPageCount);
+      setOriginalPdfBytes(arrayBuffer);
+
+      // 現在のページを調整（必要に応じて）
+      // コピーされた最初のページに移動
+      setCurrentPage(insertAfterPage + 1);
+
+      // ページサイズをクリア
+      setPageSizes({});
+      setTextItems([]);
+
+      // サムネイルを再生成
+      setThumbnails({});
+
+      toast({
+        title: "成功",
+        description: `${selectedPages.length}ページをコピーしました`,
+        variant: "success",
+      });
+
+      setSelectedPagesForDelete(new Set());
+    } catch (error) {
+      console.error('ページコピーエラー:', error);
+      toast({
+        title: "エラー",
+        description: 'ページのコピーに失敗しました: ' + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive",
+      });
+    }
   };
 
   // ページ順序を変更（ドラッグ&ドロップで使用）
@@ -2643,6 +2940,7 @@ export default function Home() {
       toast({
         title: "成功",
         description: "ページの順序を適用しました",
+        variant: "success",
       });
     } catch (error) {
       console.error('ページ順序変更エラー:', error);
@@ -2730,6 +3028,7 @@ export default function Home() {
       toast({
         title: "成功",
         description: `${pagesToProcess.length}ページのOCR処理が完了しました`,
+        variant: "success",
       });
 
       // OCR結果が読み込まれたら、最初のページを表示
@@ -2758,6 +3057,103 @@ export default function Home() {
   };
 
   // 指定ページのOCR処理
+  // 目次生成
+  const handleGenerateTableOfContents = async () => {
+    if (!pdfDoc || !docId) {
+      toast({
+        title: "エラー",
+        description: "PDFが読み込まれていません",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsGeneratingTOC(true);
+      const entries = await generateTableOfContents(pdfDoc);
+      setTableOfContents(entries);
+      await saveTableOfContents(docId, entries);
+      
+      toast({
+        title: "成功",
+        description: `${entries.length}個の見出しを検出しました`,
+        variant: "success",
+      });
+    } catch (error) {
+      console.error('目次生成エラー:', error);
+      toast({
+        title: "エラー",
+        description: `目次生成に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingTOC(false);
+    }
+  };
+
+  // 目次からページにジャンプ
+  const handleJumpToPage = (page: number) => {
+    console.log('目次ジャンプ デバッグ: ページ番号', page, 'pageOrder', pageOrder);
+    // pageOrderが設定されている場合、実際のページ番号から表示順序のインデックスに変換
+    if (pageOrder.length > 0) {
+      const displayIndex = pageOrder.indexOf(page) + 1;
+      console.log('目次ジャンプ デバッグ: displayIndex', displayIndex);
+      if (displayIndex > 0) {
+        setCurrentPage(displayIndex);
+        console.log('目次ジャンプ デバッグ: currentPageを', displayIndex, 'に設定');
+      } else {
+        // pageOrderに含まれていない場合は、そのまま使用
+        setCurrentPage(page);
+        console.log('目次ジャンプ デバッグ: currentPageを', page, 'に設定（pageOrderに含まれていない）');
+      }
+    } else {
+      setCurrentPage(page);
+      console.log('目次ジャンプ デバッグ: currentPageを', page, 'に設定（pageOrderなし）');
+    }
+    setShowTableOfContentsDialog(false);
+    console.log('目次ジャンプ デバッグ: ダイアログを閉じました');
+  };
+
+  // 目次見出しの編集を開始
+  const handleStartEditTOC = (index: number) => {
+    setEditingTOCIndex(index);
+    setEditingTOCTitle(tableOfContents[index].title);
+  };
+
+  // 目次見出しの編集を保存
+  const handleSaveEditTOC = async () => {
+    if (editingTOCIndex === null) return;
+    
+    const updatedTOC = [...tableOfContents];
+    updatedTOC[editingTOCIndex] = {
+      ...updatedTOC[editingTOCIndex],
+      title: editingTOCTitle.trim() || '（見出しなし）',
+    };
+    
+    setTableOfContents(updatedTOC);
+    
+    // IndexedDBに保存
+    try {
+      await saveTableOfContents(docId, updatedTOC);
+    } catch (error) {
+      console.error('目次の保存に失敗:', error);
+      toast({
+        title: "エラー",
+        description: "目次の保存に失敗しました",
+        variant: "destructive",
+      });
+    }
+    
+    setEditingTOCIndex(null);
+    setEditingTOCTitle('');
+  };
+
+  // 目次見出しの編集をキャンセル
+  const handleCancelEditTOC = () => {
+    setEditingTOCIndex(null);
+    setEditingTOCTitle('');
+  };
+
   const handleOCRSpecifiedPages = () => {
     if (!ocrPageRangeInput.trim()) {
       toast({
@@ -3396,6 +3792,7 @@ export default function Home() {
       toast({
         title: "成功",
         description: "保存しました",
+        variant: "success",
       });
     } catch (error) {
       console.error('保存エラー:', error);
@@ -3447,6 +3844,7 @@ export default function Home() {
           toast({
             title: "成功",
             description: "PDFを保存しました",
+            variant: "success",
           });
           setIsExporting(false);
           return;
@@ -3476,6 +3874,7 @@ export default function Home() {
       toast({
         title: "成功",
         description: "PDFをエクスポートしました",
+        variant: "success",
       });
     } catch (error) {
       console.error('エクスポートエラー:', error);
@@ -3517,6 +3916,7 @@ export default function Home() {
           toast({
             title: "成功",
             description: "保存しました",
+            variant: "success",
           });
           return;
         } catch (error: any) {
@@ -3543,6 +3943,7 @@ export default function Home() {
       toast({
         title: "成功",
         description: "保存しました",
+        variant: "success",
       });
     } catch (error) {
       console.error('保存エラー:', error);
@@ -3594,6 +3995,7 @@ export default function Home() {
       toast({
         title: "成功",
         description: "注釈をJSON形式でエクスポートしました",
+        variant: "success",
       });
     } catch (error) {
       console.error('JSONエクスポートエラー:', error);
@@ -3691,6 +4093,7 @@ export default function Home() {
       toast({
         title: "成功",
         description: `${importedCount}ページの注釈をインポートしました`,
+        variant: "success",
       });
     } catch (error) {
       console.error('JSONインポートエラー:', error);
@@ -3913,13 +4316,11 @@ export default function Home() {
                         setFormFieldValues({});
                       }
                       
-                      // 署名と承認ワークフローを読み込む
+                      // 署名を読み込む
                       if (id) {
                         try {
                           const loadedSignatures = await getAllSignatures(id);
                           setSignatures(loadedSignatures);
-                          const loadedWorkflows = await getAllApprovalWorkflows(id);
-                          setApprovalWorkflows(loadedWorkflows);
                         } catch (error) {
                           console.warn('署名・ワークフローの読み込みに失敗:', error);
                         }
@@ -4164,6 +4565,17 @@ export default function Home() {
                   title="選択を解除"
                 >
                   選択解除
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    copySelectedPages();
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                  title="選択したページをコピー"
+                >
+                  <MdFileCopy className="text-lg" />
+                  コピー ({selectedPagesForDelete.size}ページ)
                 </button>
                   <button
                     onClick={(e) => {
@@ -4555,6 +4967,7 @@ export default function Home() {
             {selectedPagesForDelete.size > 0 ? `削除(${selectedPagesForDelete.size})` : '削除'}
           </button>
           {selectedPagesForDelete.size > 0 && (
+            <>
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -4565,6 +4978,18 @@ export default function Home() {
             >
               解除
             </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                copySelectedPages();
+              }}
+              className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center justify-center gap-1"
+              title="選択したページをコピー"
+            >
+              <MdFileCopy className="text-sm" />
+              コピー({selectedPagesForDelete.size})
+            </button>
+            </>
           )}
         </div>
           {(pageOrder.length > 0 ? pageOrder : Array.from({ length: totalPages }, (_, i) => i + 1)).map((pageNum, index) => (
@@ -4861,7 +5286,12 @@ export default function Home() {
               <div className="text-xs font-semibold text-slate-600 mb-2 px-2">ツール</div>
               <div className="flex gap-2 flex-wrap">
               <button
-                onClick={() => setTool('pen')}
+                onClick={() => {
+                  setTool('pen');
+                  if (textSelectionEnabled) {
+                    setTextSelectionEnabled(false);
+                  }
+                }}
                 title="手書きで線を描画します"
                 className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-indigo-600 ${
                   tool === 'pen' ? 'shadow-md' : ''
@@ -4887,7 +5317,12 @@ export default function Home() {
                 ペン
               </button>
               <button
-                onClick={() => setTool('eraser')}
+                onClick={() => {
+                  setTool('eraser');
+                  if (textSelectionEnabled) {
+                    setTextSelectionEnabled(false);
+                  }
+                }}
                 title="描画した線を消去します"
                 className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-red-500 ${
                   tool === 'eraser' ? 'shadow-md' : ''
@@ -4913,7 +5348,12 @@ export default function Home() {
                 消しゴム
               </button>
               <button
-                onClick={() => setTool('text')}
+                onClick={() => {
+                  setTool('text');
+                  if (textSelectionEnabled) {
+                    setTextSelectionEnabled(false);
+                  }
+                }}
                 title="テキストを追加します"
                 className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-blue-500 ${
                   tool === 'text' ? 'shadow-md' : ''
@@ -4939,7 +5379,12 @@ export default function Home() {
                 テキスト
               </button>
               <button
-                onClick={() => setTool('line')}
+                onClick={() => {
+                  setTool('line');
+                  if (textSelectionEnabled) {
+                    setTextSelectionEnabled(false);
+                  }
+                }}
                 title="直線を描画します"
                 className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-emerald-500 ${
                   tool === 'line' ? 'shadow-md' : ''
@@ -4965,7 +5410,12 @@ export default function Home() {
                 線
               </button>
               <button
-                onClick={() => setTool('rectangle')}
+                onClick={() => {
+                  setTool('rectangle');
+                  if (textSelectionEnabled) {
+                    setTextSelectionEnabled(false);
+                  }
+                }}
                 title="四角形を描画します"
                 className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-orange-500 ${
                   tool === 'rectangle' ? 'shadow-md' : ''
@@ -4991,7 +5441,12 @@ export default function Home() {
                 四角形
               </button>
               <button
-                onClick={() => setTool('circle')}
+                onClick={() => {
+                  setTool('circle');
+                  if (textSelectionEnabled) {
+                    setTextSelectionEnabled(false);
+                  }
+                }}
                 title="円を描画します"
                 className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-violet-500 ${
                   tool === 'circle' ? 'shadow-md' : ''
@@ -5017,7 +5472,12 @@ export default function Home() {
                 円
               </button>
               <button
-                onClick={() => setTool('arrow')}
+                onClick={() => {
+                  setTool('arrow');
+                  if (textSelectionEnabled) {
+                    setTextSelectionEnabled(false);
+                  }
+                }}
                 title="矢印を描画します"
                 className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-rose-500 ${
                   tool === 'arrow' ? 'shadow-md' : ''
@@ -5043,7 +5503,12 @@ export default function Home() {
                 矢印
               </button>
               <button
-                onClick={() => setTool('highlight')}
+                onClick={() => {
+                  setTool('highlight');
+                  if (textSelectionEnabled) {
+                    setTextSelectionEnabled(false);
+                  }
+                }}
                 title="テキストをハイライトします"
                 className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-yellow-400 ${
                   tool === 'highlight' ? 'shadow-md' : ''
@@ -5070,7 +5535,12 @@ export default function Home() {
               </button>
               <div className="relative">
                 <button
-                  onClick={() => setTool('stamp')}
+                  onClick={() => {
+                    setTool('stamp');
+                    if (textSelectionEnabled) {
+                      setTextSelectionEnabled(false);
+                    }
+                  }}
                   title="スタンプを追加します"
                   className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-purple-500 ${
                     tool === 'stamp' ? 'shadow-md' : ''
@@ -5100,6 +5570,48 @@ export default function Home() {
                     </span>
                   )}
                 </button>
+                <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setTextSelectionEnabled(!textSelectionEnabled);
+              }}
+              title={textSelectionEnabled ? "テキスト選択を無効化" : "テキスト選択を有効化"}
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm hover:scale-105 active:scale-95 ${
+                textSelectionEnabled 
+                  ? 'border-green-600 text-white shadow-md' 
+                  : 'border-slate-300 bg-white text-slate-600'
+              }`}
+              style={{
+                pointerEvents: 'auto',
+                cursor: 'pointer',
+                zIndex: 10,
+                background: textSelectionEnabled 
+                  ? 'linear-gradient(to right, #16a34a, #22c55e)' 
+                  : 'white',
+                borderWidth: textSelectionEnabled ? '2px' : '1px',
+                fontWeight: textSelectionEnabled ? 'bold' : 'normal',
+              }}
+              onMouseEnter={(e) => {
+                if (textSelectionEnabled) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #15803d, #16a34a)';
+                } else {
+                  e.currentTarget.style.background = '#f1f5f9';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (textSelectionEnabled) {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #16a34a, #22c55e)';
+                } else {
+                  e.currentTarget.style.background = 'white';
+                }
+              }}
+            >
+              <MdSelectAll className="text-base" />
+              {textSelectionEnabled ? 'テキスト選択ON' : 'テキスト選択OFF'}
+            </button>
+            
                 {tool === 'stamp' && (
                   <div className="absolute top-full left-0 mt-1 bg-white border border-purple-300 rounded-lg shadow-lg p-2 z-50">
                     <div className="flex flex-col gap-1">
@@ -5441,35 +5953,6 @@ export default function Home() {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('承認ワークフローボタンがクリックされました');
-                console.log('showApprovalWorkflowDialogをtrueに設定します');
-                setShowApprovalWorkflowDialog(true);
-                console.log('setShowApprovalWorkflowDialog(true)を実行しました');
-              }}
-              title="承認ワークフローを設定"
-              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-indigo-500 shadow-md hover:scale-105 active:scale-95"
-              style={{
-                background: 'linear-gradient(to right, #6366f1, #8b5cf6)',
-                color: 'white',
-                pointerEvents: 'auto',
-                cursor: 'pointer',
-                zIndex: 10,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(to right, #4f46e5, #7c3aed)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(to right, #6366f1, #8b5cf6)';
-              }}
-            >
-              <MdCheckCircle className="text-base text-white" />
-              承認ワークフロー
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
                 console.log('PDF分割ボタンがクリックされました');
                 console.log('showSplitDialogをtrueに設定します');
                 setShowSplitDialog(true);
@@ -5520,7 +6003,32 @@ export default function Home() {
               <MdSecurity className="text-base text-white" />
               透かし
             </button>
-            <span className="text-slate-300 mx-1">|</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowTableOfContentsDialog(true);
+              }}
+              title="目次を生成"
+              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-indigo-500 shadow-md hover:scale-105 active:scale-95"
+              style={{
+                background: 'linear-gradient(to right, #6366f1, #8b5cf6)',
+                color: 'white',
+                pointerEvents: 'auto',
+                cursor: 'pointer',
+                zIndex: 10,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #4f46e5, #7c3aed)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(to right, #6366f1, #8b5cf6)';
+              }}
+            >
+              <MdMenuBook className="text-base text-white" />
+              目次
+            </button>
             <button
               type="button"
               onClick={(e) => {
@@ -5700,11 +6208,111 @@ export default function Home() {
             ref={containerRef}
             className="relative inline-block border border-slate-300 bg-slate-50 rounded-lg shadow-sm"
             style={{ isolation: 'isolate', position: 'relative', zIndex: 0 }}
+            onDoubleClick={(e) => {
+              // テキスト選択モードが有効な場合、ダブルクリックでテキスト範囲を検出してコピー
+              if (textSelectionEnabled) {
+                e.stopPropagation();
+                e.preventDefault();
+                
+                console.log('ダブルクリックイベント（container）:', { textSelectionEnabled, tool, pageSize: !!pageSize, textItemsCount: textItems.length });
+                
+                if (!pageSize || !containerRef.current) {
+                  console.log('テキスト選択: pageSizeまたはcontainerRefがありません');
+                  return;
+                }
+                
+                const rect = containerRef.current.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                console.log('テキスト選択: クリック位置', { x, y, textItemsCount: textItems.length });
+                
+                // ハイライト機能と同じ方法でテキスト範囲を検出
+                if (textItems.length > 0) {
+                  const boundingBox = findTextBoundingBox(textItems, x, y, 30);
+                  console.log('テキスト選択: バウンディングボックス', boundingBox);
+                  
+                  if (boundingBox) {
+                    // テキスト範囲内のすべてのテキストアイテムを取得
+                    const selectedTextItems = textItems.filter(item => {
+                      return item.x >= boundingBox.x - 5 &&
+                             item.x + item.width <= boundingBox.x + boundingBox.width + 5 &&
+                             item.y >= boundingBox.y - 5 &&
+                             item.y + item.height <= boundingBox.y + boundingBox.height + 5;
+                    });
+                    
+                    console.log('テキスト選択: 選択されたアイテム数', selectedTextItems.length);
+                    
+                    // テキストを結合（行ごとに整理）
+                    const selectedText = selectedTextItems
+                      .sort((a, b) => {
+                        // Y座標でソート（上から下へ）
+                        if (Math.abs(a.y - b.y) > 5) return a.y - b.y;
+                        // 同じ行ならX座標でソート（左から右へ）
+                        return a.x - b.x;
+                      })
+                      .map(item => item.str)
+                      .join('');
+                    
+                    console.log('テキスト選択: 抽出されたテキスト', selectedText);
+                    
+                    if (selectedText) {
+                      // クリップボードにコピー
+                      navigator.clipboard.writeText(selectedText).then(() => {
+                        console.log('テキスト選択: クリップボードにコピー成功');
+                        toast({
+                          title: "テキストをコピーしました",
+                          description: `"${selectedText.substring(0, 50)}${selectedText.length > 50 ? '...' : ''}"`,
+                          variant: "success",
+                        });
+                      }).catch(err => {
+                        console.error('クリップボードへのコピーに失敗:', err);
+                        toast({
+                          title: "エラー",
+                          description: "テキストのコピーに失敗しました",
+                          variant: "destructive",
+                        });
+                      });
+                      
+                      // 目次編集中の場合は、自動的に入力フィールドに設定
+                      if (editingTOCIndex !== null) {
+                        setEditingTOCTitle(selectedText);
+                      }
+                    } else {
+                      console.log('テキスト選択: 抽出されたテキストが空です');
+                    }
+                  } else {
+                    console.log('テキスト選択: バウンディングボックスが見つかりませんでした');
+                  }
+                } else {
+                  console.log('テキスト選択: textItemsが空です');
+                }
+              }
+            }}
           >
             <canvas
               ref={pdfCanvasRef}
               style={{ display: 'block', position: 'relative', zIndex: 1 }}
             />
+            {/* テキストレイヤー（テキスト選択可能にする） */}
+            {textSelectionEnabled && (
+              <div
+                ref={textLayerRef}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  zIndex: 9, // inkCanvasより下に配置（inkCanvasがzIndex: 11なので）
+                  pointerEvents: 'none', // イベントをブロックしない
+                  userSelect: 'text',
+                  WebkitUserSelect: 'text',
+                  MozUserSelect: 'text',
+                  msUserSelect: 'text',
+                  overflow: 'hidden',
+                  cursor: 'text',
+                }}
+              />
+            )}
             <canvas
               ref={inkCanvasRef}
               style={{
@@ -5712,25 +6320,125 @@ export default function Home() {
                 top: 0,
                 left: 0,
                 touchAction: 'none',
-                cursor: tool === 'pen' || tool === 'highlight' ? 'crosshair' : tool === 'text' ? 'text' : (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow') ? 'crosshair' : 'default',
-                pointerEvents: (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow' || tool === 'select') ? 'none' : 'auto',
-                zIndex: 2,
+                cursor: textSelectionEnabled ? 'text' : (tool === 'pen' || tool === 'highlight' ? 'crosshair' : tool === 'text' ? 'text' : (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow') ? 'crosshair' : 'default'),
+                pointerEvents: textSelectionEnabled ? 'auto' : ((tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow' || tool === 'select') ? 'none' : 'auto'),
+                zIndex: textSelectionEnabled ? 11 : 2, // テキスト選択モードの時は最前面に
                 width: '100%',
                 height: '100%',
               }}
               onPointerDown={(e) => {
+                console.log('inkCanvas onPointerDown: 呼び出されました', { textSelectionEnabled, tool, pointerEvents: textSelectionEnabled ? 'auto' : 'conditional' });
+                e.stopPropagation(); // イベントの伝播を停止
+                if (textSelectionEnabled) {
+                  // テキスト選択モードの時はhandlePointerDownを呼び出す（テキスト選択処理のため）
+                  console.log('inkCanvas onPointerDown: handlePointerDownを呼び出します');
+                  e.preventDefault(); // デフォルト動作を防止
+                  handlePointerDown(e);
+                  return;
+                }
                 if (tool !== 'select') {
                   handlePointerDown(e);
                 }
               }}
               onPointerMove={(e) => {
+                if (textSelectionEnabled) {
+                  // テキスト選択モードの時は描画を無効化
+                  return;
+                }
                 if (tool !== 'select') {
                   handlePointerMove(e);
                 }
               }}
               onPointerUp={(e) => {
+                if (textSelectionEnabled) {
+                  // テキスト選択モードの時は描画を無効化
+                  return;
+                }
                 if (tool !== 'select') {
                   handlePointerUp(e);
+                }
+              }}
+              onDoubleClick={(e) => {
+                console.log('ダブルクリックイベント:', { textSelectionEnabled, tool, pageSize: !!pageSize, containerRef: !!containerRef.current, textItemsCount: textItems.length });
+                
+                // テキスト選択モードが有効な場合、ダブルクリックでテキスト範囲を検出してコピー
+                if (textSelectionEnabled) {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  
+                  if (!pageSize || !containerRef.current) {
+                    console.log('テキスト選択: pageSizeまたはcontainerRefがありません');
+                    return;
+                  }
+                  
+                  const rect = containerRef.current.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const y = e.clientY - rect.top;
+                  
+                  console.log('テキスト選択: クリック位置', { x, y, textItemsCount: textItems.length });
+                  
+                  // ハイライト機能と同じ方法でテキスト範囲を検出
+                  if (textItems.length > 0) {
+                    const boundingBox = findTextBoundingBox(textItems, x, y, 30);
+                    console.log('テキスト選択: バウンディングボックス', boundingBox);
+                    
+                    if (boundingBox) {
+                      // テキスト範囲内のすべてのテキストアイテムを取得
+                      const selectedTextItems = textItems.filter(item => {
+                        return item.x >= boundingBox.x - 5 &&
+                               item.x + item.width <= boundingBox.x + boundingBox.width + 5 &&
+                               item.y >= boundingBox.y - 5 &&
+                               item.y + item.height <= boundingBox.y + boundingBox.height + 5;
+                      });
+                      
+                      console.log('テキスト選択: 選択されたアイテム数', selectedTextItems.length);
+                      
+                      // テキストを結合（行ごとに整理）
+                      const selectedText = selectedTextItems
+                        .sort((a, b) => {
+                          // Y座標でソート（上から下へ）
+                          if (Math.abs(a.y - b.y) > 5) return a.y - b.y;
+                          // 同じ行ならX座標でソート（左から右へ）
+                          return a.x - b.x;
+                        })
+                        .map(item => item.str)
+                        .join('');
+                      
+                      console.log('テキスト選択: 抽出されたテキスト', selectedText);
+                      
+                      if (selectedText) {
+                        // クリップボードにコピー
+                        navigator.clipboard.writeText(selectedText).then(() => {
+              console.log('テキスト選択: クリップボードにコピー成功');
+              console.log('🔔 TOAST呼び出し開始 デバッグ');
+              toast({
+                title: `テキストをコピーしました`,
+                description: `"${selectedText.replace(/^1\.\s*/, '').substring(0, 50)}${selectedText.length > 50 ? '...' : ''}"`,
+                variant: "success",
+              });
+              console.log('🔔 TOAST呼び出し完了 デバッグ');
+                        }).catch(err => {
+                          console.error('クリップボードへのコピーに失敗:', err);
+                          toast({
+                            title: "エラー",
+                            description: "テキストのコピーに失敗しました",
+                            variant: "destructive",
+                          });
+                        });
+                        
+                        // 目次編集中の場合は、自動的に入力フィールドに設定
+                        if (editingTOCIndex !== null) {
+                          setEditingTOCTitle(selectedText);
+                        }
+                      } else {
+                        console.log('テキスト選択: 抽出されたテキストが空です');
+                      }
+                    } else {
+                      console.log('テキスト選択: バウンディングボックスが見つかりませんでした');
+                    }
+                  } else {
+                    console.log('テキスト選択: textItemsが空です');
+                  }
                 }
               }}
             />
@@ -6026,10 +6734,27 @@ export default function Home() {
                       : 'bg-white border border-indigo-200 hover:border-indigo-400 hover:shadow-md hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50'
                   }`}
                 >
-                  <span className={`font-medium ${selectedAnnotationIds.strokes.includes(stroke.id || '') ? 'text-indigo-800' : 'text-slate-700'}`}>
-                    <MdBrush className="inline mr-1 text-indigo-600" />
-                    ストローク {index + 1}
-                  </span>
+                  <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                    <span className={`font-medium ${selectedAnnotationIds.strokes.includes(stroke.id || '') ? 'text-indigo-800' : 'text-slate-700'}`}>
+                      <MdBrush className="inline mr-1 text-indigo-600" />
+                      ストローク {index + 1}
+                    </span>
+                    <div className="text-[10px] text-orange-600 font-mono flex items-center gap-1.5">
+                      <span className="px-1.5 py-0.5 rounded bg-orange-50 border border-orange-200">
+                        {stroke.tool === 'pen' ? 'ペン' : stroke.tool === 'highlight' ? 'ハイライト' : '消しゴム'}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded bg-orange-50 border border-orange-200">
+                        {stroke.points.length}点
+                      </span>
+                      {stroke.color && (
+                        <span 
+                          className="inline-block w-3 h-3 rounded border border-orange-300"
+                          style={{ backgroundColor: stroke.color }}
+                          title={`色: ${stroke.color}`}
+                        />
+                      )}
+                    </div>
+                  </div>
                   <button
                     onClick={async (e) => {
                       e.stopPropagation();
@@ -7094,6 +7819,7 @@ export default function Home() {
                   toast({
                     title: "成功",
                     description: "電子署名を追加しました",
+                    variant: "success",
                   });
                   
                   setShowSignatureDialog(false);
@@ -7113,170 +7839,6 @@ export default function Home() {
           </DialogContent>
         </Dialog>
 
-      {/* 承認ワークフローダイアログ */}
-      <Dialog 
-        open={showApprovalWorkflowDialog}
-        onOpenChange={(open) => {
-          console.log('承認ワークフローダイアログ onOpenChange called with:', open);
-          // openがtrueの場合のみ状態を更新
-          if (open) {
-            setShowApprovalWorkflowDialog(true);
-          }
-          // openがfalseの場合は無視（手動で閉じるボタンのみで閉じる）
-        }}
-      >
-        <DialogContent 
-          topPosition="top-[15%]"
-          className="max-w-3xl max-h-[80vh] overflow-y-auto"
-          style={{
-            zIndex: 10001,
-            left: '50%',
-            top: '15%',
-            transform: 'translateX(-50%) translateY(0)',
-            background: 'linear-gradient(135deg, #ede9fe 0%, #f3e8ff 50%, #e9d5ff 100%)',
-          }}
-          onClose={() => {
-            setShowApprovalWorkflowDialog(false);
-          }}
-        >
-            <DialogHeader className="pb-4 border-b border-purple-200 mb-4">
-              <DialogTitle className="text-2xl font-bold text-slate-900 mb-2">承認ワークフローを設定</DialogTitle>
-              <DialogDescription className="text-base text-slate-600">複数の承認者を設定して順次承認を行います</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-5">
-              {approvalWorkflows.length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="text-lg font-bold text-slate-800">承認ワークフロー一覧</h3>
-                  {approvalWorkflows.map((workflow) => (
-                    <div key={workflow.id} className="p-4 bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border-2 border-slate-300 shadow-md">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <div className="text-lg font-bold text-slate-900 mb-1">
-                            ステップ {workflow.currentStep} / {workflow.approvers.length}
-                          </div>
-                          <div className="text-base font-semibold text-slate-700">
-                            ステータス: {workflow.status === 'pending' ? '承認待ち' : workflow.status === 'approved' ? '承認済み' : workflow.status === 'rejected' ? '却下' : '完了'}
-                          </div>
-                        </div>
-                        <div className="text-sm font-medium text-slate-600">
-                          {workflow.createdAt.toLocaleDateString('ja-JP')}
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        {workflow.approvers.map((approver) => (
-                          <div
-                            key={approver.stepNumber}
-                            className={`text-base font-medium p-3 rounded-lg border-2 ${
-                              approver.status === 'approved'
-                                ? 'bg-green-100 text-green-900 border-green-300'
-                                : approver.status === 'rejected'
-                                ? 'bg-red-100 text-red-900 border-red-300'
-                                : approver.stepNumber === workflow.currentStep
-                                ? 'bg-blue-100 text-blue-900 border-blue-300'
-                                : 'bg-slate-200 text-slate-700 border-slate-300'
-                            }`}
-                          >
-                            {approver.stepNumber}. {approver.approverName}
-                            {approver.role && ` (${approver.role})`}
-                            {approver.status === 'approved' && approver.approvedAt && (
-                              <span className="ml-2 text-sm font-semibold">
-                                ✓ {approver.approvedAt.toLocaleDateString('ja-JP')}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="border-t-2 border-slate-300 pt-5">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">新しい承認ワークフローを作成</h3>
-                <div className="space-y-3" id="approvers-list">
-                  {/* 承認者リストは動的に追加 */}
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    const list = document.getElementById('approvers-list');
-                    if (list) {
-                      const div = document.createElement('div');
-                      div.className = 'flex gap-3 items-center p-3 bg-slate-50 rounded-lg border-2 border-slate-300';
-                      div.innerHTML = `
-                        <input type="text" placeholder="承認者名" class="flex-1 h-11 px-4 text-base border-2 border-slate-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
-                        <input type="text" placeholder="役職（オプション）" class="flex-1 h-11 px-4 text-base border-2 border-slate-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
-                        <input type="email" placeholder="メール（オプション）" class="flex-1 h-11 px-4 text-base border-2 border-slate-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
-                        <button class="px-4 py-2 h-11 text-base font-semibold bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors shadow-sm">削除</button>
-                      `;
-                      list.appendChild(div);
-                    }
-                  }}
-                  className="mt-3 h-11 px-6 text-base font-semibold border-2 border-slate-300 hover:bg-slate-50"
-                >
-                  承認者を追加
-                </Button>
-              </div>
-            </div>
-            <DialogFooter className="pt-4 border-t border-purple-200 mt-4">
-              <Button
-                variant="outline"
-                onClick={() => setShowApprovalWorkflowDialog(false)}
-                className="h-11 px-6 text-base font-semibold border-2 border-slate-300 hover:bg-slate-50"
-              >
-                閉じる
-              </Button>
-              <Button
-                onClick={async () => {
-                  if (!docId) return;
-                  
-                  const list = document.getElementById('approvers-list');
-                  if (!list) return;
-                  
-                  const approvers: Array<Omit<import('./lib/signature').ApprovalStep, 'stepNumber' | 'status'>> = [];
-                  const inputs = list.querySelectorAll('div');
-                  
-                  inputs.forEach((div) => {
-                    const nameInput = div.querySelector('input[type="text"]:first-of-type') as HTMLInputElement;
-                    const roleInput = div.querySelector('input[type="text"]:nth-of-type(2)') as HTMLInputElement;
-                    const emailInput = div.querySelector('input[type="email"]') as HTMLInputElement;
-                    
-                    if (nameInput?.value) {
-                      approvers.push({
-                        approverName: nameInput.value,
-                        role: roleInput?.value || undefined,
-                        approverEmail: emailInput?.value || undefined,
-                        required: true,
-                      });
-                    }
-                  });
-                  
-                  if (approvers.length === 0) {
-                    toast({
-                      title: "エラー",
-                      description: "少なくとも1人の承認者を追加してください",
-                      variant: "destructive",
-                    });
-                    return;
-                  }
-                  
-                  const workflow = createApprovalWorkflow(docId, approvers);
-                  await saveApprovalWorkflow(docId, workflow);
-                  setApprovalWorkflows(prev => [...prev, workflow]);
-                  
-                  toast({
-                    title: "成功",
-                    description: "承認ワークフローを作成しました",
-                  });
-                  
-                  setShowApprovalWorkflowDialog(false);
-                }}
-              className="h-11 px-6 text-base font-semibold bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg hover:shadow-xl transition-all"
-              >
-                ワークフローを作成
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
       {/* PDF分割ダイアログ（ページ管理モーダルから） */}
       <Dialog 
@@ -7442,6 +8004,7 @@ export default function Home() {
                     toast({
                       title: "成功",
                       description: `${splitPdfs.length}個のPDFファイルをダウンロードしました`,
+                      variant: "success",
                     });
                     
                     setShowSplitDialogFromThumbnail(false);
@@ -7650,6 +8213,7 @@ export default function Home() {
                                   toast({
                                     title: "成功",
                                     description: `ページ ${pageNum} のOCR結果を削除しました`,
+                                    variant: "success",
                                   });
                                 }
                               }}
@@ -7682,6 +8246,7 @@ export default function Home() {
                                     toast({
                                       title: "成功",
                                       description: `ページ ${pageNum} のOCR結果を更新しました`,
+                                      variant: "success",
                                     });
                                   }
                                 }}
@@ -7969,6 +8534,7 @@ export default function Home() {
                     toast({
                       title: "成功",
                       description: `${splitPdfs.length}個のPDFファイルをダウンロードしました`,
+                      variant: "success",
                     });
                     
                     setShowSplitDialog(false);
@@ -7991,6 +8557,231 @@ export default function Home() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* 目次ダイアログ */}
+      <Dialog 
+        open={showTableOfContentsDialog}
+        onOpenChange={(open) => {
+          if (open) {
+            setShowTableOfContentsDialog(true);
+          }
+        }}
+      >
+        <DialogContent 
+          topPosition="top-[5%]"
+          className="!flex !flex-col max-w-4xl"
+          style={{
+            zIndex: 10001,
+            left: '50%',
+            top: '5%',
+            transform: 'translateX(-50%) translateY(0)',
+            background: 'linear-gradient(135deg, #ede9fe 0%, #f3e8ff 50%, #e9d5ff 100%)',
+            border: '4px solid #6366f1',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: 0,
+            overflow: 'hidden',
+            width: '90vw',
+            maxWidth: '90vw',
+            height: '90vh',
+            maxHeight: '90vh',
+          } as React.CSSProperties & { display: 'flex' }}
+          onClose={() => {
+            setShowTableOfContentsDialog(false);
+          }}
+        >
+          <DialogHeader className="pb-3 border-b-2 border-indigo-300 mb-0 bg-white rounded-t-lg p-4 shadow-sm flex-shrink-0">
+            <DialogTitle className="text-xl font-bold text-indigo-900 mb-1">目次</DialogTitle>
+            <DialogDescription className="text-sm text-indigo-700">PDFの見出しから目次を自動生成します</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 flex flex-col p-4 pl-6" style={{ minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', paddingLeft: '1.5rem' }}>
+            {tableOfContents.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <p className="text-slate-600 mb-4 text-base">目次が生成されていません</p>
+                  <Button
+                    onClick={handleGenerateTableOfContents}
+                    disabled={isGeneratingTOC}
+                    className="h-11 px-6 text-base font-semibold bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-lg hover:shadow-xl transition-all"
+                  >
+                    {isGeneratingTOC ? '生成中...' : '目次を生成'}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between items-center mb-4 flex-shrink-0 gap-3">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-indigo-800">
+                      {tableOfContents.length}個の見出しが見つかりました
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      （重複を除外した数）
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleGenerateTableOfContents}
+                    disabled={isGeneratingTOC}
+                    variant="outline"
+                    className="h-8 px-3 text-xs font-semibold border-2 border-indigo-300 hover:bg-indigo-50 ml-auto"
+                  >
+                    {isGeneratingTOC ? '再生成中...' : '再生成'}
+                  </Button>
+                </div>
+                <div 
+                  className="flex-1 pr-3"
+                  style={{
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: '#a5b4fc #e0e7ff',
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    minHeight: 0,
+                    flex: '1 1 auto',
+                    position: 'relative',
+                    WebkitOverflowScrolling: 'touch',
+                  }}
+                >
+                  <div className="space-y-2" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', width: '100%', paddingBottom: '2rem' }}>
+                    {tableOfContents.map((entry, index) => {
+                      // デバッグ: 全エントリが表示されているか確認
+                      if (index === tableOfContents.length - 1) {
+                        console.log(`目次表示: 全${tableOfContents.length}個のエントリをレンダリング中。最後のエントリ: P${entry.page} - ${entry.title}`);
+                      }
+                      console.log(`📄📄📄 目次エントリ デバッグ: エントリ ${index} をレンダリング`, { page: entry.page, title: entry.title, isEditing: editingTOCIndex === index });
+                      const isEditing = editingTOCIndex === index;
+                      
+                      return (
+                        <div
+                          key={`${entry.page}-${index}-${entry.title.substring(0, 20)}`}
+                          className="py-3 px-4 rounded-lg border-l-4 border-indigo-400 bg-white/90 hover:bg-indigo-50 transition-all shadow-sm hover:shadow-md mb-3"
+                          style={{ 
+                            display: 'flex',
+                            flexDirection: 'column',
+                            width: '100%',
+                            alignSelf: 'flex-start',
+                            marginBottom: '0.75rem',
+                          }}
+                        >
+                          {isEditing ? (
+                            // 編集モード
+                            <div className="flex items-start gap-3 w-full">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleJumpToPage(entry.page);
+                                }}
+                                className="text-sm font-bold whitespace-nowrap flex-shrink-0 pt-1 cursor-pointer transition-all px-3 py-1.5 rounded-md border-2 shadow-sm hover:shadow-md active:scale-95 font-semibold mr-2"
+                                title={`ページ ${entry.page} に移動`}
+                                style={{ 
+                                  minWidth: '70px', 
+                                  display: 'inline-block', 
+                                  backgroundColor: '#a5b4fc', 
+                                  borderColor: '#6366f1', 
+                                  color: '#1e293b',
+                                  borderWidth: '2px',
+                                  borderStyle: 'solid',
+                                }}
+                              >
+                                P{String(entry.page).padStart(2, '0')}：
+                              </button>
+                              <div className="flex-1 flex flex-col gap-2">
+                                <Input
+                                  value={editingTOCTitle}
+                                  onChange={(e) => setEditingTOCTitle(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleSaveEditTOC();
+                                    } else if (e.key === 'Escape') {
+                                      e.preventDefault();
+                                      handleCancelEditTOC();
+                                    }
+                                  }}
+                                  className="text-sm font-medium"
+                                  autoFocus
+                                />
+                                <div className="flex gap-2">
+                                  <Button
+                                    onClick={handleSaveEditTOC}
+                                    size="sm"
+                                    className="h-7 px-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+                                  >
+                                    保存
+                                  </Button>
+                                  <Button
+                                    onClick={handleCancelEditTOC}
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-3 text-xs"
+                                  >
+                                    キャンセル
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            // 表示モード
+                            <div className="flex items-start gap-3 w-full">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleJumpToPage(entry.page);
+                                }}
+                                className="text-sm font-bold whitespace-nowrap flex-shrink-0 cursor-pointer transition-all px-3 py-1.5 rounded-md border-2 shadow-sm hover:shadow-md active:scale-95 font-semibold mr-2"
+                                title={`ページ ${entry.page} に移動`}
+                                style={{ 
+                                  minWidth: '70px', 
+                                  display: 'inline-block', 
+                                  backgroundColor: '#a5b4fc', 
+                                  borderColor: '#6366f1', 
+                                  color: '#1e293b',
+                                  borderWidth: '2px',
+                                  borderStyle: 'solid',
+                                }}
+                              >
+                                P{String(entry.page).padStart(2, '0')}：
+                              </button>
+                              <span 
+                                className="flex-1 text-sm text-slate-800 font-medium break-words leading-relaxed text-left cursor-pointer hover:text-indigo-900"
+                                onClick={() => handleJumpToPage(entry.page)}
+                              >
+                                {entry.title}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStartEditTOC(index);
+                                }}
+                                className="flex-shrink-0 p-1 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 rounded transition-colors"
+                                title="編集"
+                              >
+                                <MdEdit className="text-base" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter className="pt-3 border-t border-indigo-200 mt-0 bg-white rounded-b-lg p-3 pl-6 flex-shrink-0" style={{ paddingLeft: '1.5rem' }}>
+            <Button
+              variant="outline"
+              onClick={() => setShowTableOfContentsDialog(false)}
+              className="h-9 px-5 text-sm font-semibold border-2 border-slate-300 hover:bg-slate-50"
+            >
+              閉じる
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 透かしダイアログ */}
       <Dialog open={showWatermarkDialog} onOpenChange={(open) => {
@@ -8195,6 +8986,7 @@ export default function Home() {
                   toast({
                     title: "成功",
                     description: "透かしを設定しました。エクスポート時に反映されます。",
+                    variant: "success",
                   });
                 }
                 setShowWatermarkDialog(false);

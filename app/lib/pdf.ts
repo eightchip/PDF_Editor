@@ -99,3 +99,81 @@ export async function renderPage(
   };
 }
 
+/**
+ * PDFページのテキストレイヤーを生成（テキスト選択可能にする）
+ */
+export async function renderTextLayer(
+  pdfPage: import('pdfjs-dist').PDFPageProxy,
+  textLayerDiv: HTMLDivElement,
+  viewport: import('pdfjs-dist').PageViewport
+): Promise<void> {
+  // 既存のテキストレイヤーをクリア
+  textLayerDiv.innerHTML = '';
+  textLayerDiv.style.width = `${viewport.width}px`;
+  textLayerDiv.style.height = `${viewport.height}px`;
+
+  try {
+    const textContent = await pdfPage.getTextContent();
+    const textItems = textContent.items;
+
+    // テキストアイテムをspan要素として配置
+    for (let i = 0; i < textItems.length; i++) {
+      const item = textItems[i];
+      if (!('str' in item) || !item.str) continue;
+
+      const transform = item.transform || [1, 0, 0, 1, 0, 0];
+      const pdfX = transform[4];
+      const pdfY = transform[5];
+
+      // PDF座標系からviewport座標系への変換
+      // PDF座標系: 左下が原点、Y軸が上向き
+      // viewport座標系: 左上が原点、Y軸が下向き
+      const tx = pdfX;
+      const ty = viewport.height - pdfY;
+
+      // フォントサイズとスケールを取得
+      const fontSize = (item as any).fontSize || 12;
+      const scaleX = Math.sqrt(transform[0] * transform[0] + transform[1] * transform[1]);
+      const scaleY = Math.sqrt(transform[2] * transform[2] + transform[3] * transform[3]);
+      const actualFontSize = fontSize * Math.max(scaleX, scaleY);
+
+      // テキストの幅を取得
+      const width = (item as any).width || 0;
+      const height = (item as any).height || actualFontSize;
+
+      // span要素を作成
+      const span = document.createElement('span');
+      span.textContent = item.str;
+      span.style.position = 'absolute';
+      span.style.left = `${tx}px`;
+      span.style.top = `${ty - height}px`; // ベースラインから上端に調整
+      span.style.fontSize = `${actualFontSize}px`;
+      span.style.fontFamily = (item as any).fontName || 'sans-serif';
+      span.style.color = 'rgba(0, 0, 0, 0)'; // 完全に透明にして、canvasのテキストが見えるように
+      span.style.cursor = 'text';
+      span.style.userSelect = 'text';
+      span.style.webkitUserSelect = 'text';
+      span.style.mozUserSelect = 'text';
+      span.style.msUserSelect = 'text';
+      span.style.whiteSpace = 'pre';
+      span.style.lineHeight = '1';
+      span.style.transformOrigin = '0% 0%';
+      span.style.width = width > 0 ? `${width}px` : 'auto';
+      span.style.height = `${height}px`;
+      span.style.display = 'inline-block';
+      span.style.verticalAlign = 'baseline';
+      span.style.pointerEvents = 'auto'; // クリックイベントを受け取る
+
+      // 回転を考慮
+      const angle = Math.atan2(transform[1], transform[0]) * (180 / Math.PI);
+      if (Math.abs(angle) > 0.1) {
+        span.style.transform = `rotate(${angle}deg)`;
+      }
+
+      textLayerDiv.appendChild(span);
+    }
+  } catch (error) {
+    console.error('テキストレイヤーの生成に失敗:', error);
+  }
+}
+

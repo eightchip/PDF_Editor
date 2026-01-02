@@ -102,3 +102,37 @@
 .main-content-scroll::-webkit-scrollbar {
   display: none;
 }
+
+/* トーストビューポートを画面中央に配置 */
+[data-radix-toast-viewport] {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  z-index: 9999 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: auto !important;
+  max-width: 90vw !important;
+}
+
+/* トースト自体も中央に配置 */
+[data-radix-toast-root] {
+  position: relative !important;
+  list-style: none !important;
+  list-style-type: none !important;
+}
+
+[data-radix-toast-root] * {
+  list-style: none !important;
+  list-style-type: none !important;
+}
+
+/* successバリアントのスタイルを強化 */
+.group[class*="border-green"] {
+  background-color: #dcfce7 !important;
+  border-color: #22c55e !important;
+  color: #14532d !important;
+}

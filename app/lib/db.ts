@@ -65,6 +65,10 @@ interface AnnotationsDB extends DBSchema {
     key: string; // `${docId}_${pageNumber}`
     value: import('./ocr').OCRResult;
   };
+  tableOfContents: {
+    key: string; // `${docId}`
+    value: import('./table-of-contents').TableOfContentsEntry[];
+  };
 }
 
 let dbInstance: IDBPDatabase<AnnotationsDB> | null = null;
@@ -78,7 +82,7 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
   }
 
   try {
-    dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 7, {
+    dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 8, {
       upgrade(db, oldVersion) {
         // 既存のオブジェクトストアが存在しない場合のみ作成
         if (!db.objectStoreNames.contains('annotations')) {
@@ -101,6 +105,9 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
         }
         if (!db.objectStoreNames.contains('ocrResults')) {
           db.createObjectStore('ocrResults');
+        }
+        if (!db.objectStoreNames.contains('tableOfContents')) {
+          db.createObjectStore('tableOfContents');
         }
       },
       // 既存のデータベースがより新しいバージョンの場合のエラーを処理
@@ -128,7 +135,7 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
         });
         
         // データベースを再作成
-        dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 7, {
+        dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 8, {
           upgrade(db) {
             db.createObjectStore('annotations');
             db.createObjectStore('textAnnotations');
@@ -136,6 +143,8 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
             db.createObjectStore('signatures');
             db.createObjectStore('approvalWorkflows');
             db.createObjectStore('watermarkHistory');
+            db.createObjectStore('ocrResults');
+            db.createObjectStore('tableOfContents');
           },
         });
       } catch (recreateError) {
@@ -453,5 +462,30 @@ export async function deleteOCRResult(
   const db = await getDB();
   const key = `${docId}_${pageNumber}`;
   await db.delete('ocrResults', key);
+}
+
+export async function saveTableOfContents(
+  docId: string,
+  entries: import('./table-of-contents').TableOfContentsEntry[]
+): Promise<void> {
+  const db = await getDB();
+  const key = docId;
+  await db.put('tableOfContents', entries, key);
+}
+
+export async function loadTableOfContents(
+  docId: string
+): Promise<import('./table-of-contents').TableOfContentsEntry[] | undefined> {
+  const db = await getDB();
+  const key = docId;
+  return await db.get('tableOfContents', key);
+}
+
+export async function deleteTableOfContents(
+  docId: string
+): Promise<void> {
+  const db = await getDB();
+  const key = docId;
+  await db.delete('tableOfContents', key);
 }
 
