@@ -3072,7 +3072,9 @@ export default function Home() {
       setIsGeneratingTOC(true);
       const entries = await generateTableOfContents(pdfDoc);
       setTableOfContents(entries);
-      await saveTableOfContents(docId, entries);
+      if (docId) {
+        await saveTableOfContents(docId, entries);
+      }
       
       toast({
         title: "成功",
@@ -3134,7 +3136,9 @@ export default function Home() {
     
     // IndexedDBに保存
     try {
-      await saveTableOfContents(docId, updatedTOC);
+      if (docId) {
+        await saveTableOfContents(docId, updatedTOC);
+      }
     } catch (error) {
       console.error('目次の保存に失敗:', error);
       toast({
