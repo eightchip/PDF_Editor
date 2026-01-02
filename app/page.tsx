@@ -17,6 +17,66 @@ import { saveSignature, getAllSignatures, deleteSignature, saveWatermarkHistory,
 import { generateTableOfContents, type TableOfContentsEntry } from './lib/table-of-contents';
 import { splitPDF, splitPDFByRanges, splitPDFByPageGroups } from './lib/pdf-split';
 import { performOCROnPDFPage, type OCRResult } from './lib/ocr';
+
+// OCR結果から不要なスペースを削除する関数
+function removeUnnecessarySpaces(text: string): string {
+  // 日本語文字（ひらがな、カタカナ、漢字）のUnicode範囲
+  const japaneseChar = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF]/;
+  // 句読点
+  const punctuation = /[。、]/;
+  // 数字
+  const number = /[0-9０-９]/;
+  // 英語文字
+  const englishChar = /[a-zA-ZＡ-Ｚａ-ｚ]/;
+  
+  let result = text;
+  
+  // 1. 日本語文字の間のスペースを削除
+  result = result.replace(/([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF])\s+([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF])/g, '$1$2');
+  
+  // 2. 数字と日本語の間のスペースを削除
+  result = result.replace(/([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF])\s+([0-9０-９])/g, '$1$2');
+  result = result.replace(/([0-9０-９])\s+([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF])/g, '$1$2');
+  
+  // 3. カンマやピリオドの前後のスペースを削除
+  result = result.replace(/\s+([,，.．])/g, '$1');
+  result = result.replace(/([,，.．])\s+/g, '$1');
+  
+  // 4. 日本語と英語の間のスペースを削除
+  result = result.replace(/([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF])\s+([a-zA-ZＡ-Ｚａ-ｚ])/g, '$1$2');
+  result = result.replace(/([a-zA-ZＡ-Ｚａ-ｚ])\s+([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF])/g, '$1$2');
+  
+  // 5. 句読点の前後のスペースを削除
+  result = result.replace(/\s+([。、])/g, '$1');
+  result = result.replace(/([。、])\s+/g, '$1');
+  
+  // 6. 括弧の前後のスペースを削除
+  result = result.replace(/\s+([\(（])/g, '$1');
+  result = result.replace(/([\)）])\s+/g, '$1');
+  
+  // 7. コロン、セミコロンの前後のスペースを削除
+  result = result.replace(/\s+([:：;；])/g, '$1');
+  result = result.replace(/([:：;；])\s+/g, '$1');
+  
+  // 8. 英語単語間のスペース以外の連続スペースを削除
+  // 英語文字の間のスペースは保持しつつ、それ以外の連続スペースを削除
+  result = result.replace(/([^\s])\s{2,}([^\s])/g, (match, p1, p2, offset, str) => {
+    // 英語文字の間のスペースは保持
+    if (englishChar.test(p1) && englishChar.test(p2)) {
+      return `${p1} ${p2}`;
+    }
+    // それ以外はスペースを削除
+    return `${p1}${p2}`;
+  });
+  
+  // 9. 行頭・行末のスペースを削除
+  result = result.trim();
+  
+  // 10. 改行の前後の不要なスペースを削除
+  result = result.replace(/\s*\n\s*/g, '\n');
+  
+  return result;
+}
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -238,6 +298,7 @@ export default function Home() {
   const [editingOcrPage, setEditingOcrPage] = useState<number | null>(null); // 編集中のOCRページ番号
   const [editingOcrText, setEditingOcrText] = useState(''); // 編集中のOCRテキスト
   const [currentOcrResultPage, setCurrentOcrResultPage] = useState(1); // 現在表示しているOCR結果のページ番号（検索結果内のインデックス）
+  const [ocrThumbnailSize, setOcrThumbnailSize] = useState(200); // OCRサムネイルのサイズ（px）
   const [ocrPageRangeInput, setOcrPageRangeInput] = useState(''); // ページ指定入力（例: "1, 3, 5-7"）
   const [splitRangeInputs, setSplitRangeInputs] = useState<string[]>(['']); // PDF分割の範囲入力の配列（例: ["1-3, 5, 7-9", "11-13, 15, 17-19"]）
   const [showSplitDialogFromThumbnail, setShowSplitDialogFromThumbnail] = useState(false); // ページ管理モーダルから開いたPDF分割ダイアログ
@@ -971,7 +1032,15 @@ export default function Home() {
               
               // OCR結果を読み込む
               const loadedOcrResults = await getAllOCRResults(id, doc.numPages);
-              setOcrResults(loadedOcrResults);
+              // 既存のOCR結果にも不要なスペース削除を適用
+              const cleanedOcrResults: Record<number, OCRResult> = {};
+              for (const [pageNum, result] of Object.entries(loadedOcrResults)) {
+                cleanedOcrResults[parseInt(pageNum)] = {
+                  ...result,
+                  text: removeUnnecessarySpaces(result.text),
+                };
+              }
+              setOcrResults(cleanedOcrResults);
             } catch (error) {
               console.warn('署名・ワークフロー・OCR結果の読み込みに失敗:', error);
             }
@@ -1273,14 +1342,22 @@ export default function Home() {
         
         if (!ctx) continue;
 
-        // サムネイルサイズ（幅150px、高さはアスペクト比を保持）
+        // サムネイルサイズ（ページ管理用：幅120px、高さはアスペクト比を保持）
         const pageRotation = pageRotations[pageNum] || 0;
         const viewport = page.getViewport({ scale: 1.0, rotation: pageRotation });
-        const thumbnailScale = 150 / viewport.width;
+        const thumbnailScale = 120 / viewport.width;
         const thumbnailViewport = page.getViewport({ scale: thumbnailScale, rotation: pageRotation });
         
-        canvas.width = thumbnailViewport.width;
-        canvas.height = thumbnailViewport.height;
+        // デバイスピクセル比を考慮して高解像度で生成（ページ管理用は控えめに）
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        const outputScale = devicePixelRatio; // ページ管理用は1倍で十分
+        
+        canvas.width = Math.floor(thumbnailViewport.width * outputScale);
+        canvas.height = Math.floor(thumbnailViewport.height * outputScale);
+        canvas.style.width = `${thumbnailViewport.width}px`;
+        canvas.style.height = `${thumbnailViewport.height}px`;
+        
+        ctx.scale(outputScale, outputScale);
 
         const renderContext = {
           canvasContext: ctx,
@@ -1312,14 +1389,22 @@ export default function Home() {
         
         if (!ctx) continue;
 
-        // サムネイルサイズ（幅150px、高さはアスペクト比を保持）
+        // サムネイルサイズ（ページ管理用：幅120px、高さはアスペクト比を保持）
         const pageRotation = pageRotations[pageNum] || 0;
         const viewport = page.getViewport({ scale: 1.0, rotation: pageRotation });
-        const thumbnailScale = 150 / viewport.width;
+        const thumbnailScale = 120 / viewport.width;
         const thumbnailViewport = page.getViewport({ scale: thumbnailScale, rotation: pageRotation });
         
-        canvas.width = thumbnailViewport.width;
-        canvas.height = thumbnailViewport.height;
+        // デバイスピクセル比を考慮して高解像度で生成（ページ管理用は控えめに）
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        const outputScale = devicePixelRatio; // ページ管理用は1倍で十分
+        
+        canvas.width = Math.floor(thumbnailViewport.width * outputScale);
+        canvas.height = Math.floor(thumbnailViewport.height * outputScale);
+        canvas.style.width = `${thumbnailViewport.width}px`;
+        canvas.style.height = `${thumbnailViewport.height}px`;
+        
+        ctx.scale(outputScale, outputScale);
 
         // PDFをレンダリング
         const renderContext = {
@@ -3005,11 +3090,19 @@ export default function Home() {
           
           // OCR処理を実行
           const result = await performOCROnPDFPage(page, 2.0, ocrLanguage);
-          newResults[pageNum] = result;
+          
+          // 不要なスペースを削除
+          const cleanedText = removeUnnecessarySpaces(result.text);
+          const cleanedResult = {
+            ...result,
+            text: cleanedText,
+          };
+          
+          newResults[pageNum] = cleanedResult;
           
           // OCR結果をIndexedDBに保存
           if (docId) {
-            await saveOCRResult(docId, pageNum, result);
+            await saveOCRResult(docId, pageNum, cleanedResult);
           }
           
           setOcrResults(newResults);
@@ -4657,10 +4750,10 @@ export default function Home() {
             {/* サムネイルグリッド */}
             <div className="flex-1 overflow-y-auto p-6">
               <div 
-                className="gap-4"
                 style={{ 
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 120px))',
+                  gap: '1rem',
                 }}
               >
                 {(pageOrder.length > 0 ? pageOrder : Array.from({ length: totalPages }, (_, i) => i + 1)).map((pageNum, index) => (
@@ -4828,7 +4921,8 @@ export default function Home() {
                           <img
                             src={thumbnailsWithAnnotations[pageNum]}
                             alt={`ページ ${pageNum} (注釈付き)`}
-                            className="w-full h-auto block rounded shadow-sm"
+                            className="w-full h-auto block rounded shadow-sm max-w-full"
+                            style={{ maxWidth: '100%', height: 'auto' }}
                           />
                         ) : (
                           <div className="py-12 text-center text-slate-400 text-sm bg-slate-100 rounded">
@@ -4840,7 +4934,8 @@ export default function Home() {
                         <img
                           src={thumbnails[pageNum]}
                           alt={`ページ ${pageNum}`}
-                          className="w-full h-auto block rounded shadow-sm"
+                          className="w-full h-auto block rounded shadow-sm max-w-full"
+                          style={{ maxWidth: '100%', height: 'auto' }}
                         />
                       ) : (
                         <div className="py-12 text-center text-slate-400 text-sm bg-slate-100 rounded">
@@ -8154,15 +8249,31 @@ export default function Home() {
               const currentResult = filteredResults[currentIndex];
               
               return (
-              <div className="p-2 bg-white rounded-lg border-2 border-purple-300 shadow-sm" style={{ borderWidth: '2px' }}>
-                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+              <div className="p-2 bg-white rounded-lg border-2 border-purple-300 shadow-sm flex flex-col" style={{ borderWidth: '2px', maxHeight: 'calc(98vh - 300px)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                <div className="flex items-center justify-between mb-2 flex-wrap gap-2 flex-shrink-0">
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold text-purple-900">OCR結果</h3>
                     <span className="text-xs text-purple-700 font-medium bg-purple-100 px-2 py-0.5 rounded-full">
                       {totalFilteredPages}ページ
                     </span>
                   </div>
-                  <div className="flex gap-2 items-center">
+                  <div className="flex gap-2 items-center flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-purple-700 font-medium whitespace-nowrap">サムネイルサイズ:</label>
+                      <input
+                        type="range"
+                        min="100"
+                        max="1000"
+                        step="50"
+                        value={ocrThumbnailSize}
+                        onChange={(e) => setOcrThumbnailSize(parseInt(e.target.value))}
+                        className="w-24 h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer"
+                        style={{
+                          background: `linear-gradient(to right, #a855f7 0%, #a855f7 ${((ocrThumbnailSize - 100) / 900) * 100}%, #e9d5ff ${((ocrThumbnailSize - 100) / 900) * 100}%, #e9d5ff 100%)`
+                        }}
+                      />
+                      <span className="text-xs text-purple-700 font-medium whitespace-nowrap w-16">{ocrThumbnailSize}px</span>
+                    </div>
                     <Input
                       type="text"
                       placeholder="検索..."
@@ -8178,12 +8289,12 @@ export default function Home() {
                   </div>
                 </div>
                 {currentResult ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2 flex-1" style={{ minHeight: 0 }}>
                     {(() => {
                       const [pageNum, result] = currentResult;
                       return (
-                      <div key={pageNum} className="p-2 bg-purple-50 rounded border border-purple-200 hover:bg-purple-100 transition-colors max-w-full overflow-hidden">
-                        <div className="flex items-center justify-between mb-1">
+                      <div key={pageNum} className="p-2 bg-purple-50 rounded border border-purple-200 hover:bg-purple-100 transition-colors max-w-full" style={{ minHeight: '200px' }}>
+                        <div className="flex items-center justify-between mb-2">
                           <button
                             onClick={() => {
                               setCurrentPage(parseInt(pageNum));
@@ -8227,63 +8338,95 @@ export default function Home() {
                             </button>
                           </div>
                         </div>
-                        {editingOcrPage === parseInt(pageNum) ? (
-                          <div className="space-y-1">
-                            <textarea
-                              value={editingOcrText}
-                              onChange={(e) => setEditingOcrText(e.target.value)}
-                              className="w-full text-sm text-purple-900 bg-white p-2 rounded border border-purple-400 min-h-64 max-h-64 resize-none overflow-y-auto"
-                              rows={16}
-                              style={{ maxHeight: '16rem', overflowY: 'auto', wordBreak: 'break-word', overflowWrap: 'break-word' }}
-                            />
-                            <div className="flex gap-1">
-                              <button
-                                onClick={async () => {
-                                  if (docId) {
-                                    const updatedResult = { ...result, text: editingOcrText };
-                                    await saveOCRResult(docId, parseInt(pageNum), updatedResult);
-                                    const newResults = { ...ocrResults };
-                                    newResults[parseInt(pageNum)] = updatedResult;
-                                    setOcrResults(newResults);
-                                    setEditingOcrPage(null);
-                                    setEditingOcrText('');
-                                    toast({
-                                      title: "成功",
-                                      description: `ページ ${pageNum} のOCR結果を更新しました`,
-                                      variant: "success",
-                                    });
-                                  }
-                                }}
-                                className="px-2 py-1 text-xs font-medium bg-green-500 text-white rounded hover:bg-green-600"
-                              >
-                                保存
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setEditingOcrPage(null);
-                                  setEditingOcrText('');
-                                }}
-                                className="px-2 py-1 text-xs font-medium bg-gray-500 text-white rounded hover:bg-gray-600"
-                              >
-                                キャンセル
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-sm text-purple-900 bg-white p-2 rounded border border-purple-200 max-h-64 overflow-y-auto overflow-x-hidden whitespace-pre-wrap leading-relaxed break-words" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-                            {ocrSearchQuery.trim() ? (
-                              result.text.split(new RegExp(`(${ocrSearchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')).map((part, idx) => 
-                                part.toLowerCase() === ocrSearchQuery.toLowerCase() ? (
-                                  <mark key={idx} className="bg-yellow-300 text-purple-900 font-semibold">{part}</mark>
-                                ) : (
-                                  <span key={idx}>{part}</span>
-                                )
-                              )
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'start' }}>
+                          <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                            {editingOcrPage === parseInt(pageNum) ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                <textarea
+                                  value={editingOcrText}
+                                  onChange={(e) => setEditingOcrText(e.target.value)}
+                                  className="w-full text-sm text-purple-900 bg-white p-2 rounded border border-purple-400 resize-none"
+                                  rows={16}
+                                  style={{ 
+                                    minHeight: '300px', 
+                                    maxHeight: 'calc(98vh - 550px)', 
+                                    wordBreak: 'break-word', 
+                                    overflowWrap: 'break-word',
+                                    overflowY: 'auto'
+                                  }}
+                                />
+                                <div className="flex gap-1 flex-shrink-0">
+                                  <button
+                                    onClick={async () => {
+                                      if (docId) {
+                                        const updatedResult = { ...result, text: editingOcrText };
+                                        await saveOCRResult(docId, parseInt(pageNum), updatedResult);
+                                        const newResults = { ...ocrResults };
+                                        newResults[parseInt(pageNum)] = updatedResult;
+                                        setOcrResults(newResults);
+                                        setEditingOcrPage(null);
+                                        setEditingOcrText('');
+                                        toast({
+                                          title: "成功",
+                                          description: `ページ ${pageNum} のOCR結果を更新しました`,
+                                          variant: "success",
+                                        });
+                                      }
+                                    }}
+                                    className="px-2 py-1 text-xs font-medium bg-green-500 text-white rounded hover:bg-green-600"
+                                  >
+                                    保存
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingOcrPage(null);
+                                      setEditingOcrText('');
+                                    }}
+                                    className="px-2 py-1 text-xs font-medium bg-gray-500 text-white rounded hover:bg-gray-600"
+                                  >
+                                    キャンセル
+                                  </button>
+                                </div>
+                              </div>
                             ) : (
-                              result.text || '(テキストが見つかりませんでした)'
+                              <div 
+                                className="text-sm text-purple-900 bg-white p-2 rounded border border-purple-200 overflow-y-auto overflow-x-hidden whitespace-pre-wrap leading-relaxed break-words" 
+                                style={{ 
+                                  wordBreak: 'break-word', 
+                                  overflowWrap: 'break-word',
+                                  minHeight: '200px',
+                                  maxHeight: 'calc(98vh - 500px)'
+                                }}
+                              >
+                                {ocrSearchQuery.trim() ? (
+                                  result.text.split(new RegExp(`(${ocrSearchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')).map((part, idx) => 
+                                    part.toLowerCase() === ocrSearchQuery.toLowerCase() ? (
+                                      <mark key={idx} className="bg-yellow-300 text-purple-900 font-semibold">{part}</mark>
+                                    ) : (
+                                      <span key={idx}>{part}</span>
+                                    )
+                                  )
+                                ) : (
+                                  result.text || '(テキストが見つかりませんでした)'
+                                )}
+                              </div>
                             )}
                           </div>
-                        )}
+                          <div style={{ flexShrink: 0, position: 'sticky', top: '0.5rem' }}>
+                            {thumbnails[parseInt(pageNum)] ? (
+                              <img
+                                src={thumbnails[parseInt(pageNum)]}
+                                alt={`ページ ${pageNum} のサムネイル`}
+                                className="border-2 border-purple-400 rounded shadow-lg bg-white"
+                                style={{ width: `${ocrThumbnailSize}px`, height: 'auto', display: 'block' }}
+                              />
+                            ) : (
+                              <div style={{ width: `${ocrThumbnailSize}px`, height: `${ocrThumbnailSize * 1.4}px`, border: '2px solid #c084fc', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3e8ff', color: '#9333ea', fontSize: '0.75rem' }}>
+                                サムネイルなし
+                              </div>
+                            )}
+                          </div>
+                        </div>
                         {result.words.length > 0 && (
                           <details className="mt-2">
                             <summary className="text-xs text-purple-700 cursor-pointer font-semibold">単語詳細 ({result.words.length}個)</summary>
@@ -8303,7 +8446,7 @@ export default function Home() {
                       );
                     })()}
                     {/* ページナビゲーションボタン */}
-                    <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-purple-200">
+                    <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-purple-200 flex-shrink-0" style={{ position: 'sticky', bottom: 0, backgroundColor: '#faf5ff', paddingTop: '0.75rem', paddingBottom: '0.75rem', zIndex: 50 }}>
                       <button
                         onClick={() => {
                           if (currentOcrResultPage > 1) {
