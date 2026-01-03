@@ -69,6 +69,10 @@ interface AnnotationsDB extends DBSchema {
     key: string; // `${docId}`
     value: import('./table-of-contents').TableOfContentsEntry[];
   };
+  scenarios: {
+    key: string; // `${docId}_${pageNumber}`
+    value: string; // シナリオテキスト
+  };
 }
 
 let dbInstance: IDBPDatabase<AnnotationsDB> | null = null;
@@ -82,7 +86,7 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
   }
 
   try {
-    dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 8, {
+    dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 9, {
       upgrade(db, oldVersion) {
         // 既存のオブジェクトストアが存在しない場合のみ作成
         if (!db.objectStoreNames.contains('annotations')) {
@@ -108,6 +112,9 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
         }
         if (!db.objectStoreNames.contains('tableOfContents')) {
           db.createObjectStore('tableOfContents');
+        }
+        if (!db.objectStoreNames.contains('scenarios')) {
+          db.createObjectStore('scenarios');
         }
       },
       // 既存のデータベースがより新しいバージョンの場合のエラーを処理
@@ -135,7 +142,7 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
         });
         
         // データベースを再作成
-        dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 8, {
+        dbInstance = await openDB<AnnotationsDB>('pdf-annotations', 9, {
           upgrade(db) {
             db.createObjectStore('annotations');
             db.createObjectStore('textAnnotations');
@@ -145,6 +152,7 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
             db.createObjectStore('watermarkHistory');
             db.createObjectStore('ocrResults');
             db.createObjectStore('tableOfContents');
+            db.createObjectStore('scenarios');
           },
         });
       } catch (recreateError) {
@@ -487,5 +495,50 @@ export async function deleteTableOfContents(
   const db = await getDB();
   const key = docId;
   await db.delete('tableOfContents', key);
+}
+
+// シナリオ関連の関数
+export async function saveScenario(
+  docId: string,
+  pageNumber: number,
+  scenario: string
+): Promise<void> {
+  const db = await getDB();
+  const key = `${docId}_${pageNumber}`;
+  await db.put('scenarios', scenario, key);
+}
+
+export async function loadScenario(
+  docId: string,
+  pageNumber: number
+): Promise<string | undefined> {
+  const db = await getDB();
+  const key = `${docId}_${pageNumber}`;
+  return await db.get('scenarios', key);
+}
+
+export async function getAllScenarios(
+  docId: string,
+  totalPages: number
+): Promise<Record<number, string>> {
+  const results: Record<number, string> = {};
+  
+  for (let page = 1; page <= totalPages; page++) {
+    const scenario = await loadScenario(docId, page);
+    if (scenario) {
+      results[page] = scenario;
+    }
+  }
+  
+  return results;
+}
+
+export async function deleteScenario(
+  docId: string,
+  pageNumber: number
+): Promise<void> {
+  const db = await getDB();
+  const key = `${docId}_${pageNumber}`;
+  await db.delete('scenarios', key);
 }
 

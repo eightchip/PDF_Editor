@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { loadPDF, renderPage, renderTextLayer } from './lib/pdf';
 import { drawStroke, redrawStrokes, normalizePoint } from './lib/ink';
 import { saveAnnotations, loadAnnotations, deleteAnnotations, getAllAnnotations, saveTextAnnotations, loadTextAnnotations, deleteTextAnnotations, getAllTextAnnotations, saveShapeAnnotations, loadShapeAnnotations, deleteShapeAnnotations, getAllShapeAnnotations, type Stroke, type TextAnnotation, type ShapeAnnotation } from './lib/db';
@@ -13,12 +14,12 @@ import { extractTextItems, findNearestTextLine, findTextBoundingBox, smoothStrok
 import { convertImageToPDF } from './lib/image-to-pdf';
 import { extractFormFields, setFormFieldValues, calculateFormFields, setupCommonCalculations, type FormField } from './lib/forms';
 import { generateSignatureId, type Signature } from './lib/signature';
-import { saveSignature, getAllSignatures, deleteSignature, saveWatermarkHistory, getAllWatermarkHistory, saveOCRResult, loadOCRResult, getAllOCRResults, deleteOCRResult, saveTableOfContents, loadTableOfContents } from './lib/db';
+import { saveSignature, getAllSignatures, deleteSignature, saveWatermarkHistory, getAllWatermarkHistory, saveOCRResult, loadOCRResult, getAllOCRResults, deleteOCRResult, saveTableOfContents, loadTableOfContents, saveScenario, loadScenario, getAllScenarios, deleteScenario } from './lib/db';
 import { generateTableOfContents, type TableOfContentsEntry } from './lib/table-of-contents';
 import { splitPDF, splitPDFByRanges, splitPDFByPageGroups } from './lib/pdf-split';
 import { performOCROnPDFPage, type OCRResult } from './lib/ocr';
 
-// OCR結果から不要なスペースを削除する関数
+// OCR結果から不要なスペースと意味不明な文字列を削除する関数
 function removeUnnecessarySpaces(text: string): string {
   // 日本語文字（ひらがな、カタカナ、漢字）のUnicode範囲
   const japaneseChar = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF]/;
@@ -31,8 +32,42 @@ function removeUnnecessarySpaces(text: string): string {
   
   let result = text;
   
-  // 1. 日本語文字の間のスペースを削除
-  result = result.replace(/([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF])\s+([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF])/g, '$1$2');
+  // 0. 意味不明な文字列パターンを削除（より積極的に）
+  // 「ババババババ...」「vvユvvバサバサ...」「ユユ ユユ ユユ...」などの繰り返しパターン
+  result = result.replace(/ババババババババババババババババ[^\n]*/g, '');
+  result = result.replace(/ババ[バホリルロN\s]*ババ/g, ''); // 「ババ...ババ」パターン
+  result = result.replace(/[バユvvサ]{3,}/g, ''); // 3文字以上の「バ」「ユ」「v」「サ」の繰り返し
+  result = result.replace(/[ユユ\s]{3,}/g, ''); // 「ユユ」の繰り返しパターン
+  result = result.replace(/バサバサ[バユvvサ\s]*/g, ''); // 「バサバサ...」パターン
+  result = result.replace(/サバサバ[バユvvサ\s]*/g, ''); // 「サバサバ...」パターン
+  result = result.replace(/ユーユーザー/g, ''); // 「ユーユーザー」パターン
+  
+  // 意味不明な記号や特殊文字の連続を削除
+  result = result.replace(/[=ー\-_]{3,}/g, ''); // 3文字以上の「=」「ー」「-」「_」の連続
+  result = result.replace(/[|｜]{3,}/g, ''); // 3文字以上の「|」「｜」の連続
+  
+  // 意味不明な文字の組み合わせパターンを削除
+  result = result.replace(/[vvユバサ]{3,}/g, ''); // 「vv」「ユ」「バ」「サ」の組み合わせ
+  
+  // 行全体が意味不明な文字列の場合は削除（先に処理）
+  const preLines = result.split('\n');
+  const preCleanedLines = preLines.filter(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return true; // 空行は保持
+    
+    // 「バババ...」「vvユvv...」などの意味不明な文字列を含む行を削除
+    if (/ババ[バホリルロN\s]{5,}/.test(trimmed)) return false;
+    if (/[バユvvサ]{5,}/.test(trimmed)) return false;
+    if (/ユーユーザー/.test(trimmed)) return false;
+    
+    return true;
+  });
+  result = preCleanedLines.join('\n');
+  
+  // 1. 日本語文字の間のスペースを削除（より積極的に、複数回実行）
+  for (let i = 0; i < 3; i++) {
+    result = result.replace(/([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF])\s+([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF])/g, '$1$2');
+  }
   
   // 2. 数字と日本語の間のスペースを削除
   result = result.replace(/([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF])\s+([0-9０-９])/g, '$1$2');
@@ -58,7 +93,11 @@ function removeUnnecessarySpaces(text: string): string {
   result = result.replace(/\s+([:：;；])/g, '$1');
   result = result.replace(/([:：;；])\s+/g, '$1');
   
-  // 8. 英語単語間のスペース以外の連続スペースを削除
+  // 8. 日本語文字の前後のスペースを削除（句読点以外）
+  result = result.replace(/([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF])\s+([^\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF\s。、，.．\(（\)）:：;；,])/g, '$1$2');
+  result = result.replace(/([^\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF\s。、，.．\(（\)）:：;；,])\s+([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF])/g, '$1$2');
+  
+  // 9. 英語単語間のスペース以外の連続スペースを削除
   // 英語文字の間のスペースは保持しつつ、それ以外の連続スペースを削除
   result = result.replace(/([^\s])\s{2,}([^\s])/g, (match, p1, p2, offset, str) => {
     // 英語文字の間のスペースは保持
@@ -69,11 +108,32 @@ function removeUnnecessarySpaces(text: string): string {
     return `${p1}${p2}`;
   });
   
-  // 9. 行頭・行末のスペースを削除
+  // 10. 行頭・行末のスペースを削除
   result = result.trim();
   
-  // 10. 改行の前後の不要なスペースを削除
+  // 11. 改行の前後の不要なスペースを削除
   result = result.replace(/\s*\n\s*/g, '\n');
+  
+  // 12. 空行を1行にまとめる（連続する空行を1つに）
+  result = result.replace(/\n{3,}/g, '\n\n');
+  
+  // 13. 意味不明な単独文字や記号の行を削除（行全体が意味不明な文字のみの場合）
+  const finalLines = result.split('\n');
+  const cleanedLines = finalLines.filter(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return true; // 空行は保持
+    
+    // 意味不明な文字のみの行を削除
+    if (/^[バユvvサ=ー\-_|｜\s]+$/.test(trimmed)) return false;
+    if (/^[^\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\w\s]{3,}$/.test(trimmed)) return false;
+    
+    return true;
+  });
+  result = cleanedLines.join('\n');
+  
+  // 14. 最終的なスペースの整理（日本語文字の前後からスペースを削除）
+  result = result.replace(/([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF])\s+/g, '$1');
+  result = result.replace(/\s+([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF])/g, '$1');
   
   return result;
 }
@@ -90,7 +150,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button"; // Dialog内でのみ使用
-import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections, MdDragHandle, MdLock, MdSecurity, MdCheckCircle, MdInfo, MdLocalOffer, MdAssignment, MdContentCut, MdMenuBook, MdFileCopy } from 'react-icons/md';
+import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections, MdDragHandle, MdLock, MdSecurity, MdCheckCircle, MdInfo, MdLocalOffer, MdAssignment, MdContentCut, MdMenuBook, MdFileCopy, MdSlideshow, MdFullscreen, MdFullscreenExit, MdVisibility, MdVisibilityOff, MdPrint, MdDescription, MdNotes, MdTimer, MdTimerOff, MdPlayArrow, MdPause, MdStop } from 'react-icons/md';
 import { QRCodeSVG } from 'qrcode.react';
 // PDF.jsの型は動的インポートで取得
 
@@ -303,6 +363,34 @@ export default function Home() {
   const [splitRangeInputs, setSplitRangeInputs] = useState<string[]>(['']); // PDF分割の範囲入力の配列（例: ["1-3, 5, 7-9", "11-13, 15, 17-19"]）
   const [showSplitDialogFromThumbnail, setShowSplitDialogFromThumbnail] = useState(false); // ページ管理モーダルから開いたPDF分割ダイアログ
   
+  // プレゼンモード関連
+  const [isPresentationMode, setIsPresentationMode] = useState(false); // スライドショーモード（全画面表示）
+  const [showAnnotationsInPresentation, setShowAnnotationsInPresentation] = useState(true); // プレゼン中に注釈を表示するか
+  const [showPageNumberInPresentation, setShowPageNumberInPresentation] = useState(true); // プレゼン中にページ番号を表示するか
+  const [autoPageNumberEnabled, setAutoPageNumberEnabled] = useState(false); // 自動ページ番号表示
+  const [autoPageNumberPosition, setAutoPageNumberPosition] = useState<'top-right' | 'top-left' | 'bottom-right' | 'bottom-left'>('bottom-right'); // ページ番号の位置
+  
+  // プレゼンタイマー関連
+  const [presentationTimer, setPresentationTimer] = useState<{ isRunning: boolean; elapsed: number; totalTime: number | null }>({
+    isRunning: false,
+    elapsed: 0,
+    totalTime: null, // nullの場合は経過時間のみ表示
+  });
+  const [timerAlarms, setTimerAlarms] = useState<number[]>([]); // アラーム時間（秒）の配列
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // レーザーポインター関連
+  const [laserPointerEnabled, setLaserPointerEnabled] = useState(false);
+  const [laserPointerPosition, setLaserPointerPosition] = useState<{ x: number; y: number } | null>(null);
+  const laserPointerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // シナリオ関連
+  const [scenarios, setScenarios] = useState<Record<number, string>>({}); // シナリオ（ページ番号をキーとする）
+  const [showScenarioDialog, setShowScenarioDialog] = useState(false); // シナリオダイアログの表示状態
+  const [editingScenarioPage, setEditingScenarioPage] = useState<number | null>(null); // 編集中のシナリオページ番号
+  const [editingScenarioText, setEditingScenarioText] = useState(''); // 編集中のシナリオテキスト
+  const [scenarioPrintPageBreak, setScenarioPrintPageBreak] = useState(false); // シナリオ印刷の改ページ設定
+  
   // ダイアログが開いているときにbodyのpointer-eventsを有効化
   useEffect(() => {
     if (showSignatureDialog || showSplitDialog || showOCRDialog) {
@@ -328,6 +416,8 @@ export default function Home() {
   const inkCanvasRef = useRef<HTMLCanvasElement>(null);
   const textCanvasRef = useRef<HTMLCanvasElement>(null);
   const shapeCanvasRef = useRef<HTMLCanvasElement>(null);
+  const isFixingRotationRef = useRef<boolean>(false); // 回転修正中フラグ（無限ループ防止）
+  const renderTaskRef = useRef<any>(null); // PDFレンダリングタスクの参照（キャンセル用）
   const textLayerRef = useRef<HTMLDivElement>(null); // テキストレイヤー用
   const containerRef = useRef<HTMLDivElement>(null);
   const isDrawingRef = useRef(false);
@@ -369,6 +459,90 @@ export default function Home() {
       setCurrentOcrResultPage(1);
     }
   }, [ocrResults, showOCRDialog]);
+
+  // ocrThumbnailSizeが変更されたときに、既存のサムネイルを再生成（高解像度）
+  useEffect(() => {
+    if (!pdfDoc || !docId || Object.keys(ocrResults).length === 0) return;
+    
+    const regenerateThumbnails = async () => {
+      if (!pdfDoc) return;
+      
+      const newThumbnails: Record<number, string> = {};
+      
+      for (const pageNumStr of Object.keys(ocrResults)) {
+        const pageNum = parseInt(pageNumStr);
+        try {
+          // OCR処理では1ベースのページ番号を使用（データベースキー用）
+          // PDF.jsは0ベースのインデックスを期待するので、getActualPageNumForPDFを使用
+          const actualPageNumForPDF = getActualPageNumForPDF(pageNum);
+          
+          // 範囲チェック
+          if (actualPageNumForPDF < 0 || actualPageNumForPDF >= pdfDoc.numPages) {
+            console.warn(`サムネイル生成: 無効なページ番号 ${actualPageNumForPDF} (pageNum: ${pageNum}, totalPages: ${pdfDoc.numPages})`);
+            continue;
+          }
+          
+          const page = await pdfDoc.getPage(actualPageNumForPDF);
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          if (ctx) {
+            const pageRotation = pageRotations[pageNum] || 0;
+            const baseViewport = page.getViewport({ scale: 1.0, rotation: pageRotation });
+            
+            // ocrThumbnailSizeに応じたスケールを計算（高解像度を維持）
+            const targetWidth = ocrThumbnailSize;
+            const baseScale = targetWidth / baseViewport.width;
+            
+            // 高解像度を維持するため、デバイスピクセル比を考慮しつつ、最低でも2倍スケール
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            const renderScale = Math.max(baseScale * 2.0, baseScale * devicePixelRatio, 2.0);
+            
+            const thumbnailViewport = page.getViewport({ scale: renderScale, rotation: pageRotation });
+            
+            // キャンバスサイズを高解像度で設定
+            canvas.width = Math.floor(thumbnailViewport.width);
+            canvas.height = Math.floor(thumbnailViewport.height);
+            canvas.style.width = `${targetWidth}px`;
+            canvas.style.height = `${(thumbnailViewport.height / thumbnailViewport.width) * targetWidth}px`;
+            
+            const renderContext = {
+              canvasContext: ctx,
+              viewport: thumbnailViewport,
+              canvas: canvas,
+            };
+            
+            await page.render(renderContext).promise;
+            const thumbnailDataUrl = canvas.toDataURL('image/png', 1.0); // 最高品質でエクスポート
+            
+            newThumbnails[pageNum] = thumbnailDataUrl;
+          }
+        } catch (error) {
+          console.warn(`ページ ${pageNum} のサムネイル再生成エラー:`, error);
+        }
+      }
+      
+      setThumbnails(prev => ({ ...prev, ...newThumbnails }));
+    };
+    
+    // デバウンス処理（500ms待機してから再生成）
+    const timeoutId = setTimeout(() => {
+      regenerateThumbnails();
+    }, 500);
+    
+    return () => clearTimeout(timeoutId);
+  }, [ocrThumbnailSize, pdfDoc, docId, ocrResults, pageRotations]);
+
+  // シナリオを読み込む
+  useEffect(() => {
+    const loadScenarios = async () => {
+      if (docId && pdfDoc) {
+        const loadedScenarios = await getAllScenarios(docId, totalPages);
+        setScenarios(loadedScenarios);
+      }
+    };
+    loadScenarios();
+  }, [docId, pdfDoc, totalPages]);
 
   // 検索クエリが変更されたら、最初のページを表示
   useEffect(() => {
@@ -1141,6 +1315,66 @@ export default function Home() {
     ctx.restore();
   }, [watermarkText, showWatermarkPreview, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity]);
 
+  // スライドショーモードが変更されたときに再レンダリング
+  useEffect(() => {
+    if (isPresentationMode && pdfDoc) {
+      // プレゼンモード開始時に状態をリセット
+      setPresentationTimer({ isRunning: false, elapsed: 0, totalTime: null });
+      setLaserPointerEnabled(false);
+      setLaserPointerPosition(null);
+      renderCurrentPage();
+    } else if (!isPresentationMode) {
+      // プレゼンモード終了時にタイマーを停止
+      setPresentationTimer(prev => ({ ...prev, isRunning: false }));
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      if (laserPointerTimeoutRef.current) {
+        clearTimeout(laserPointerTimeoutRef.current);
+        laserPointerTimeoutRef.current = null;
+      }
+    }
+  }, [isPresentationMode]);
+
+  // プレゼンタイマーの処理
+  useEffect(() => {
+    console.log('タイマーuseEffect実行:', { isRunning: presentationTimer.isRunning, isPresentationMode, elapsed: presentationTimer.elapsed });
+    
+    if (presentationTimer.isRunning && isPresentationMode) {
+      console.log('タイマー開始');
+      timerIntervalRef.current = setInterval(() => {
+        setPresentationTimer(prev => {
+          const newElapsed = prev.elapsed + 1;
+          console.log('タイマー更新:', newElapsed);
+          // アラームチェック
+          timerAlarms.forEach(alarmTime => {
+            if (newElapsed === alarmTime) {
+              toast({
+                title: "タイマーアラーム",
+                description: `${Math.floor(alarmTime / 60)}分経過しました`,
+                variant: "default",
+              });
+            }
+          });
+          return { ...prev, elapsed: newElapsed };
+        });
+      }, 1000);
+    } else {
+      if (timerIntervalRef.current) {
+        console.log('タイマー停止');
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+    }
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+    };
+  }, [presentationTimer.isRunning, isPresentationMode, timerAlarms]);
+
   // ページレンダリング
   const renderCurrentPage = async () => {
     if (!pdfDoc || !pdfCanvasRef.current || !inkCanvasRef.current) return;
@@ -1148,14 +1382,96 @@ export default function Home() {
     try {
       // pageOrderが設定されている場合は、表示順序から実際のページ番号に変換
       const actualPageNum = getActualPageNum(currentPage);
+      console.log('renderCurrentPage:', { currentPage, actualPageNum, totalPages: pdfDoc.numPages });
       const page = await pdfDoc.getPage(actualPageNum);
       const pdfCanvas = pdfCanvasRef.current;
       const inkCanvas = inkCanvasRef.current;
 
-      // PDFをレンダリング（現在のページの回転角度を取得）
-      const currentRotation = pageRotations[actualPageNum] || 0;
-      const size = await renderPage(page, pdfCanvas, scale, currentRotation);
+      // スライドショーモードの場合は、画面に収まるようにスケールを計算
+      let renderScale = scale;
+      if (isPresentationMode) {
+        // actualPageNumは1ベースの実際のページ番号なので、そのままpageRotationsを参照
+        const viewport = page.getViewport({ scale: 1.0, rotation: pageRotations[actualPageNum] || 0 });
+        const maxWidth = window.innerWidth * 0.95; // 表示領域を最大限活用
+        const maxHeight = (window.innerHeight - 68) * 0.95; // コントロールバーの高さを考慮（さらにコンパクト化）
+        const scaleX = maxWidth / viewport.width;
+        const scaleY = maxHeight / viewport.height;
+        renderScale = Math.min(scaleX, scaleY, 2.0); // 最大2倍まで
+      }
+
+      // 前のレンダリングタスクを確実にキャンセルして完了を待つ（根本的な解決）
+      const previousTask = renderTaskRef.current;
+      if (previousTask) {
+        try {
+          // タスクが存在し、まだ実行中の場合のみキャンセル
+          if (previousTask && typeof previousTask.cancel === 'function') {
+            // キャンセル前にタスクの状態を確認
+            const taskState = (previousTask as any)._internalRenderTask?.cancelled;
+            if (!taskState) {
+              previousTask.cancel();
+              // タスクのpromiseが完了またはキャンセルされるまで待機
+              // エラーでも成功でも完了を待つ
+              try {
+                await Promise.race([
+                  previousTask.promise,
+                  new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
+                ]).catch((error) => {
+                  // キャンセルエラーやタイムアウトは無視
+                });
+              } catch (error) {
+                // エラーは無視（キャンセルエラーは正常）
+              }
+              // さらに少し待機して確実に完了させる
+              await new Promise(resolve => setTimeout(resolve, 500));
+              console.log('レンダリングタスクが完全にキャンセルされました');
+            }
+          }
+        } catch (error) {
+          console.log('レンダリングタスクのキャンセル中にエラー:', error);
+        }
+        // 確実にnullに設定
+        renderTaskRef.current = null;
+      }
+
+      // キャンバスを完全にリセット（前のレンダリングタスクがキャンバスを使用できなくする）
+      // 新しいキャンバスコンテキストを取得するために、一度サイズを0にリセット
+      const oldWidth = pdfCanvas.width;
+      const oldHeight = pdfCanvas.height;
+      pdfCanvas.width = 0;
+      pdfCanvas.height = 0;
+      // キャンバスが完全にリセットされるまで待機
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // PDFをレンダリング（プレゼンモードでは回転を0に固定してそのまま表示）
+      // 回転処理を無視して、PDFの元の向きのまま表示する
+      // actualPageNumは1ベースの実際のページ番号なので、そのままpageRotationsを参照
+      const currentRotation = isPresentationMode ? 0 : (pageRotations[actualPageNum] || 0);
+      
+      // 新しいレンダリングタスクを開始（前のタスクは既にキャンセル済みなのでnullを渡す）
+      const result = await renderPage(page, pdfCanvas, renderScale, currentRotation, null);
+      renderTaskRef.current = result.task; // レンダリングタスクを保存
+      const size = { width: result.width, height: result.height };
       setPageSize(size);
+
+      // プレゼンモードで逆さ表示が発生する場合の自動修正：レンダリングを2回実行
+      // 無限ループを防ぐためにフラグで制御し、直接レンダリングを再実行
+      if (isPresentationMode && !isFixingRotationRef.current && pdfDoc && pdfCanvas) {
+        isFixingRotationRef.current = true;
+        // 一度レンダリングを完了させてから、再度レンダリングを実行
+        await new Promise(resolve => setTimeout(resolve, 300));
+        // 同じページを再度レンダリング（これにより逆さ表示が修正される）
+        try {
+          const samePage = await pdfDoc.getPage(actualPageNum);
+          const fixResult = await renderPage(samePage, pdfCanvas, renderScale, 0, renderTaskRef.current);
+          renderTaskRef.current = fixResult.task;
+        } catch (error) {
+          console.log('回転修正レンダリングエラー:', error);
+        }
+        // フラグをリセット
+        setTimeout(() => {
+          isFixingRotationRef.current = false;
+        }, 1000);
+      }
 
       // テキストレイヤーを生成（テキスト選択可能にする）
       if (textLayerRef.current) {
@@ -1300,9 +1616,14 @@ export default function Home() {
   };
 
   // ページ変更時に再レンダリング
+  // pageOrderはgetActualPageNum内で参照されるため、依存配列から除外
+  // （pageOrderが変更されても、currentPageが変わらない限り再レンダリングしない）
   useEffect(() => {
-    renderCurrentPage();
-      }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, drawWatermarkOnCanvas, snapToTextEnabled, textSelectionEnabled]);
+    // pdfDocが有効な場合のみレンダリング
+    if (pdfDoc && pdfDoc.numPages > 0) {
+      renderCurrentPage();
+    }
+      }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, drawWatermarkOnCanvas, snapToTextEnabled, textSelectionEnabled, isPresentationMode]);
 
   // strokesの状態変更時に再描画（ハイライトなどが追加/削除されたとき）
   useEffect(() => {
@@ -1336,6 +1657,7 @@ export default function Home() {
     
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
       try {
+        console.log('generateThumbnails:', { pageNum, totalPages });
         const page = await pdfDoc.getPage(pageNum);
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
@@ -1383,6 +1705,7 @@ export default function Home() {
     
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
       try {
+        console.log('generateThumbnailsWithAnnotations:', { pageNum, totalPages });
         const page = await pdfDoc.getPage(pageNum);
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
@@ -1524,11 +1847,56 @@ export default function Home() {
       // Ctrl/Cmdキーが押されている場合
       const isCtrl = e.ctrlKey || e.metaKey;
       
-      // 入力フィールドにフォーカスがある場合は無視
+      // スライドショーモード中のキーボードショートカット（優先処理）
+      if (isPresentationMode) {
+        // Esc: スライドショーモードを終了
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsPresentationMode(false);
+          return;
+        }
+
+        // ←: 前のページ
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          e.stopPropagation();
+          goToPrevPage();
+          return;
+        }
+
+        // →: 次のページ
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          e.stopPropagation();
+          goToNextPage();
+          return;
+        }
+
+        // スペース: 次のページ
+        if (e.key === ' ' && !isCtrl) {
+          e.preventDefault();
+          e.stopPropagation();
+          goToNextPage();
+          return;
+        }
+
+        // L: レーザーポインターの切り替え
+        if (e.key === 'l' || e.key === 'L') {
+          e.preventDefault();
+          e.stopPropagation();
+          setLaserPointerEnabled(prev => !prev);
+          return;
+        }
+      }
+      
+      // 入力フィールドにフォーカスがある場合は無視（スライドショーモード以外）
       if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        e.target instanceof HTMLButtonElement
+        !isPresentationMode && (
+          e.target instanceof HTMLInputElement ||
+          e.target instanceof HTMLTextAreaElement ||
+          (e.target instanceof HTMLButtonElement && e.target.type !== 'button')
+        )
       ) {
         return;
       }
@@ -1565,17 +1933,26 @@ export default function Home() {
         return;
       }
 
-      // ←: 前のページ
-      if (e.key === 'ArrowLeft' && !isCtrl) {
+      // ←: 前のページ（通常モード）
+      if (e.key === 'ArrowLeft' && !isCtrl && !isPresentationMode) {
         e.preventDefault();
         goToPrevPage();
         return;
       }
 
-      // →: 次のページ
-      if (e.key === 'ArrowRight' && !isCtrl) {
+      // →: 次のページ（通常モード）
+      if (e.key === 'ArrowRight' && !isCtrl && !isPresentationMode) {
         e.preventDefault();
         goToNextPage();
+        return;
+      }
+
+      // F11またはF5: スライドショーモードの切り替え
+      if ((e.key === 'F11' || e.key === 'F5') && !isCtrl) {
+        e.preventDefault();
+        if (pdfDoc) {
+          setIsPresentationMode(prev => !prev);
+        }
         return;
       }
     };
@@ -1584,7 +1961,7 @@ export default function Home() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [undoStack, redoStack, pdfDoc, isExporting, currentPage, totalPages]);
+  }, [undoStack, redoStack, pdfDoc, isExporting, currentPage, totalPages, isPresentationMode]);
 
   // 描画開始
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -2625,12 +3002,24 @@ export default function Home() {
     }
   };
 
-  // 表示順序のインデックスから実際のページ番号に変換するヘルパー関数
+  // 表示順序のインデックスから実際のページ番号に変換するヘルパー関数（1ベース）
+  // displayIndexは1ベース、返り値も1ベース（データベースキー用）
   const getActualPageNum = (displayIndex: number): number => {
     if (pageOrder.length > 0 && displayIndex > 0 && displayIndex <= pageOrder.length) {
+      // pageOrderは1ベースのページ番号の配列
       return pageOrder[displayIndex - 1];
     }
+    // pageOrderが空の場合は、displayIndexをそのまま返す（1ベース）
     return displayIndex;
+  };
+
+  // PDF.js用のページ番号取得（0ベース）
+  const getActualPageNumForPDF = (displayIndex: number): number => {
+    const actualPageNum1Based = getActualPageNum(displayIndex);
+    // 1ベースから0ベースに変換（最小値は0）
+    const result = Math.max(0, actualPageNum1Based - 1);
+    console.log('getActualPageNumForPDF:', { displayIndex, actualPageNum1Based, result, pageOrderLength: pageOrder.length });
+    return result;
   };
 
   // ページ削除（指定したページを削除）
@@ -3078,14 +3467,8 @@ export default function Home() {
 
         try {
           // renderCurrentPageと同じ方法でページを取得
-          // getActualPageNumを使用して実際のページ番号を取得
-          const actualPageNum = getActualPageNum(pageNum);
-          
-          // renderCurrentPageでは pdfDoc.getPage(actualPageNum) を直接使用している
-          // これは、getActualPageNumが0ベースインデックスを返すか、またはgetPageが1ベースを受け取ることを意味する
-          // 実際には、PDF.jsのgetPageは0ベースインデックスを期待する
-          // しかし、renderCurrentPageが動作しているということは、getActualPageNumが0ベースを返している可能性がある
-          // 安全のため、renderCurrentPageと同じ方法を使用（actualPageNumをそのまま使用）
+          // PDF.jsは0ベースのインデックスを期待するので、getActualPageNumForPDFを使用
+          const actualPageNum = getActualPageNumForPDF(pageNum);
           const page = await pdfDocJs.getPage(actualPageNum);
           
           // OCR処理を実行
@@ -3103,6 +3486,53 @@ export default function Home() {
           // OCR結果をIndexedDBに保存
           if (docId) {
             await saveOCRResult(docId, pageNum, cleanedResult);
+          }
+          
+          // OCR処理後にサムネイルを生成（高解像度、ocrThumbnailSizeに応じて動的に調整）
+          try {
+            const thumbPage = await pdfDocJs.getPage(actualPageNum);
+            const thumbCanvas = document.createElement('canvas');
+            const thumbCtx = thumbCanvas.getContext('2d');
+            
+            if (thumbCtx) {
+              const pageRotation = pageRotations[pageNum] || 0;
+              const baseViewport = thumbPage.getViewport({ scale: 1.0, rotation: pageRotation });
+              
+              // ocrThumbnailSizeに応じたスケールを計算（高解像度を維持）
+              // 表示サイズが大きいほど、より高解像度で生成
+              const targetWidth = ocrThumbnailSize;
+              const baseScale = targetWidth / baseViewport.width;
+              
+              // 高解像度を維持するため、デバイスピクセル比を考慮しつつ、最低でも2倍スケール
+              const devicePixelRatio = window.devicePixelRatio || 1;
+              const renderScale = Math.max(baseScale * 2.0, baseScale * devicePixelRatio, 2.0); // 最低2倍、表示サイズに応じて調整
+              
+              const thumbnailViewport = thumbPage.getViewport({ scale: renderScale, rotation: pageRotation });
+              
+              // キャンバスサイズを高解像度で設定
+              thumbCanvas.width = Math.floor(thumbnailViewport.width);
+              thumbCanvas.height = Math.floor(thumbnailViewport.height);
+              thumbCanvas.style.width = `${targetWidth}px`;
+              thumbCanvas.style.height = `${(thumbnailViewport.height / thumbnailViewport.width) * targetWidth}px`;
+              
+              const renderContext = {
+                canvasContext: thumbCtx,
+                viewport: thumbnailViewport,
+                canvas: thumbCanvas,
+              };
+              
+              await thumbPage.render(renderContext).promise;
+              const thumbnailDataUrl = thumbCanvas.toDataURL('image/png', 1.0); // 最高品質でエクスポート
+              
+              // サムネイルを更新
+              setThumbnails(prev => ({
+                ...prev,
+                [pageNum]: thumbnailDataUrl
+              }));
+            }
+          } catch (thumbError) {
+            console.warn(`ページ ${pageNum} のサムネイル生成エラー:`, thumbError);
+            // サムネイル生成エラーは無視して続行
           }
           
           setOcrResults(newResults);
@@ -4578,6 +5008,398 @@ export default function Home() {
         </div>
       )}
 
+      {/* スライドショーモード（全画面表示） */}
+      {pdfDoc && isPresentationMode && (
+        <div 
+          className="fixed inset-0 bg-black z-[10005] flex items-center justify-center"
+          style={{ 
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: '#000000',
+            zIndex: 10005,
+          }}
+          onClick={(e) => {
+            // 背景をクリックした場合は次のページ
+            if (e.target === e.currentTarget) {
+              goToNextPage();
+            }
+          }}
+        >
+          {/* コントロールバー（上部） */}
+          <div 
+            className="absolute top-0 left-0 right-0 bg-black/70 text-white flex items-center z-10"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.85)', // 背景を少し濃くして視認性向上
+              padding: '0.4rem 0.5rem', // パディングをさらに減らす
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-start', // 左から順に配置
+              zIndex: 10000, // z-indexを上げて確実に前面に表示
+              minHeight: '44px', // 最小高さをさらに減らす
+              maxHeight: '44px', // 最大高さも設定して縦に広がらないようにする
+              overflowX: 'auto', // 横スクロール可能にする（画面幅が狭い場合）
+              overflowY: 'hidden', // 縦スクロールは禁止
+              flexWrap: 'nowrap', // 折り返しを禁止
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.5)', // 影を追加して視認性向上
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-1 flex-nowrap" style={{ flexWrap: 'nowrap', overflow: 'visible', justifyContent: 'flex-start', display: 'flex', flexShrink: 0 }}> {/* 左から順に一列で配置 */}
+              {/* 注釈表示切り替え */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowAnnotationsInPresentation(!showAnnotationsInPresentation);
+                }}
+                className="px-1.5 py-0.5 bg-white/20 hover:bg-white/30 rounded transition-colors flex items-center gap-0.5 flex-shrink-0"
+                title="注釈の表示/非表示"
+                style={{ fontSize: '0.7rem' }}
+              >
+                {showAnnotationsInPresentation ? (
+                  <MdVisibility className="text-xs" />
+                ) : (
+                  <MdVisibilityOff className="text-xs" />
+                )}
+                <span className="text-xs whitespace-nowrap">注釈</span>
+              </button>
+              
+              {/* 自動ページ番号付与 */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAutoPageNumberEnabled(!autoPageNumberEnabled);
+                }}
+                className={`px-1.5 py-0.5 rounded transition-colors flex items-center gap-0.5 flex-shrink-0 ${
+                  autoPageNumberEnabled 
+                    ? 'bg-green-600 hover:bg-green-700' 
+                    : 'bg-white/20 hover:bg-white/30'
+                }`}
+                title="自動ページ番号付与"
+                style={{ fontSize: '0.7rem' }}
+              >
+                <span className="text-xs whitespace-nowrap">自動番号</span>
+              </button>
+              
+              {/* 自動ページ番号の表示位置選択 */}
+              {autoPageNumberEnabled && (
+                <select
+                  value={autoPageNumberPosition}
+                  onChange={(e) => setAutoPageNumberPosition(e.target.value as any)}
+                  className="px-1.5 py-0.5 text-xs bg-white/20 hover:bg-white/30 rounded border border-white/30 text-white flex-shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ fontSize: '0.7rem', height: '24px' }}
+                >
+                  <option value="top-right" className="text-black">右上</option>
+                  <option value="top-left" className="text-black">左上</option>
+                  <option value="bottom-right" className="text-black">右下</option>
+                  <option value="bottom-left" className="text-black">左下</option>
+                </select>
+              )}
+              
+              {/* ページ送りボタン（前へ） */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  goToPrevPage();
+                }}
+                disabled={currentPage === 1}
+                className={`px-1.5 py-0.5 rounded transition-colors flex items-center flex-shrink-0 ${
+                  currentPage === 1 
+                    ? 'bg-gray-600 cursor-not-allowed opacity-50' 
+                    : 'bg-white/20 hover:bg-white/30'
+                }`}
+                title="前のページ (←)"
+                style={{ fontSize: '0.7rem' }}
+              >
+                <MdNavigateBefore className="text-base" />
+              </button>
+              
+              {/* ページ送りボタン（次へ） */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  goToNextPage();
+                }}
+                disabled={currentPage >= totalPages}
+                className={`px-1.5 py-0.5 rounded transition-colors flex items-center flex-shrink-0 ${
+                  currentPage >= totalPages 
+                    ? 'bg-gray-600 cursor-not-allowed opacity-50' 
+                    : 'bg-white/20 hover:bg-white/30'
+                }`}
+                title="次のページ (→ または スペース)"
+                style={{ fontSize: '0.7rem' }}
+              >
+                <MdNavigateNext className="text-base" />
+              </button>
+              
+              {/* タイマー */}
+              <div 
+                className="flex items-center gap-1 px-1.5 py-0.5 bg-black/70 border border-white/40 rounded flex-shrink-0"
+                style={{
+                  minWidth: 'auto',
+                  backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                  flexWrap: 'nowrap',
+                  overflow: 'visible',
+                }}
+              >
+                <MdTimer className="text-sm text-white" style={{ flexShrink: 0 }} />
+                <div className="flex items-center min-w-[50px]">
+                  <span 
+                    className="text-xs font-mono font-bold text-white"
+                    style={{
+                      fontFamily: 'monospace',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      color: '#ffffff',
+                    }}
+                  >
+                    {String(Math.floor(presentationTimer.elapsed / 60)).padStart(2, '0')}:{String(presentationTimer.elapsed % 60).padStart(2, '0')}
+                  </span>
+                  {presentationTimer.totalTime !== null && (
+                    <span 
+                      className="text-xs text-white/70 ml-0.5"
+                      style={{
+                        fontSize: '9px',
+                        color: 'rgba(255, 255, 255, 0.7)',
+                      }}
+                    >
+                      / {String(Math.floor(presentationTimer.totalTime / 60)).padStart(2, '0')}:{String(presentationTimer.totalTime % 60).padStart(2, '0')}
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-0.5 ml-1 border-l border-white/40 pl-1">
+                  {!presentationTimer.isRunning ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPresentationTimer(prev => ({ ...prev, isRunning: true }));
+                      }}
+                      className="p-1 hover:bg-white/30 rounded transition-colors bg-white/20"
+                      title="タイマー開始"
+                      style={{ flexShrink: 0 }}
+                    >
+                      <MdPlayArrow className="text-sm text-white" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPresentationTimer(prev => ({ ...prev, isRunning: false }));
+                      }}
+                      className="p-1 hover:bg-white/30 rounded transition-colors bg-white/20"
+                      title="タイマー一時停止"
+                      style={{ flexShrink: 0 }}
+                    >
+                      <MdPause className="text-sm text-white" />
+                    </button>
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPresentationTimer({ isRunning: false, elapsed: 0, totalTime: null });
+                    }}
+                    className="p-1 hover:bg-white/30 rounded transition-colors bg-white/20"
+                    title="タイマーリセット"
+                    style={{ flexShrink: 0 }}
+                  >
+                    <MdStop className="text-sm text-white" />
+                  </button>
+                </div>
+              </div>
+              
+              {/* 終了ボタン */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsPresentationMode(false);
+                }}
+                className="px-2 py-1 bg-red-600 hover:bg-red-700 rounded transition-colors flex items-center gap-1 flex-shrink-0"
+                title="スライドショーを終了 (Esc)"
+                style={{ fontSize: '0.7rem' }}
+              >
+                <MdFullscreenExit className="text-sm" />
+                <span className="text-xs whitespace-nowrap">終了</span>
+              </button>
+            </div>
+          </div>
+
+          {/* PDF表示エリア */}
+          <div 
+            className="flex items-center justify-center w-full h-full"
+            style={{
+              display: 'flex',
+              alignItems: 'center', // 中央揃え
+              justifyContent: 'center',
+              width: '100%',
+              height: '100%',
+              paddingTop: '48px', // コントロールバーの高さ分（さらにコンパクト化）
+              paddingBottom: '20px', // 下部の余白（影を表示するスペースを確保）
+            }}
+            onClick={(e) => {
+              // レーザーポインターが有効な場合は、クリック位置にレーザーを表示
+              if (laserPointerEnabled) {
+                setLaserPointerPosition({
+                  x: e.clientX,
+                  y: e.clientY,
+                });
+                // 3秒後に自動的に非表示
+                if (laserPointerTimeoutRef.current) {
+                  clearTimeout(laserPointerTimeoutRef.current);
+                }
+                laserPointerTimeoutRef.current = setTimeout(() => {
+                  setLaserPointerPosition(null);
+                }, 3000);
+              } else {
+                // 中央をクリックした場合は次のページ
+                if (e.target === e.currentTarget || (e.target as HTMLElement).tagName === 'DIV') {
+                  goToNextPage();
+                }
+              }
+            }}
+            onMouseMove={(e) => {
+              // レーザーポインターが有効な場合は、マウス位置にレーザーを表示
+              if (laserPointerEnabled) {
+                setLaserPointerPosition({
+                  x: e.clientX,
+                  y: e.clientY,
+                });
+                // マウス移動時にタイムアウトをリセット
+                if (laserPointerTimeoutRef.current) {
+                  clearTimeout(laserPointerTimeoutRef.current);
+                }
+                laserPointerTimeoutRef.current = setTimeout(() => {
+                  setLaserPointerPosition(null);
+                }, 1000); // 1秒後に非表示
+              }
+            }}
+            onMouseLeave={() => {
+              // マウスが領域外に出た場合はレーザーを非表示
+              if (laserPointerEnabled) {
+                setLaserPointerPosition(null);
+                if (laserPointerTimeoutRef.current) {
+                  clearTimeout(laserPointerTimeoutRef.current);
+                  laserPointerTimeoutRef.current = null;
+                }
+              }
+            }}
+          >
+            <div
+              className="relative"
+              style={{
+                position: 'relative',
+                maxWidth: '100%',
+                maxHeight: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* PDFキャンバス */}
+              <canvas
+                ref={pdfCanvasRef}
+                style={{ 
+                  display: 'block', 
+                  maxWidth: '95%', // 少し小さくする（最後の手段）
+                  maxHeight: 'calc(100vh - 68px)', // 上下の余白を考慮（paddingTop + paddingBottom）
+                  objectFit: 'contain',
+                }}
+              />
+              {/* 注釈キャンバス（表示/非表示切り替え可能） */}
+              {showAnnotationsInPresentation && (
+                <>
+                  <canvas
+                    ref={inkCanvasRef}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      maxWidth: '95%', // PDFキャンバスと同じサイズに合わせる
+                      maxHeight: 'calc(100vh - 68px)', // 上下の余白を考慮
+                      pointerEvents: 'none',
+                    }}
+                  />
+                  <canvas
+                    ref={textCanvasRef}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      maxWidth: '95%', // PDFキャンバスと同じサイズに合わせる
+                      maxHeight: 'calc(100vh - 68px)', // 上下の余白を考慮
+                      pointerEvents: 'none',
+                    }}
+                  />
+                  <canvas
+                    ref={shapeCanvasRef}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      maxWidth: '95%', // PDFキャンバスと同じサイズに合わせる
+                      maxHeight: 'calc(100vh - 68px)', // 上下の余白を考慮
+                      pointerEvents: 'none',
+                    }}
+                  />
+                </>
+              )}
+              {/* レーザーポインター */}
+              {laserPointerEnabled && laserPointerPosition && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    left: `${laserPointerPosition.x}px`,
+                    top: `${laserPointerPosition.y}px`,
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    backgroundColor: '#ef4444',
+                    boxShadow: '0 0 15px #ef4444, 0 0 30px #ef4444, 0 0 45px rgba(239, 68, 68, 0.5)',
+                    pointerEvents: 'none',
+                    transform: 'translate(-50%, -50%)',
+                    zIndex: 10006,
+                    transition: 'all 0.05s linear',
+                  }}
+                />
+              )}
+              {/* 自動ページ番号付与 */}
+              {autoPageNumberEnabled && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    ...(autoPageNumberPosition === 'top-right' ? { top: '20px', right: '20px' } :
+                        autoPageNumberPosition === 'top-left' ? { top: '20px', left: '20px' } :
+                        autoPageNumberPosition === 'bottom-right' ? { bottom: '20px', right: '20px' } :
+                        { bottom: '20px', left: '20px' }),
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                    color: 'white',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    zIndex: 10005,
+                    pointerEvents: 'none',
+                    fontFamily: 'Arial, sans-serif',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+                  }}
+                >
+                  {currentPage} / {totalPages}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 下部ナビゲーションバーは削除（全て上部に統合） */}
+        </div>
+      )}
+
       {/* 全画面サムネイルモーダル */}
       {pdfDoc && showThumbnailModal && (
         <div 
@@ -4850,9 +5672,9 @@ export default function Home() {
                           
                           // 拡大表示用の画像を生成（大きなスケールでレンダリング）
                           if (pdfDoc) {
-                            try {
-                              const page = await pdfDoc.getPage(pageNum);
-                              const canvas = document.createElement('canvas');
+      try {
+        const page = await pdfDoc.getPage(pageNum);
+        const canvas = document.createElement('canvas');
                               const ctx = canvas.getContext('2d');
                               
                               if (ctx) {
@@ -6155,6 +6977,33 @@ export default function Home() {
               OCR
             </button>
             <span className="text-slate-300 mx-1">|</span>
+            {/* プレゼンモードボタン */}
+            {pdfDoc && (
+              <>
+                <button
+                  onClick={() => setIsPresentationMode(true)}
+                  className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-green-500 shadow-md hover:scale-105 active:scale-95"
+                  style={{
+                    background: 'linear-gradient(to right, #10b981, #059669)',
+                    color: 'white',
+                    pointerEvents: 'auto',
+                    cursor: 'pointer',
+                    zIndex: 10,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #059669, #047857)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #10b981, #059669)';
+                  }}
+                  title="スライドショーモード (F11)"
+                >
+                  <MdSlideshow className="text-base text-white" />
+                  プレゼン
+                </button>
+                <span className="text-slate-300 mx-1">|</span>
+              </>
+            )}
             <button
               onClick={handleUndo}
               disabled={undoStack.length === 0}
@@ -8199,20 +9048,56 @@ export default function Home() {
             )}
 
             <div className="p-2 bg-white rounded-lg border-2 border-purple-300 shadow-sm" style={{ borderWidth: '2px' }}>
-              <div className="flex gap-2 mb-2">
+              <div className="flex flex-wrap gap-2 mb-2">
                 <Button
                   onClick={handleOCRCurrentPage}
                   disabled={isProcessingOCR || !pdfDoc}
-                  className="flex-1 h-8 px-3 text-xs font-semibold bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-purple-500"
+                  className="flex-1 min-w-[120px] h-8 px-3 text-xs font-semibold bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-purple-500"
                 >
                   現在のページをOCR
                 </Button>
                 <Button
                   onClick={handleOCRAllPages}
                   disabled={isProcessingOCR || !pdfDoc}
-                  className="flex-1 h-8 px-3 text-xs font-semibold bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-purple-500"
+                  className="flex-1 min-w-[120px] h-8 px-3 text-xs font-semibold bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-purple-500"
                 >
                   全ページをOCR
+                </Button>
+                <Button
+                  onClick={async () => {
+                    // 全OCR結果をシナリオとして一括保存
+                    if (docId && Object.keys(ocrResults).length > 0) {
+                      const newScenarios: Record<number, string> = {};
+                      for (const [pageNum, result] of Object.entries(ocrResults)) {
+                        await saveScenario(docId, parseInt(pageNum), result.text);
+                        newScenarios[parseInt(pageNum)] = result.text;
+                      }
+                      setScenarios(prev => ({ ...prev, ...newScenarios }));
+                      toast({
+                        title: "成功",
+                        description: `${Object.keys(ocrResults).length}ページのシナリオを保存しました`,
+                        variant: "success",
+                      });
+                    }
+                  }}
+                  disabled={!pdfDoc || Object.keys(ocrResults).length === 0}
+                  className="flex-1 min-w-[140px] h-8 px-3 text-xs font-semibold bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900 text-white shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-green-500 flex items-center gap-1"
+                  title="全OCR結果をシナリオとして保存"
+                >
+                  <MdNotes className="text-sm" />
+                  全ページをシナリオにする
+                </Button>
+                <Button
+                  onClick={() => {
+                    // OCRモーダルは開いたままにして、シナリオモーダルを前面に表示
+                    setShowScenarioDialog(true);
+                  }}
+                  disabled={!pdfDoc || Object.keys(scenarios).length === 0}
+                  className="flex-1 min-w-[120px] h-8 px-3 text-xs font-semibold bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-blue-500 flex items-center gap-1"
+                  title="シナリオ一覧・編集・印刷"
+                >
+                  <MdDescription className="text-sm" />
+                  シナリオ編集
                 </Button>
               </div>
               <div className="flex gap-2 items-center">
@@ -8320,6 +9205,36 @@ export default function Home() {
                             </button>
                             <button
                               onClick={async () => {
+                                // OCR結果からシナリオを作成
+                                if (docId) {
+                                  await saveScenario(docId, parseInt(pageNum), result.text);
+                                  setScenarios(prev => ({ ...prev, [parseInt(pageNum)]: result.text }));
+                                  toast({
+                                    title: "成功",
+                                    description: `ページ ${pageNum} のシナリオを保存しました`,
+                                    variant: "success",
+                                  });
+                                }
+                              }}
+                              className="px-2 py-0.5 text-xs font-medium bg-green-500 text-white rounded hover:bg-green-600 flex items-center gap-1"
+                              title="OCR結果をシナリオとして保存"
+                            >
+                              <MdNotes className="text-xs" />
+                              シナリオ保存
+                            </button>
+                            <button
+                              onClick={() => {
+                                // シナリオモーダルを開く（表示・印刷のみ）
+                                setShowScenarioDialog(true);
+                              }}
+                              className="px-2 py-0.5 text-xs font-medium bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-1"
+                              title="シナリオモーダルで表示・印刷"
+                            >
+                              <MdDescription className="text-xs" />
+                              シナリオ表示
+                            </button>
+                            <button
+                              onClick={async () => {
                                 if (docId) {
                                   await deleteOCRResult(docId, parseInt(pageNum));
                                   const newResults = { ...ocrResults };
@@ -8364,6 +9279,13 @@ export default function Home() {
                                         const newResults = { ...ocrResults };
                                         newResults[parseInt(pageNum)] = updatedResult;
                                         setOcrResults(newResults);
+                                        
+                                        // シナリオにも反映（同期）
+                                        if (scenarios[parseInt(pageNum)]) {
+                                          await saveScenario(docId, parseInt(pageNum), editingOcrText);
+                                          setScenarios(prev => ({ ...prev, [parseInt(pageNum)]: editingOcrText }));
+                                        }
+                                        
                                         setEditingOcrPage(null);
                                         setEditingOcrText('');
                                         toast({
@@ -8376,6 +9298,36 @@ export default function Home() {
                                     className="px-2 py-1 text-xs font-medium bg-green-500 text-white rounded hover:bg-green-600"
                                   >
                                     保存
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      // OCR結果をシナリオに保存してからシナリオモーダルを開く
+                                      if (docId) {
+                                        const updatedResult = { ...result, text: editingOcrText };
+                                        await saveOCRResult(docId, parseInt(pageNum), updatedResult);
+                                        const newResults = { ...ocrResults };
+                                        newResults[parseInt(pageNum)] = updatedResult;
+                                        setOcrResults(newResults);
+                                        
+                                        // シナリオにも保存
+                                        await saveScenario(docId, parseInt(pageNum), editingOcrText);
+                                        setScenarios(prev => ({ ...prev, [parseInt(pageNum)]: editingOcrText }));
+                                        
+                                        setEditingOcrPage(null);
+                                        setEditingOcrText('');
+                                        setShowScenarioDialog(true);
+                                        toast({
+                                          title: "成功",
+                                          description: `ページ ${pageNum} のOCR結果とシナリオを更新しました`,
+                                          variant: "success",
+                                        });
+                                      }
+                                    }}
+                                    className="px-2 py-1 text-xs font-medium bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-1"
+                                    title="OCR結果をシナリオに反映して表示"
+                                  >
+                                    <MdDescription className="text-xs" />
+                                    シナリオに反映
                                   </button>
                                   <button
                                     onClick={() => {
@@ -8463,9 +9415,34 @@ export default function Home() {
                         <MdNavigateBefore className="text-sm" />
                         前へ
                       </button>
-                      <span className="text-xs font-semibold text-purple-900 px-3 py-1.5 bg-purple-50 rounded border border-purple-200">
-                        ページ {currentOcrResultPage} / {totalFilteredPages}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-purple-900 px-3 py-1.5 bg-purple-50 rounded border border-purple-200">
+                          ページ {currentOcrResultPage} / {totalFilteredPages}
+                        </span>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={totalFilteredPages}
+                          value={currentOcrResultPage}
+                          onChange={(e) => {
+                            const page = parseInt(e.target.value);
+                            if (!isNaN(page) && page >= 1 && page <= totalFilteredPages) {
+                              setCurrentOcrResultPage(page);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const page = parseInt(e.currentTarget.value);
+                              if (!isNaN(page) && page >= 1 && page <= totalFilteredPages) {
+                                setCurrentOcrResultPage(page);
+                              }
+                            }
+                          }}
+                          className="w-16 h-8 text-xs text-center border-2 border-purple-400 rounded bg-white focus:border-purple-600 focus:ring-2 focus:ring-purple-200"
+                          style={{ borderWidth: '2px' }}
+                          placeholder="ページ"
+                        />
+                      </div>
                       <button
                         onClick={() => {
                           if (currentOcrResultPage < totalFilteredPages) {
@@ -8516,6 +9493,264 @@ export default function Home() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* シナリオダイアログ - 独立したモーダルとして実装（OCRモーダルより前面に表示） */}
+      {showScenarioDialog && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 flex items-center justify-center"
+          style={{
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            zIndex: 99999,
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            pointerEvents: 'auto',
+          }}
+          onClick={(e) => {
+            console.log('🔴 シナリオモーダルオーバーレイ onClick:', e.target, e.currentTarget);
+            const target = e.target as HTMLElement;
+            // 編集エリア内のクリックは無視
+            if (target.closest('[data-editing-area]') || target.closest('textarea')) {
+              console.log('🔴 編集エリア内のクリックを無視');
+              return;
+            }
+            setShowScenarioDialog(false);
+          }}
+        >
+          <div
+            className="bg-white border-4 border-green-600 shadow-2xl rounded-lg flex flex-col max-w-5xl w-[90vw] max-h-[90vh]"
+            onClick={(e) => {
+              console.log('🟠 シナリオモーダルコンテンツ onClick:', e.target, e.currentTarget);
+              e.stopPropagation();
+            }}
+            style={{
+              zIndex: 100011,
+              position: 'relative',
+              backgroundColor: '#ffffff',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+              margin: '0 auto',
+            }}
+          >
+            {/* ヘッダー */}
+            <div 
+              className="flex items-center justify-between p-6 border-b-4 border-green-600"
+              style={{
+                backgroundColor: '#f0fdf4',
+                borderBottomWidth: '4px',
+                borderBottomColor: '#16a34a',
+              }}
+            >
+              <div>
+                <h2 
+                  className="flex items-center gap-2 text-3xl font-bold"
+                  style={{
+                    color: '#166534',
+                  }}
+                >
+                  <MdDescription className="text-4xl" style={{ color: '#16a34a' }} />
+                  プレゼンシナリオ
+                </h2>
+                <p 
+                  className="text-base mt-2 font-semibold"
+                  style={{
+                    color: '#15803d',
+                  }}
+                >
+                  OCR結果から作成したシナリオを編集・印刷できます
+                </p>
+              </div>
+              <button
+                onClick={() => setShowScenarioDialog(false)}
+                className="p-3 hover:bg-green-200 rounded-lg transition-colors"
+                title="閉じる"
+                style={{
+                  backgroundColor: '#dcfce7',
+                }}
+              >
+                <MdClose className="text-3xl" style={{ color: '#166534' }} />
+              </button>
+            </div>
+            <div 
+              className="flex-1 overflow-y-auto p-6 space-y-4"
+              style={{
+                backgroundColor: '#ffffff',
+                overflowY: 'auto',
+                maxHeight: 'calc(90vh - 300px)',
+                paddingLeft: '2rem',
+                paddingRight: '2rem',
+              }}
+            >
+              {Object.keys(scenarios).length === 0 ? (
+                <div className="text-center py-8">
+                  <MdNotes className="text-4xl text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-600 font-semibold">シナリオがありません</p>
+                  <p className="text-gray-500 text-sm mt-1">OCR結果から「シナリオ」ボタンで作成してください</p>
+                </div>
+              ) : (
+                Object.entries(scenarios)
+                  .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                  .map(([pageNum, scenario]) => (
+                    <div 
+                      key={pageNum} 
+                      className="border-2 rounded-lg p-5"
+                      style={{
+                        borderColor: '#86efac',
+                        backgroundColor: '#f0fdf4',
+                        borderWidth: '2px',
+                        position: 'relative',
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-bold text-green-900">ページ {pageNum}</h3>
+                      </div>
+                      <div className="text-base text-gray-900 whitespace-pre-wrap bg-gradient-to-br from-white to-green-50 p-5 rounded-lg border-2 border-green-300 shadow-md" style={{ 
+                        fontFamily: 'MS Gothic, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif',
+                        lineHeight: '2.0',
+                        minHeight: '120px',
+                        fontSize: '15px',
+                      }}>
+                        {scenario}
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+            {/* フッター */}
+            <div 
+              className="flex-shrink-0 flex flex-col gap-3 p-6 border-t-4"
+              style={{
+                backgroundColor: '#f0fdf4',
+                borderTopWidth: '4px',
+                borderTopColor: '#16a34a',
+              }}
+            >
+              {/* 印刷オプション */}
+              <div className="flex items-center gap-3 w-full pb-2 border-b border-green-200">
+                <label className="flex items-center gap-2 text-sm text-green-800 font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={scenarioPrintPageBreak}
+                    onChange={(e) => setScenarioPrintPageBreak(e.target.checked)}
+                    className="w-4 h-4 text-green-600 border-green-400 rounded focus:ring-green-500"
+                  />
+                  <span>ページごとに改ページ</span>
+                </label>
+              </div>
+              <div className="flex gap-2 w-full">
+                <Button
+                  onClick={() => {
+                    // 全ページ一括印刷
+                    const printWindow = window.open('', '_blank');
+                    if (printWindow) {
+                      const sortedScenarios = Object.entries(scenarios)
+                        .sort(([a], [b]) => parseInt(a) - parseInt(b));
+                      const pageBreakStyle = scenarioPrintPageBreak ? 'page-break-after: always;' : '';
+                      const printContent = `
+                        <!DOCTYPE html>
+                        <html>
+                          <head>
+                            <title>プレゼンシナリオ（全ページ）</title>
+                            <style>
+                              body { font-family: 'MS Gothic', sans-serif; padding: 20px; line-height: 2.0; }
+                              h1 { color: #059669; border-bottom: 2px solid #059669; padding-bottom: 10px; margin-bottom: 30px; }
+                              .page { margin-bottom: ${scenarioPrintPageBreak ? '0' : '30px'}; ${pageBreakStyle} padding: 20px; }
+                              .page-number { font-weight: bold; color: #059669; margin-bottom: 15px; font-size: 1.2em; border-bottom: 1px solid #059669; padding-bottom: 5px; }
+                              .scenario { white-space: pre-wrap; line-height: 2.0; font-size: 15px; }
+                              @media print {
+                                body { padding: 15px; }
+                                .page { ${pageBreakStyle} margin-bottom: ${scenarioPrintPageBreak ? '0' : '20px'}; }
+                                .page:last-child { page-break-after: auto; }
+                              }
+                            </style>
+                          </head>
+                          <body>
+                            <h1>プレゼンシナリオ（全ページ）</h1>
+                            ${sortedScenarios.map(([pageNum, scenario]) => `
+                              <div class="page">
+                                <div class="page-number">ページ ${pageNum}</div>
+                                <div class="scenario">${scenario.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div>
+                              </div>
+                            `).join('')}
+                          </body>
+                        </html>
+                      `;
+                      printWindow.document.write(printContent);
+                      printWindow.document.close();
+                      printWindow.focus();
+                      setTimeout(() => {
+                        printWindow.print();
+                      }, 250);
+                    }
+                  }}
+                  disabled={Object.keys(scenarios).length === 0}
+                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 flex-1"
+                >
+                  <MdPrint className="text-lg" />
+                  全ページ印刷
+                </Button>
+                <Button
+                  onClick={() => {
+                    // 現在編集中のページのみ印刷（編集中でなくても選択可能）
+                    const pageToPrint = editingScenarioPage || (Object.keys(scenarios).length > 0 ? parseInt(Object.keys(scenarios).sort((a, b) => parseInt(a) - parseInt(b))[0]) : null);
+                    if (pageToPrint !== null && scenarios[pageToPrint]) {
+                      const printWindow = window.open('', '_blank');
+                      if (printWindow) {
+                        const scenario = scenarios[pageToPrint];
+                        const printContent = `
+                          <!DOCTYPE html>
+                          <html>
+                            <head>
+                              <title>プレゼンシナリオ - ページ ${pageToPrint}</title>
+                              <style>
+                                body { font-family: 'MS Gothic', sans-serif; padding: 20px; line-height: 2.0; }
+                                h1 { color: #059669; border-bottom: 2px solid #059669; padding-bottom: 10px; margin-bottom: 30px; }
+                                .page-number { font-weight: bold; color: #059669; margin-bottom: 15px; font-size: 1.2em; border-bottom: 1px solid #059669; padding-bottom: 5px; }
+                                .scenario { white-space: pre-wrap; line-height: 2.0; font-size: 15px; }
+                              </style>
+                            </head>
+                            <body>
+                              <h1>プレゼンシナリオ</h1>
+                              <div class="page-number">ページ ${pageToPrint}</div>
+                              <div class="scenario">${scenario.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div>
+                            </body>
+                          </html>
+                        `;
+                        printWindow.document.write(printContent);
+                        printWindow.document.close();
+                        printWindow.focus();
+                        setTimeout(() => {
+                          printWindow.print();
+                        }, 250);
+                      }
+                    } else {
+                      toast({
+                        title: "情報",
+                        description: "印刷可能なページがありません",
+                        variant: "default",
+                      });
+                    }
+                  }}
+                  disabled={Object.keys(scenarios).length === 0}
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+                >
+                  <MdPrint className="text-lg" />
+                  現在のページ印刷
+                </Button>
+                <Button
+                  onClick={() => setShowScenarioDialog(false)}
+                  variant="outline"
+                  className="border-2 border-green-400 hover:bg-green-100"
+                >
+                  閉じる
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* PDF分割ダイアログ */}
       <Dialog 

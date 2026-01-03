@@ -65,37 +65,76 @@ export async function renderPage(
   pdfPage: import('pdfjs-dist').PDFPageProxy,
   canvas: HTMLCanvasElement,
   scale: number = 1.0,
-  rotation: number = 0
-): Promise<{ width: number; height: number }> {
+  rotation: number = 0,
+  previousTask?: any // 前のレンダリングタスク（キャンセル用、通常はnull）
+): Promise<{ width: number; height: number; task: any }> {
+  // 前のレンダリングタスクが渡された場合は確実にキャンセルして完了を待つ
+  // ただし、通常はrenderCurrentPageで既にキャンセル済みなので、この処理は実行されない
+  if (previousTask) {
+    try {
+      if (previousTask && typeof previousTask.cancel === 'function') {
+        previousTask.cancel();
+        try {
+          await Promise.race([
+            previousTask.promise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1000))
+          ]).catch(() => {
+            // キャンセルエラーやタイムアウトは無視
+          });
+        } catch (error) {
+          // エラーは無視
+        }
+        await new Promise(resolve => setTimeout(resolve, 200));
+        console.log('renderPage: 前のタスクが完全にキャンセルされました');
+      }
+    } catch (error) {
+      console.log('前のレンダリングタスクのキャンセルに失敗:', error);
+    }
+  }
+
   const viewport = pdfPage.getViewport({ scale, rotation });
-  const context = canvas.getContext('2d');
+  
+  // キャンバスのサイズを設定（上下反転問題を防ぐ）
+  const devicePixelRatio = window.devicePixelRatio || 1;
+  const outputScale = devicePixelRatio;
+  const newWidth = Math.floor(viewport.width * outputScale);
+  const newHeight = Math.floor(viewport.height * outputScale);
+  
+  // キャンバスのサイズを設定（サイズ変更によりコンテキストが自動的にリセットされる）
+  // これにより、前のレンダリングタスクがキャンバスを使用できなくなる
+  canvas.width = newWidth;
+  canvas.height = newHeight;
+  canvas.style.width = `${viewport.width}px`;
+  canvas.style.height = `${viewport.height}px`;
+
+  // 新しいコンテキストを取得（サイズ変更後は自動的に新しいコンテキストになる）
+  const context = canvas.getContext('2d', { willReadFrequently: false });
   
   if (!context) {
     throw new Error('Failed to get canvas context');
   }
 
-  // デバイスピクセル比を考慮
-  const devicePixelRatio = window.devicePixelRatio || 1;
-  const outputScale = devicePixelRatio;
+  // キャンバスを完全にクリア（前のレンダリングの残りを削除）
+  context.clearRect(0, 0, canvas.width, canvas.height);
 
-  canvas.width = Math.floor(viewport.width * outputScale);
-  canvas.height = Math.floor(viewport.height * outputScale);
-  canvas.style.width = `${viewport.width}px`;
-  canvas.style.height = `${viewport.height}px`;
-
+  // transformを完全にリセットしてからスケールを設定
+  context.setTransform(1, 0, 0, 1, 0, 0);
   context.scale(outputScale, outputScale);
 
   const renderContext = {
     canvasContext: context,
     viewport: viewport,
-    canvas: canvas,
   };
 
-  await pdfPage.render(renderContext).promise;
+  // 新しいレンダリングタスクを開始
+  // キャンバスのサイズを変更したので、前のタスクはこのキャンバスを使用できない
+  const renderTask = pdfPage.render(renderContext);
+  await renderTask.promise;
 
   return {
     width: viewport.width,
     height: viewport.height,
+    task: renderTask,
   };
 }
 
