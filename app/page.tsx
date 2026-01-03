@@ -3260,11 +3260,28 @@ export default function Home() {
       
       const canvas = shapeCanvasRef.current;
       
-      const updatedShape = {
-        ...currentShape,
-        x2: normalizedX,
-        y2: normalizedY,
-      };
+      // 折れ線矢印の場合はpoints配列を更新
+      let updatedShape;
+      if (tool === 'polyline-arrow' && currentShape.points) {
+        // 最後の点を更新（または新しい点を追加）
+        const points = [...currentShape.points];
+        if (points.length > 0) {
+          // 最後の点を更新
+          points[points.length - 1] = { x: normalizedX, y: normalizedY };
+        }
+        updatedShape = {
+          ...currentShape,
+          x2: normalizedX,
+          y2: normalizedY,
+          points: points,
+        };
+      } else {
+        updatedShape = {
+          ...currentShape,
+          x2: normalizedX,
+          y2: normalizedY,
+        };
+      }
       setCurrentShape(updatedShape);
 
       // リアルタイム描画
@@ -7738,7 +7755,7 @@ export default function Home() {
               </>
             )}
 
-            {(tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow') && (
+            {(tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow' || tool === 'double-line' || tool === 'polyline-arrow') && (
               <div className="flex gap-3 items-center flex-wrap">
                 <div className="flex items-center gap-2">
                   <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -8241,7 +8258,7 @@ export default function Home() {
                 top: 0,
                 left: 0,
                 touchAction: 'none',
-                cursor: textSelectionEnabled ? 'text' : (tool === 'pen' || tool === 'highlight' ? 'crosshair' : tool === 'text' ? 'text' : (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow') ? 'crosshair' : 'default'),
+                cursor: textSelectionEnabled ? 'text' : (tool === 'pen' || tool === 'highlight' ? 'crosshair' : tool === 'text' ? 'text' : (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow' || tool === 'double-line' || tool === 'polyline-arrow') ? 'crosshair' : 'default'),
                 pointerEvents: textSelectionEnabled ? 'auto' : ((tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow' || tool === 'select') ? 'none' : 'auto'),
                 zIndex: textSelectionEnabled ? 11 : 2, // テキスト選択モードの時は最前面に
                 width: '100%',

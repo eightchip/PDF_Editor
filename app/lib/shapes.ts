@@ -85,9 +85,8 @@ export function drawShapeAnnotation(
 
     case 'double-line':
       // 二重線（取り消し線）を描画
-      const lineLength = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
       const lineAngle = Math.atan2(y2 - y1, x2 - x1);
-      const offset = shape.width * 0.5; // 線の間隔
+      const offset = shape.width * 0.8; // 線の間隔（太さに応じて調整）
       const perpX = -Math.sin(lineAngle) * offset;
       const perpY = Math.cos(lineAngle) * offset;
 
