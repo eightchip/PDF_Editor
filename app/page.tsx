@@ -1337,19 +1337,20 @@ export default function Home() {
       // プレゼンモード終了時にメイン画面のPDFを再レンダリング
       // currentPageを強制的に更新してuseEffectを確実にトリガーする
       (async () => {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        // currentPageを一度更新してから元に戻すことで、useEffectを確実にトリガー
+        await new Promise(resolve => setTimeout(resolve, 150));
         const currentPageValue = currentPage;
-        if (currentPageValue > 0) {
-          // 一時的に別のページに設定してから元に戻す
-          setCurrentPage(0);
-          await new Promise(resolve => setTimeout(resolve, 50));
+        if (currentPageValue > 0 && pdfDoc && currentPageValue <= pdfDoc.numPages) {
+          // 一時的に別のページに設定してから元に戻すことで、useEffectを確実にトリガー
+          // ただし、0に設定すると無効なページになるので、1に設定してから元に戻す
+          const tempPage = currentPageValue === 1 ? 2 : 1;
+          setCurrentPage(tempPage);
+          await new Promise(resolve => setTimeout(resolve, 100));
           setCurrentPage(currentPageValue);
-        } else {
-          // currentPageが0の場合は、直接renderCurrentPage()を呼ぶ
-          if (pdfDoc && pdfCanvasRef.current && inkCanvasRef.current) {
-            await renderCurrentPage();
-          }
+          console.log('プレゼンモード終了: currentPageを更新して再レンダリングをトリガー', { currentPageValue });
+        } else if (pdfDoc && pdfCanvasRef.current && inkCanvasRef.current) {
+          // currentPageが無効な場合は、直接renderCurrentPage()を呼ぶ
+          console.log('プレゼンモード終了: 直接renderCurrentPage()を呼び出し');
+          await renderCurrentPage();
         }
       })();
     }
@@ -1657,10 +1658,11 @@ export default function Home() {
   // （pageOrderが変更されても、currentPageが変わらない限り再レンダリングしない）
   useEffect(() => {
     // pdfDocが有効な場合のみレンダリング
-    if (pdfDoc && pdfDoc.numPages > 0) {
+    if (pdfDoc && pdfDoc.numPages > 0 && currentPage > 0 && currentPage <= pdfDoc.numPages) {
+      console.log('useEffect: currentPage変更を検知、renderCurrentPage()を呼び出し', { currentPage, isPresentationMode });
       renderCurrentPage();
     }
-      }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, drawWatermarkOnCanvas, snapToTextEnabled, textSelectionEnabled, isPresentationMode]);
+  }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, drawWatermarkOnCanvas, snapToTextEnabled, textSelectionEnabled, isPresentationMode]);
 
   // strokesの状態変更時に再描画（ハイライトなどが追加/削除されたとき）
   useEffect(() => {
@@ -3675,23 +3677,28 @@ export default function Home() {
       newPage = page;
       console.log('目次ジャンプ デバッグ: currentPageを', page, 'に設定（pageOrderなし）');
     }
-    // 現在のページと同じ場合は、強制的に更新してuseEffectをトリガー
-    if (newPage === currentPage) {
-      // 一時的に別のページに設定してから元に戻す
-      setCurrentPage(0);
-      setTimeout(() => {
-        setCurrentPage(newPage);
-      }, 50);
-    } else {
-      setCurrentPage(newPage);
-    }
     setShowTableOfContentsDialog(false);
     console.log('目次ジャンプ デバッグ: ダイアログを閉じました');
+    
+    // 現在のページと同じ場合は、強制的に更新してuseEffectをトリガー
+    if (newPage === currentPage) {
+      // 一時的に別のページに設定してから元に戻すことで、useEffectを確実にトリガー
+      const tempPage = newPage === 1 ? 2 : 1;
+      setCurrentPage(tempPage);
+      setTimeout(() => {
+        setCurrentPage(newPage);
+        console.log('目次ジャンプ: currentPageを更新して再レンダリングをトリガー', { newPage });
+      }, 100);
+    } else {
+      setCurrentPage(newPage);
+      console.log('目次ジャンプ: currentPageを設定', { newPage });
+    }
+    
     // useEffectで自動的にrenderCurrentPage()が呼ばれるが、確実に実行されるように少し待ってから明示的に呼ぶ
     if (pdfDoc && pdfCanvasRef.current && inkCanvasRef.current) {
       setTimeout(async () => {
         await renderCurrentPage();
-      }, 200);
+      }, 250);
     }
   };
 
@@ -5731,7 +5738,18 @@ export default function Home() {
                         } else {
                           newPage = pageNum;
                         }
-                        setCurrentPage(newPage);
+                        // 現在のページと同じ場合は、強制的に更新してuseEffectをトリガー
+                        if (newPage === currentPage) {
+                          const tempPage = newPage === 1 ? 2 : 1;
+                          setCurrentPage(tempPage);
+                          setTimeout(() => {
+                            setCurrentPage(newPage);
+                            console.log('ページ管理: currentPageを更新して再レンダリングをトリガー', { newPage });
+                          }, 100);
+                        } else {
+                          setCurrentPage(newPage);
+                          console.log('ページ管理: currentPageを設定', { newPage });
+                        }
                         // useEffectで自動的にrenderCurrentPage()が呼ばれる
                         // サムネイルモーダルは閉じない
                       }}
@@ -5750,7 +5768,18 @@ export default function Home() {
                         } else {
                           newPage = pageNum;
                         }
-                        setCurrentPage(newPage);
+                        // 現在のページと同じ場合は、強制的に更新してuseEffectをトリガー
+                        if (newPage === currentPage) {
+                          const tempPage = newPage === 1 ? 2 : 1;
+                          setCurrentPage(tempPage);
+                          setTimeout(() => {
+                            setCurrentPage(newPage);
+                            console.log('ページ管理: currentPageを更新して再レンダリングをトリガー', { newPage });
+                          }, 100);
+                        } else {
+                          setCurrentPage(newPage);
+                          console.log('ページ管理: currentPageを設定', { newPage });
+                        }
                         // useEffectで自動的にrenderCurrentPage()が呼ばれる
                         setShowThumbnailModal(false);
                       }}
