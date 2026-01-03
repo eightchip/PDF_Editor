@@ -1419,18 +1419,27 @@ export default function Home() {
     if (!pdfCanvasRef.current || !inkCanvasRef.current) {
       console.warn('renderCurrentPage: キャンバスが取得できません、再試行します', { 
         hasPdfCanvas: !!pdfCanvasRef.current, 
-        hasInkCanvas: !!inkCanvasRef.current 
+        hasInkCanvas: !!inkCanvasRef.current,
+        showThumbnailModal,
+        showTableOfContentsDialog,
+        isPresentationMode
       });
-      // 少し待ってから再試行（モーダルが閉じるのを待つ）
-      await new Promise(resolve => setTimeout(resolve, 100));
-      if (!pdfCanvasRef.current || !inkCanvasRef.current) {
-        console.warn('renderCurrentPage: 再試行後もキャンバスが取得できません', { 
-          hasPdfCanvas: !!pdfCanvasRef.current, 
-          hasInkCanvas: !!inkCanvasRef.current 
-        });
-        return;
+      // モーダルが開いている場合は、モーダルが閉じるまで待つ
+      // 最大5回まで再試行（合計500ms）
+      for (let i = 0; i < 5; i++) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        if (pdfCanvasRef.current && inkCanvasRef.current) {
+          console.log('renderCurrentPage: 再試行でキャンバスを取得しました', { retryCount: i + 1 });
+          break;
+        }
+        if (i === 4) {
+          console.warn('renderCurrentPage: 再試行後もキャンバスが取得できません', { 
+            hasPdfCanvas: !!pdfCanvasRef.current, 
+            hasInkCanvas: !!inkCanvasRef.current 
+          });
+          return;
+        }
       }
-      console.log('renderCurrentPage: 再試行でキャンバスを取得しました');
     }
 
     // プレゼンモード中でもレンダリングを実行（プレゼンモード用の表示のため）
@@ -1732,17 +1741,51 @@ export default function Home() {
   useEffect(() => {
     // pdfDocが有効な場合のみレンダリング
     if (pdfDoc && pdfDoc.numPages > 0 && currentPage > 0 && currentPage <= pdfDoc.numPages) {
-      console.log('useEffect: currentPage変更を検知、renderCurrentPage()を呼び出し', { currentPage, isPresentationMode });
-      // 確実に実行されるように、少し待ってから呼び出す
-      const timer = setTimeout(() => {
-        console.log('useEffect: renderCurrentPage()を実行', { currentPage });
+      console.log('useEffect: currentPage変更を検知、renderCurrentPage()を呼び出し', { 
+        currentPage, 
+        isPresentationMode,
+        showThumbnailModal,
+        showTableOfContentsDialog
+      });
+      // モーダルが開いている場合は、モーダルが閉じるまで待つ
+      const checkAndRender = async () => {
+        // モーダルが開いている場合は、モーダルが閉じるまで待つ（最大1秒）
+        let retryCount = 0;
+        while ((showThumbnailModal || showTableOfContentsDialog) && retryCount < 10) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          retryCount++;
+        }
+        // 確実に実行されるように、少し待ってから呼び出す
+        await new Promise(resolve => setTimeout(resolve, 50));
+        console.log('useEffect: renderCurrentPage()を実行', { currentPage, retryCount });
         renderCurrentPage().catch(error => {
           console.error('useEffect: renderCurrentPage()エラー', error);
         });
-      }, 0);
-      return () => clearTimeout(timer);
+      };
+      checkAndRender();
     }
-  }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, drawWatermarkOnCanvas, snapToTextEnabled, textSelectionEnabled, isPresentationMode]);
+  }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, drawWatermarkOnCanvas, snapToTextEnabled, textSelectionEnabled, isPresentationMode, showThumbnailModal, showTableOfContentsDialog]);
+  
+  // モーダルが閉じたときに再レンダリング
+  useEffect(() => {
+    if (pdfDoc && pdfDoc.numPages > 0 && currentPage > 0 && currentPage <= pdfDoc.numPages) {
+      if (!showThumbnailModal && !showTableOfContentsDialog && !isPresentationMode) {
+        console.log('useEffect: モーダルが閉じたので再レンダリング', { 
+          currentPage,
+          showThumbnailModal,
+          showTableOfContentsDialog,
+          isPresentationMode
+        });
+        // モーダルが閉じた後、少し待ってからレンダリング
+        const timer = setTimeout(() => {
+          renderCurrentPage().catch(error => {
+            console.error('useEffect: モーダル閉鎖後のrenderCurrentPage()エラー', error);
+          });
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [showThumbnailModal, showTableOfContentsDialog, isPresentationMode, pdfDoc, currentPage]);
 
   // strokesの状態変更時に再描画（ハイライトなどが追加/削除されたとき）
   useEffect(() => {
