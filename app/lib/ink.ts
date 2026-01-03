@@ -73,6 +73,9 @@ export function drawStroke(
         ctx.globalAlpha = 1.0; // テキストは不透明
         ctx.globalCompositeOperation = 'source-over'; // 通常の描画モード
         ctx.fillStyle = '#000000'; // テキストは黒色
+        
+        // フォントサイズを正しく計算（viewport座標系のフォントサイズをそのまま使用）
+        // stroke.fontSizeは既にviewport座標系に変換されている
         ctx.font = `${stroke.fontSize}px ${stroke.fontName}`;
         ctx.textBaseline = 'top'; // 上端基準
         ctx.textAlign = 'left'; // 左揃え

@@ -64,8 +64,14 @@ export async function extractTextItems(
       const y = viewportY - adjustedHeight + (adjustedHeight * 0.05); // テキストの上端を計算（少し下に調整）
 
       // フォント情報を取得
-      const fontSize = (item as any).fontSize || 12;
+      const pdfFontSize = (item as any).fontSize || 12;
       const fontName = (item as any).fontName || 'Arial'; // デフォルトフォント
+      
+      // PDF座標系のフォントサイズをviewport座標系に変換
+      // transform[0]とtransform[3]はスケール因子
+      const scaleX = Math.sqrt(transform[0] * transform[0] + transform[1] * transform[1]);
+      const scaleY = Math.sqrt(transform[2] * transform[2] + transform[3] * transform[3]);
+      const viewportFontSize = pdfFontSize * Math.max(scaleX, scaleY);
       
       textItems.push({
         str: item.str,
@@ -75,7 +81,7 @@ export async function extractTextItems(
         height: adjustedHeight, // 調整後のheightを使用
         transform,
         fontName,
-        fontSize,
+        fontSize: viewportFontSize, // viewport座標系のフォントサイズ
       });
     }
   }

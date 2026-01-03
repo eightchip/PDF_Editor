@@ -2475,15 +2475,58 @@ export default function Home() {
       const clickedShapes: string[] = [];
       const clickedTexts: string[] = [];
       
-      // ストロークの検出（簡易版：最初の点との距離で判定）
+      // ストロークの検出
       for (const stroke of strokes) {
         if (stroke.points.length > 0 && stroke.id) {
-          const firstPoint = stroke.points[0];
-          const strokeX = firstPoint.x * pageSize.width;
-          const strokeY = firstPoint.y * pageSize.height;
-          const distance = Math.sqrt(Math.pow(x - strokeX, 2) + Math.pow(y - strokeY, 2));
-          if (distance < 20) {
-            clickedStrokes.push(stroke.id);
+          // ハイライトの場合は矩形の範囲内かどうかで判定
+          if (stroke.tool === 'highlight' && stroke.points.length >= 4) {
+            // 矩形の左上と右下の点を計算
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+            
+            for (const point of stroke.points) {
+              const px = point.x * pageSize.width;
+              const py = point.y * pageSize.height;
+              minX = Math.min(minX, px);
+              minY = Math.min(minY, py);
+              maxX = Math.max(maxX, px);
+              maxY = Math.max(maxY, py);
+            }
+            
+            // クリック位置が矩形の範囲内かチェック
+            if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
+              clickedStrokes.push(stroke.id);
+              
+              // ハイライトにテキストが埋め込まれている場合は、テキスト編集モードに入る
+              if (stroke.text !== undefined && stroke.textX !== undefined && stroke.textY !== undefined) {
+                setEditingTextId(stroke.id); // ハイライトのIDを編集IDとして設定
+                setTextInputValue(stroke.text || '');
+                setTextInputPosition({ 
+                  x: stroke.textX * pageSize.width, 
+                  y: stroke.textY * pageSize.height 
+                });
+                if (stroke.fontSize) {
+                  setFontSize(stroke.fontSize);
+                }
+                setColor(stroke.color);
+                // テキストツールに切り替え（編集モード）
+                setTool('text');
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+              }
+            }
+          } else {
+            // 通常のストロークは最初の点との距離で判定
+            const firstPoint = stroke.points[0];
+            const strokeX = firstPoint.x * pageSize.width;
+            const strokeY = firstPoint.y * pageSize.height;
+            const distance = Math.sqrt(Math.pow(x - strokeX, 2) + Math.pow(y - strokeY, 2));
+            if (distance < 20) {
+              clickedStrokes.push(stroke.id);
+            }
           }
         }
       }
@@ -4556,6 +4599,44 @@ export default function Home() {
       }
       return;
     }
+    
+    // ハイライトのストロークを編集している場合
+    if (editingTextId) {
+      const highlightStroke = strokes.find(s => s.id === editingTextId && s.tool === 'highlight');
+      if (highlightStroke) {
+        // ハイライトのテキストを更新
+        const updatedStrokes = strokes.map(s => {
+          if (s.id === editingTextId && s.tool === 'highlight') {
+            return {
+              ...s,
+              text: textInputValue.trim() || '', // 空の場合は空文字列
+            };
+          }
+          return s;
+        });
+        
+        setStrokes(updatedStrokes);
+        const actualPageNum = getActualPageNum(currentPage);
+        await saveAnnotations(docId, actualPageNum, updatedStrokes);
+        
+        // 再描画
+        if (inkCanvasRef.current && pageSize) {
+          const ctx = inkCanvasRef.current.getContext('2d');
+          if (ctx) {
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+            ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+            redrawStrokes(ctx, updatedStrokes, pageSize.width, pageSize.height);
+          }
+        }
+        
+        setEditingTextId(null);
+        setTextInputValue('');
+        setTextInputPosition(null);
+        return;
+      }
+    }
+    
     // 空のテキストの場合は編集をキャンセル（新規追加時のみ）
     if (!editingTextId && !textInputValue.trim()) {
       setTextInputPosition(null);
