@@ -1335,12 +1335,21 @@ export default function Home() {
         laserPointerTimeoutRef.current = null;
       }
       // プレゼンモード終了時にメイン画面のPDFを再レンダリング
-      // 確実に再レンダリングするため、少し待ってから明示的にrenderCurrentPage()を呼ぶ
+      // currentPageを強制的に更新してuseEffectを確実にトリガーする
       (async () => {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        // 明示的にrenderCurrentPage()を呼ぶ
-        if (pdfDoc && pdfCanvasRef.current && inkCanvasRef.current) {
-          await renderCurrentPage();
+        await new Promise(resolve => setTimeout(resolve, 100));
+        // currentPageを一度更新してから元に戻すことで、useEffectを確実にトリガー
+        const currentPageValue = currentPage;
+        if (currentPageValue > 0) {
+          // 一時的に別のページに設定してから元に戻す
+          setCurrentPage(0);
+          await new Promise(resolve => setTimeout(resolve, 50));
+          setCurrentPage(currentPageValue);
+        } else {
+          // currentPageが0の場合は、直接renderCurrentPage()を呼ぶ
+          if (pdfDoc && pdfCanvasRef.current && inkCanvasRef.current) {
+            await renderCurrentPage();
+          }
         }
       })();
     }
@@ -3666,14 +3675,23 @@ export default function Home() {
       newPage = page;
       console.log('目次ジャンプ デバッグ: currentPageを', page, 'に設定（pageOrderなし）');
     }
-    setCurrentPage(newPage);
+    // 現在のページと同じ場合は、強制的に更新してuseEffectをトリガー
+    if (newPage === currentPage) {
+      // 一時的に別のページに設定してから元に戻す
+      setCurrentPage(0);
+      setTimeout(() => {
+        setCurrentPage(newPage);
+      }, 50);
+    } else {
+      setCurrentPage(newPage);
+    }
     setShowTableOfContentsDialog(false);
     console.log('目次ジャンプ デバッグ: ダイアログを閉じました');
     // useEffectで自動的にrenderCurrentPage()が呼ばれるが、確実に実行されるように少し待ってから明示的に呼ぶ
     if (pdfDoc && pdfCanvasRef.current && inkCanvasRef.current) {
       setTimeout(async () => {
         await renderCurrentPage();
-      }, 150);
+      }, 200);
     }
   };
 
