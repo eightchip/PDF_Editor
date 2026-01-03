@@ -1360,6 +1360,7 @@ export default function Home() {
         if (inkCanvasRef.current) {
           inkCanvasRef.current.style.display = 'block';
           inkCanvasRef.current.style.visibility = 'visible';
+          inkCanvasRef.current.style.opacity = '1';
         }
         
         // キャンバスが取得できるまで待機（最大1秒）
@@ -1369,17 +1370,14 @@ export default function Home() {
           retryCount++;
         }
         
+        // currentPageを強制的に更新してuseEffectを確実にトリガー
         if (currentPageValue > 0 && pdfDoc && currentPageValue <= pdfDoc.numPages) {
-          // 明示的にrenderCurrentPage()を呼ぶ（useEffectに依存しない）
-          if (pdfDoc && pdfCanvasRef.current && inkCanvasRef.current) {
-            console.log('プレゼンモード終了: 明示的にrenderCurrentPage()を呼び出し', { currentPageValue });
-            await renderCurrentPage();
-          } else {
-            console.warn('プレゼンモード終了: キャンバスが取得できません', {
-              hasPdfCanvas: !!pdfCanvasRef.current,
-              hasInkCanvas: !!inkCanvasRef.current
-            });
-          }
+          // 一時的に別のページに設定してから元に戻すことで、useEffectを確実にトリガー
+          const tempPage = currentPageValue === 1 ? 2 : 1;
+          setCurrentPage(tempPage);
+          await new Promise(resolve => setTimeout(resolve, 100));
+          setCurrentPage(currentPageValue);
+          console.log('プレゼンモード終了: currentPageを更新して再レンダリングをトリガー', { currentPageValue });
         } else if (pdfDoc && pdfCanvasRef.current && inkCanvasRef.current) {
           // currentPageが無効な場合は、直接renderCurrentPage()を呼ぶ
           console.log('プレゼンモード終了: 直接renderCurrentPage()を呼び出し');
@@ -1430,18 +1428,22 @@ export default function Home() {
   // ページレンダリング
   const renderCurrentPage = async () => {
     // プレゼンモードの場合はプレゼンモード用のキャンバスとページ、そうでない場合はメイン画面用のキャンバスとページを使用
-    const targetCanvasRef = isPresentationMode ? presentationCanvasRef : pdfCanvasRef;
-    const targetPage = isPresentationMode ? presentationPage : currentPage; // プレゼンモードは独立したページ管理
+    // 状態を確実に取得するため、関数の開始時に値を固定
+    const currentIsPresentationMode = isPresentationMode;
+    const currentPresentationPage = presentationPage;
+    const currentCurrentPage = currentPage;
+    const targetCanvasRef = currentIsPresentationMode ? presentationCanvasRef : pdfCanvasRef;
+    const targetPage = currentIsPresentationMode ? currentPresentationPage : currentCurrentPage; // プレゼンモードは独立したページ管理
     
     console.log('renderCurrentPage: 開始', { 
       hasPdfDoc: !!pdfDoc, 
       hasPdfCanvas: !!targetCanvasRef.current, 
       hasInkCanvas: !!inkCanvasRef.current,
-      currentPage,
-      presentationPage,
+      currentPage: currentCurrentPage,
+      presentationPage: currentPresentationPage,
       targetPage,
-      isPresentationMode,
-      usingPresentationCanvas: isPresentationMode
+      isPresentationMode: currentIsPresentationMode,
+      usingPresentationCanvas: currentIsPresentationMode
     });
     
     // キャンバスが取得できない場合、少し待ってから再試行（モーダルが開いている場合など）
@@ -1456,8 +1458,8 @@ export default function Home() {
         hasInkCanvas: !!inkCanvasRef.current,
         showThumbnailModal,
         showTableOfContentsDialog,
-        isPresentationMode,
-        usingPresentationCanvas: isPresentationMode
+        isPresentationMode: currentIsPresentationMode,
+        usingPresentationCanvas: currentIsPresentationMode
       });
       // モーダルが開いている場合は、モーダルが閉じるまで待つ
       // 最大10回まで再試行（合計1秒）
@@ -1479,7 +1481,7 @@ export default function Home() {
 
     // プレゼンモード中でもレンダリングを実行（プレゼンモード用の表示のため）
     // ただし、プレゼンモードでない場合は、メイン画面のキャンバスが確実に表示されるようにする
-    if (!isPresentationMode && pdfCanvasRef.current) {
+    if (!currentIsPresentationMode && pdfCanvasRef.current) {
       // メイン画面のキャンバスが確実に表示されるようにする
       pdfCanvasRef.current.style.display = 'block';
       pdfCanvasRef.current.style.visibility = 'visible';
@@ -1494,12 +1496,12 @@ export default function Home() {
       // プレゼンモードの場合はpresentationPageを使用、そうでない場合はcurrentPageを使用
       const actualPageNum = getActualPageNum(targetPage);
       console.log('renderCurrentPage: レンダリング開始', { 
-        currentPage, 
-        presentationPage, 
+        currentPage: currentCurrentPage, 
+        presentationPage: currentPresentationPage, 
         targetPage,
         actualPageNum, 
         totalPages: pdfDoc.numPages, 
-        isPresentationMode 
+        isPresentationMode: currentIsPresentationMode 
       });
       const page = await pdfDoc.getPage(actualPageNum);
       const pdfCanvas = targetCanvasRef.current;
@@ -1512,7 +1514,7 @@ export default function Home() {
 
       // スライドショーモードの場合は、画面に収まるようにスケールを計算
       let renderScale = scale;
-      if (isPresentationMode) {
+      if (currentIsPresentationMode) {
         // プレゼンモードでは回転0でビューポートを取得（回転を適用しない）
         const viewport = page.getViewport({ scale: 1.0, rotation: 0 });
         const maxWidth = window.innerWidth * 0.95; // 表示領域を最大限活用
@@ -1574,7 +1576,7 @@ export default function Home() {
       // PDFをレンダリング（プレゼンモードでは回転を0に固定してそのまま表示）
       // 回転処理を無視して、PDFの元の向きのまま表示する
       // actualPageNumは1ベースの実際のページ番号なので、そのままpageRotationsを参照
-      const currentRotation = isPresentationMode ? 0 : (pageRotations[actualPageNum] || 0);
+      const currentRotation = currentIsPresentationMode ? 0 : (pageRotations[actualPageNum] || 0);
       
       // 新しいレンダリングタスクを開始（前のタスクは既にキャンセル済みなのでnullを渡す）
       console.log('renderCurrentPage: renderPageを呼び出し', { 
@@ -1582,7 +1584,7 @@ export default function Home() {
         currentRotation, 
         canvasWidth: pdfCanvas.width, 
         canvasHeight: pdfCanvas.height,
-        isPresentationMode 
+        isPresentationMode: currentIsPresentationMode 
       });
       const result = await renderPage(page, pdfCanvas, renderScale, currentRotation, null);
       renderTaskRef.current = result.task; // レンダリングタスクを保存
@@ -1600,40 +1602,45 @@ export default function Home() {
       // プレゼンモードで逆さ表示が発生する場合の自動修正：レンダリングを2回実行
       // 無限ループを防ぐためにフラグで制御し、直接レンダリングを再実行
       // 逆さ表示をユーザーに見せないため、レンダリング中はキャンバスを非表示にする
-      if (isPresentationMode && !isFixingRotationRef.current && pdfDoc && pdfCanvas) {
+      if (currentIsPresentationMode && !isFixingRotationRef.current && pdfDoc && pdfCanvas) {
         isFixingRotationRef.current = true;
         // レンダリング中はキャンバスを非表示にして、逆さ表示を見せない
         const originalDisplay = pdfCanvas.style.display;
         const originalVisibility = pdfCanvas.style.visibility;
+        const originalOpacity = pdfCanvas.style.opacity;
         pdfCanvas.style.display = 'none';
         pdfCanvas.style.visibility = 'hidden';
+        pdfCanvas.style.opacity = '0';
         
         // 一度レンダリングを完了させてから、再度レンダリングを実行
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 100));
         // 同じページを再度レンダリング（これにより逆さ表示が修正される）
         try {
           const samePage = await pdfDoc.getPage(actualPageNum);
           const fixResult = await renderPage(samePage, pdfCanvas, renderScale, 0, renderTaskRef.current);
           renderTaskRef.current = fixResult.task;
           // レンダリング完了後にキャンバスを表示
+          await new Promise(resolve => setTimeout(resolve, 50));
           pdfCanvas.style.display = originalDisplay || 'block';
           pdfCanvas.style.visibility = originalVisibility || 'visible';
+          pdfCanvas.style.opacity = originalOpacity || '1';
         } catch (error) {
           console.log('回転修正レンダリングエラー:', error);
           // エラー時もキャンバスを表示
           pdfCanvas.style.display = originalDisplay || 'block';
           pdfCanvas.style.visibility = originalVisibility || 'visible';
+          pdfCanvas.style.opacity = originalOpacity || '1';
         }
         // フラグをリセット
         setTimeout(() => {
           isFixingRotationRef.current = false;
-        }, 1000);
+        }, 500);
       }
 
       // テキストレイヤーを生成（テキスト選択可能にする）
       if (textLayerRef.current) {
         // プレゼンモードでは回転0でテキストレイヤーを生成
-        const textRotation = isPresentationMode ? 0 : currentRotation;
+        const textRotation = currentIsPresentationMode ? 0 : currentRotation;
         const viewport = page.getViewport({ scale, rotation: textRotation });
         await renderTextLayer(page, textLayerRef.current, viewport);
       }
@@ -1865,7 +1872,13 @@ export default function Home() {
         presentationPage, 
         isPresentationMode
       });
-      renderCurrentPage();
+      // 確実に実行されるように、少し待ってから呼び出す
+      const timer = setTimeout(() => {
+        renderCurrentPage().catch(error => {
+          console.error('useEffect: プレゼンモードrenderCurrentPage()エラー', error);
+        });
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [presentationPage, isPresentationMode, pdfDoc]);
 
@@ -3236,9 +3249,9 @@ export default function Home() {
   const goToPrevPage = () => {
     if (isPresentationMode) {
       // プレゼンモードの場合はpresentationPageを変更（独立管理）
+      // useEffectで自動的にrenderCurrentPage()が呼ばれる
       if (presentationPage > 1) {
         setPresentationPage(presentationPage - 1);
-        renderCurrentPage();
       }
     } else {
       // メイン画面の場合はcurrentPageを変更（ページ送り、目次、ページ管理と同期）
@@ -3259,9 +3272,9 @@ export default function Home() {
   const goToNextPage = () => {
     if (isPresentationMode) {
       // プレゼンモードの場合はpresentationPageを変更（独立管理）
+      // useEffectで自動的にrenderCurrentPage()が呼ばれる
       if (pdfDoc && presentationPage < totalPages) {
         setPresentationPage(presentationPage + 1);
-        renderCurrentPage();
       }
     } else {
       // メイン画面の場合はcurrentPageを変更（ページ送り、目次、ページ管理と同期）
