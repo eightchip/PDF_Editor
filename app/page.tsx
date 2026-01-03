@@ -1457,26 +1457,6 @@ export default function Home() {
       const size = { width: result.width, height: result.height };
       setPageSize(size);
 
-      // プレゼンモードで逆さ表示が発生する場合の自動修正：レンダリングを2回実行
-      // 無限ループを防ぐためにフラグで制御し、直接レンダリングを再実行
-      if (isPresentationMode && !isFixingRotationRef.current && pdfDoc && pdfCanvas) {
-        isFixingRotationRef.current = true;
-        // 一度レンダリングを完了させてから、再度レンダリングを実行
-        await new Promise(resolve => setTimeout(resolve, 300));
-        // 同じページを再度レンダリング（これにより逆さ表示が修正される）
-        try {
-          const samePage = await pdfDoc.getPage(actualPageNum);
-          const fixResult = await renderPage(samePage, pdfCanvas, renderScale, 0, renderTaskRef.current);
-          renderTaskRef.current = fixResult.task;
-        } catch (error) {
-          console.log('回転修正レンダリングエラー:', error);
-        }
-        // フラグをリセット
-        setTimeout(() => {
-          isFixingRotationRef.current = false;
-        }, 1000);
-      }
-
       // テキストレイヤーを生成（テキスト選択可能にする）
       if (textLayerRef.current) {
         const viewport = page.getViewport({ scale, rotation: currentRotation });
@@ -2997,8 +2977,8 @@ export default function Home() {
     if (currentPage > 1) {
       const newPage = currentPage - 1;
       setCurrentPage(newPage);
-      // useEffectで自動的にrenderCurrentPage()が呼ばれるが、プレゼンモードでは確実に反映させるため明示的に呼ぶ
-      if (isPresentationMode && pdfDoc) {
+      // useEffectで自動的にrenderCurrentPage()が呼ばれるが、確実に反映させるため明示的に呼ぶ
+      if (pdfDoc) {
         // 少し待ってからレンダリング（状態更新を待つ）
         setTimeout(async () => {
           await renderCurrentPage();
@@ -3012,8 +2992,8 @@ export default function Home() {
     if (pdfDoc && currentPage < totalPages) {
       const newPage = currentPage + 1;
       setCurrentPage(newPage);
-      // useEffectで自動的にrenderCurrentPage()が呼ばれるが、プレゼンモードでは確実に反映させるため明示的に呼ぶ
-      if (isPresentationMode && pdfDoc) {
+      // useEffectで自動的にrenderCurrentPage()が呼ばれるが、確実に反映させるため明示的に呼ぶ
+      if (pdfDoc) {
         // 少し待ってからレンダリング（状態更新を待つ）
         setTimeout(async () => {
           await renderCurrentPage();
@@ -4061,16 +4041,18 @@ export default function Home() {
     setTextAnnotations([]);
     setShapeAnnotations([]);
     
-    // クリア処理完了後、フラグをリセット
-    isClearingRef.current = false;
     console.log('handleClear: 状態をクリア完了');
     
     // ページを再レンダリングして、空の状態を反映
+    // フラグをfalseにリセットしてからrenderCurrentPage()を呼ぶ
+    // これにより、データベースから空の配列が読み込まれる（既に削除済み）
+    isClearingRef.current = false;
     try {
       await renderCurrentPage();
     } catch (error) {
       console.error('handleClear: ページ再レンダリングエラー', error);
       // エラーが発生しても状態はクリア済みなので、useEffectで再レンダリングされる
+      isClearingRef.current = false;
     }
     
     console.log('handleClear: 完了');
