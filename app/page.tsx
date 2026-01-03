@@ -2824,24 +2824,47 @@ export default function Home() {
         // テキスト情報を取得（テキスト埋め込み用）
         const textItem = boundingBox.textItem;
         
+        if (!textItem) {
+          console.warn('ハイライト: テキストアイテムが取得できません');
+          return;
+        }
+        
         // テキストの位置を元のテキストの位置に正確に合わせる
         // boundingBoxは既にviewport座標系なので、pageSizeで正規化する
         const textNormalizedX = boundingBox.x / pageSize.width;
         const textNormalizedY = boundingBox.y / pageSize.height;
         
-        // フォントサイズを実際のテキストの高さから逆算する（より正確）
-        // boundingBox.heightは実際のテキストの高さなので、それをフォントサイズとして使用
-        // ただし、テキストの高さは通常フォントサイズの約1.2倍なので、調整する
-        const actualFontSize = textItem?.fontSize || (boundingBox.height / 1.2);
+        // フォントサイズを正確に計算
+        // textItem.fontSizeは既にviewport座標系（scale=1.0）に変換されている
+        // しかし、実際の描画時にはscaleが適用されているので、それを考慮する必要がある
+        // ただし、pageSizeは既にscaleが適用されたサイズなので、そのまま使用できる
+        // boundingBox.heightは実際のテキストの高さなので、それを基準にする
+        // テキストの高さは通常フォントサイズの約1.0-1.2倍なので、そのまま使用
+        const actualFontSize = textItem.fontSize || boundingBox.height;
         
         console.log('ハイライト: テキスト情報', {
-          text: textItem?.str,
-          boundingBoxHeight: boundingBox.height,
-          fontSize: textItem?.fontSize,
-          actualFontSize,
-          fontName: textItem?.fontName,
-          textX: textNormalizedX,
-          textY: textNormalizedY
+          text: textItem.str,
+          boundingBox: {
+            x: boundingBox.x,
+            y: boundingBox.y,
+            width: boundingBox.width,
+            height: boundingBox.height
+          },
+          textItem: {
+            fontSize: textItem.fontSize,
+            fontName: textItem.fontName,
+            x: textItem.x,
+            y: textItem.y
+          },
+          pageSize: {
+            width: pageSize.width,
+            height: pageSize.height
+          },
+          normalized: {
+            textX: textNormalizedX,
+            textY: textNormalizedY
+          },
+          actualFontSize
         });
         
         const stroke: Stroke = {
@@ -2856,8 +2879,8 @@ export default function Home() {
             { x: normalizedX1, y: normalizedY2 },
           ],
           // テキスト情報を保存（テキスト埋め込み用）
-          text: textItem?.str || '',
-          fontName: textItem?.fontName || 'Arial',
+          text: textItem.str,
+          fontName: textItem.fontName || 'Arial',
           fontSize: actualFontSize,
           textX: textNormalizedX, // 元のテキストの位置を使用
           textY: textNormalizedY, // 元のテキストの位置を使用

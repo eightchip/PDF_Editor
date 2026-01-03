@@ -74,16 +74,42 @@ export function drawStroke(
         ctx.globalCompositeOperation = 'source-over'; // 通常の描画モード
         ctx.fillStyle = '#000000'; // テキストは黒色
         
-        // フォントサイズをそのまま使用（既に正しいスケールで計算されている）
+        // フォントサイズをそのまま使用
+        // stroke.fontSizeは既にviewport座標系（scale=1.0）に変換されている
+        // canvasWidth/canvasHeightは既にスケールが適用されているので、そのまま使用できる
         const actualFontSize = stroke.fontSize;
         
-        ctx.font = `${actualFontSize}px ${stroke.fontName}`;
-        ctx.textBaseline = 'top'; // 上端基準（元のテキストの位置に合わせる）
+        // フォント名を正規化（PDF.jsのフォント名は複雑な場合がある）
+        let fontFamily = stroke.fontName;
+        // PDF.jsのフォント名から実際のフォント名を抽出
+        if (fontFamily.includes('+')) {
+          fontFamily = fontFamily.split('+')[1] || fontFamily;
+        }
+        if (fontFamily.includes('-')) {
+          fontFamily = fontFamily.split('-')[0] || fontFamily;
+        }
+        // 日本語フォントのフォールバック
+        if (!fontFamily || fontFamily === 'Arial') {
+          fontFamily = 'sans-serif';
+        }
+        
+        ctx.font = `${actualFontSize}px ${fontFamily}`;
+        ctx.textBaseline = 'top'; // 上端基準
         ctx.textAlign = 'left'; // 左揃え
         
         // テキストの位置を計算（正規化座標から実際の座標へ）
         const textX = stroke.textX * canvasWidth;
         const textY = stroke.textY * canvasHeight;
+        
+        // デバッグ用ログ
+        console.log('テキスト描画:', {
+          text: stroke.text,
+          fontSize: actualFontSize,
+          fontName: fontFamily,
+          position: { x: textX, y: textY },
+          canvasSize: { width: canvasWidth, height: canvasHeight },
+          normalized: { x: stroke.textX, y: stroke.textY }
+        });
         
         // テキストを描画
         ctx.fillText(stroke.text, textX, textY);
