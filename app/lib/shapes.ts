@@ -104,22 +104,21 @@ export function drawShapeAnnotation(
       break;
 
     case 'polyline-arrow':
-      // 折れ線矢印を描画
-      if (shape.points && shape.points.length > 0) {
+      // 折れ線矢印を描画（直角に曲がる矢印）
+      if (shape.points && shape.points.length >= 2) {
         ctx.beginPath();
         const firstPoint = shape.points[0];
         ctx.moveTo(firstPoint.x * canvasWidth, firstPoint.y * canvasHeight);
         
-        // 最初の点から最後の点まで線を描画
+        // すべての点を結ぶ線を描画
         for (let i = 1; i < shape.points.length; i++) {
           const point = shape.points[i];
           ctx.lineTo(point.x * canvasWidth, point.y * canvasHeight);
         }
         ctx.stroke();
 
-        // 矢印を描画（pointsが1つでも、x1,y1からx2,y2への矢印を描画）
+        // 最後の線分に矢印を描画
         if (shape.points.length >= 2) {
-          // 複数点がある場合：最後の2点から角度を計算
           const lastPoint = shape.points[shape.points.length - 1];
           const prevPoint = shape.points[shape.points.length - 2];
           const lastX = lastPoint.x * canvasWidth;
@@ -141,31 +140,6 @@ export function drawShapeAnnotation(
           ctx.lineTo(
             lastX - arrowLength * Math.cos(arrowAngle + arrowAngleOffset),
             lastY - arrowLength * Math.sin(arrowAngle + arrowAngleOffset)
-          );
-          ctx.stroke();
-        } else if (shape.points.length === 1) {
-          // 1点しかない場合：x1,y1からx2,y2への矢印を描画
-          const angle = Math.atan2(y2 - y1, x2 - x1);
-          const arrowLength = shape.width * 3;
-          const arrowAngle = Math.PI / 6;
-
-          // 線を描画
-          ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          ctx.lineTo(x2, y2);
-          ctx.stroke();
-
-          // 矢印を描画
-          ctx.beginPath();
-          ctx.moveTo(x2, y2);
-          ctx.lineTo(
-            x2 - arrowLength * Math.cos(angle - arrowAngle),
-            y2 - arrowLength * Math.sin(angle - arrowAngle)
-          );
-          ctx.moveTo(x2, y2);
-          ctx.lineTo(
-            x2 - arrowLength * Math.cos(angle + arrowAngle),
-            y2 - arrowLength * Math.sin(angle + arrowAngle)
           );
           ctx.stroke();
         }

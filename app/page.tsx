@@ -3260,23 +3260,41 @@ export default function Home() {
       
       const canvas = shapeCanvasRef.current;
       
-      // 折れ線矢印の場合はpoints配列を更新
+      // 折れ線矢印の場合は直角に曲がる中間点を自動計算
       let updatedShape;
       if (tool === 'polyline-arrow') {
-        // points配列を更新
-        const points = currentShape.points ? [...currentShape.points] : [{ x: currentShape.x1, y: currentShape.y1 }];
-        if (points.length > 0) {
-          // 最後の点を更新（ドラッグ中は最後の点を更新）
-          points[points.length - 1] = { x: normalizedX, y: normalizedY };
+        const startX = currentShape.x1;
+        const startY = currentShape.y1;
+        const endX = normalizedX;
+        const endY = normalizedY;
+        
+        // 水平距離と垂直距離を計算
+        const dx = Math.abs(endX - startX);
+        const dy = Math.abs(endY - startY);
+        
+        // 直角に曲がる中間点を計算
+        // 水平方向に先に進むか、垂直方向に先に進むかを決定
+        let midX: number, midY: number;
+        if (dx > dy) {
+          // 水平方向に先に進む（L字型：→↓）
+          midX = endX;
+          midY = startY;
         } else {
-          // pointsが空の場合は最初の点を追加
-          points.push({ x: normalizedX, y: normalizedY });
+          // 垂直方向に先に進む（L字型：↓→）
+          midX = startX;
+          midY = endY;
         }
+        
+        // 3点で構成：開始点、中間点、終了点
         updatedShape = {
           ...currentShape,
-          x2: normalizedX,
-          y2: normalizedY,
-          points: points,
+          x2: endX,
+          y2: endY,
+          points: [
+            { x: startX, y: startY },
+            { x: midX, y: midY },
+            { x: endX, y: endY }
+          ],
         };
       } else {
         updatedShape = {
