@@ -1416,6 +1416,25 @@ export default function Home() {
       return;
     }
     
+    // プレゼンモードでない場合は、メイン画面のキャンバスが存在することを確認
+    if (!isPresentationMode) {
+      // メイン画面のキャンバスがDOMに存在するか確認
+      const mainCanvas = document.querySelector('canvas[ref]') || 
+                         (containerRef.current?.querySelector('canvas') as HTMLCanvasElement);
+      if (!mainCanvas && !pdfCanvasRef.current) {
+        console.warn('renderCurrentPage: メイン画面のキャンバスがDOMに存在しません', { 
+          hasContainer: !!containerRef.current,
+          hasPdfCanvas: !!pdfCanvasRef.current
+        });
+        // 少し待ってから再試行
+        await new Promise(resolve => setTimeout(resolve, 200));
+        if (!pdfCanvasRef.current) {
+          console.warn('renderCurrentPage: 再試行後もメイン画面のキャンバスが取得できません');
+          return;
+        }
+      }
+    }
+    
     if (!pdfCanvasRef.current || !inkCanvasRef.current) {
       console.warn('renderCurrentPage: キャンバスが取得できません、再試行します', { 
         hasPdfCanvas: !!pdfCanvasRef.current, 
@@ -1425,14 +1444,14 @@ export default function Home() {
         isPresentationMode
       });
       // モーダルが開いている場合は、モーダルが閉じるまで待つ
-      // 最大5回まで再試行（合計500ms）
-      for (let i = 0; i < 5; i++) {
+      // 最大10回まで再試行（合計1秒）
+      for (let i = 0; i < 10; i++) {
         await new Promise(resolve => setTimeout(resolve, 100));
         if (pdfCanvasRef.current && inkCanvasRef.current) {
           console.log('renderCurrentPage: 再試行でキャンバスを取得しました', { retryCount: i + 1 });
           break;
         }
-        if (i === 4) {
+        if (i === 9) {
           console.warn('renderCurrentPage: 再試行後もキャンバスが取得できません', { 
             hasPdfCanvas: !!pdfCanvasRef.current, 
             hasInkCanvas: !!inkCanvasRef.current 
