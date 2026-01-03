@@ -3,11 +3,11 @@ import { openDB, DBSchema, IDBPDatabase } from 'idb';
 export type Point = { x: number; y: number; p?: number };
 export type Stroke = { 
   id?: string; // 後方互換性のためオプショナル
-  tool: 'pen' | 'eraser' | 'highlight'; 
+  tool: 'pen' | 'eraser' | 'highlight' | 'redact'; 
   color: string; 
   width: number; 
   points: Point[];
-  // ハイライト用のテキスト情報（オプション）
+  // 墨消し用のテキスト情報（オプション）
   text?: string; // 埋め込むテキスト
   fontName?: string; // フォント名
   fontSize?: number; // フォントサイズ

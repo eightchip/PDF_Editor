@@ -150,7 +150,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button"; // Dialog内でのみ使用
-import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections, MdDragHandle, MdLock, MdSecurity, MdCheckCircle, MdInfo, MdLocalOffer, MdAssignment, MdContentCut, MdMenuBook, MdFileCopy, MdSlideshow, MdFullscreen, MdFullscreenExit, MdVisibility, MdVisibilityOff, MdPrint, MdDescription, MdNotes, MdTimer, MdTimerOff, MdPlayArrow, MdPause, MdStop } from 'react-icons/md';
+import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections, MdDragHandle, MdLock, MdSecurity, MdCheckCircle, MdInfo, MdLocalOffer, MdAssignment, MdContentCut, MdMenuBook, MdFileCopy, MdSlideshow, MdFullscreen, MdFullscreenExit, MdVisibility, MdVisibilityOff, MdPrint, MdDescription, MdNotes, MdTimer, MdTimerOff, MdPlayArrow, MdPause, MdStop, MdBlock } from 'react-icons/md';
 import { QRCodeSVG } from 'qrcode.react';
 // PDF.jsの型は動的インポートで取得
 
@@ -288,7 +288,7 @@ export default function Home() {
   };
 
   // 描画関連
-  const [tool, setTool] = useState<'pen' | 'eraser' | 'text' | 'line' | 'rectangle' | 'circle' | 'arrow' | 'highlight' | 'select' | 'stamp'>('pen');
+  const [tool, setTool] = useState<'pen' | 'eraser' | 'text' | 'line' | 'rectangle' | 'circle' | 'arrow' | 'highlight' | 'redact' | 'select' | 'stamp'>('pen');
   const [highlightMode, setHighlightMode] = useState<'auto' | 'manual'>('auto'); // ハイライトモード: 'auto' = 自動（クリックで文字列全体）、'manual' = 手動（ドラッグで範囲指定）
   
   // 選択関連
@@ -2799,80 +2799,133 @@ export default function Home() {
       return; // テキスト選択処理後は他の処理をスキップ
     }
 
-    // ハイライトツールの場合
+    // ハイライトツールの場合（通常のハイライト機能）
     if (tool === 'highlight') {
       // 自動モード：テキスト全体を検出してハイライト
       if (highlightMode === 'auto') {
         if (textItems.length === 0) {
           console.warn('ハイライト: テキストアイテムがありません。テキスト抽出が失敗している可能性があります。');
-            return;
-          }
+          return;
+        }
         const boundingBox = findTextBoundingBox(textItems, x, y, 30);
         if (boundingBox) {
           console.log('ハイライト: バウンディングボックスを検出', boundingBox);
-        // テキスト全体のバウンディングボックスをハイライトとして描画
-        // 矩形の4つの角をpointsとして追加
-        // ハイライト範囲が少し上にはみ出さないように、y座標を少し下に調整
-        // ディセンダー（「り」などの下にはみ出す部分）を含めるため、heightを少し大きくする
-        const yOffset = boundingBox.height * 0.05; // heightの5%分下げる（上方向の調整）
-        const heightAdjustment = boundingBox.height * 0.15; // heightの15%分増やす（下方向の調整、ディセンダー対応）
+          // テキスト全体のバウンディングボックスをハイライトとして描画
+          // 矩形の4つの角をpointsとして追加
+          // ハイライト範囲が少し上にはみ出さないように、y座標を少し下に調整
+          // ディセンダー（「り」などの下にはみ出す部分）を含めるため、heightを少し大きくする
+          const yOffset = boundingBox.height * 0.05; // heightの5%分下げる（上方向の調整）
+          const heightAdjustment = boundingBox.height * 0.15; // heightの15%分増やす（下方向の調整、ディセンダー対応）
+          const normalizedX1 = boundingBox.x / pageSize.width;
+          const normalizedY1 = (boundingBox.y + yOffset) / pageSize.height;
+          const normalizedX2 = (boundingBox.x + boundingBox.width) / pageSize.width;
+          const normalizedY2 = (boundingBox.y + boundingBox.height + heightAdjustment) / pageSize.height;
+
+          // 通常のハイライトストロークを作成
+          const stroke: Stroke = {
+            id: `stroke-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            tool: 'highlight',
+            color: color, // 選択された色を使用
+            width: boundingBox.height * 1.2, // テキストの高さに合わせて調整
+            points: [
+              { x: normalizedX1, y: normalizedY1 },
+              { x: normalizedX2, y: normalizedY1 },
+              { x: normalizedX2, y: normalizedY2 },
+              { x: normalizedX1, y: normalizedY2 },
+            ],
+          };
+
+          // ストロークを即座に確定
+          const newStrokes = [...strokes, stroke];
+          setStrokes(newStrokes);
+          if (docId) {
+            const actualPageNum = getActualPageNum(currentPage);
+            saveAnnotations(docId, actualPageNum, newStrokes);
+          }
+          
+          // 再描画
+          if (inkCanvasRef.current && pageSize) {
+            const ctx = inkCanvasRef.current.getContext('2d');
+            if (ctx) {
+              const devicePixelRatio = window.devicePixelRatio || 1;
+              ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+              redrawStrokes(ctx, newStrokes, pageSize.width, pageSize.height);
+            }
+          }
+
+          e.preventDefault();
+          return;
+        }
+      }
+      
+      // 手動モード：ドラッグで範囲を指定
+      if (highlightMode === 'manual') {
+        const normalizedX = x / pageSize.width;
+        const normalizedY = y / pageSize.height;
+        
+        // ドラッグ開始位置を記録
+        setDragStart({ x, y });
+        setIsDragging(true);
+        
+        // ハイライト矩形の開始位置を記録
+        const stroke: Stroke = {
+          id: `stroke-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          tool: 'highlight',
+          color: color,
+          width: 0, // 手動モードでは使用しない
+          points: [
+            { x: normalizedX, y: normalizedY }, // 開始位置
+            { x: normalizedX, y: normalizedY }, // 終了位置（後で更新）
+            { x: normalizedX, y: normalizedY }, // 終了位置（後で更新）
+            { x: normalizedX, y: normalizedY }, // 終了位置（後で更新）
+          ],
+        };
+        setCurrentStroke(stroke);
+        isDrawingRef.current = true;
+        canvas.setPointerCapture(e.pointerId);
+        e.preventDefault();
+        return;
+      }
+    }
+    
+    // 墨消しツールの場合（テキストを非表示にしてテキスト注釈を作成）
+    if (tool === 'redact') {
+      if (textItems.length === 0) {
+        console.warn('墨消し: テキストアイテムがありません。テキスト抽出が失敗している可能性があります。');
+        return;
+      }
+      const boundingBox = findTextBoundingBox(textItems, x, y, 30);
+      if (boundingBox) {
+        console.log('墨消し: バウンディングボックスを検出', boundingBox);
+        // テキスト全体のバウンディングボックスを墨消しとして描画
+        const yOffset = boundingBox.height * 0.05;
+        const heightAdjustment = boundingBox.height * 0.15;
         const normalizedX1 = boundingBox.x / pageSize.width;
         const normalizedY1 = (boundingBox.y + yOffset) / pageSize.height;
         const normalizedX2 = (boundingBox.x + boundingBox.width) / pageSize.width;
         const normalizedY2 = (boundingBox.y + boundingBox.height + heightAdjustment) / pageSize.height;
 
-        // テキスト情報を取得（テキスト埋め込み用）
+        // テキスト情報を取得
         const textItem = boundingBox.textItem;
         
         if (!textItem) {
-          console.warn('ハイライト: テキストアイテムが取得できません');
+          console.warn('墨消し: テキストアイテムが取得できません');
           return;
         }
         
         // テキストの位置を元のテキストの位置に正確に合わせる
-        // boundingBoxは既にviewport座標系なので、pageSizeで正規化する
         const textNormalizedX = boundingBox.x / pageSize.width;
         const textNormalizedY = boundingBox.y / pageSize.height;
         
         // フォントサイズを正確に計算
-        // boundingBox.heightは実際のテキストの高さ（adjustedHeight）
-        // テキストの高さは通常フォントサイズの約1.0-1.2倍なので、それを考慮
-        // adjustedHeight = height * 1.15 なので、元のheight = adjustedHeight / 1.15
-        // そして、height = fontSize * scale なので、fontSize = height / scale
-        // ただし、実際のテキストの高さから直接逆算する方が正確
-        const actualFontSize = boundingBox.height / 1.2; // テキストの高さからフォントサイズを逆算
+        const actualFontSize = boundingBox.height / 1.2;
         
-        console.log('ハイライト: テキスト情報', {
-          text: textItem.str,
-          boundingBox: {
-            x: boundingBox.x,
-            y: boundingBox.y,
-            width: boundingBox.width,
-            height: boundingBox.height
-          },
-          textItem: {
-            fontSize: textItem.fontSize,
-            fontName: textItem.fontName,
-            x: textItem.x,
-            y: textItem.y
-          },
-          pageSize: {
-            width: pageSize.width,
-            height: pageSize.height
-          },
-          normalized: {
-            textX: textNormalizedX,
-            textY: textNormalizedY
-          },
-          actualFontSize
-        });
-        
-        // ハイライトストロークを作成（テキストを非表示にするため、背景色で塗りつぶす）
+        // 墨消しストロークを作成（背景色で塗りつぶす）
         const stroke: Stroke = {
           id: `stroke-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          tool: 'highlight',
-          color: '#FFFFFF', // 背景色（白）で固定（墨消し用）
-          width: boundingBox.height * 1.2, // テキストの高さに合わせて調整
+          tool: 'redact',
+          color: '#FFFFFF', // 背景色（白）で固定
+          width: boundingBox.height * 1.2,
           points: [
             { x: normalizedX1, y: normalizedY1 },
             { x: normalizedX2, y: normalizedY1 },
@@ -2958,38 +3011,6 @@ export default function Home() {
           variant: "default",
         });
 
-        e.preventDefault();
-        return;
-        }
-      }
-      
-      // 手動モード：ドラッグで範囲を指定
-      if (highlightMode === 'manual') {
-        const normalizedX = x / pageSize.width;
-        const normalizedY = y / pageSize.height;
-        
-        // ドラッグ開始位置を記録
-        setDragStart({ x, y });
-        setIsDragging(true);
-        
-        // ハイライト矩形の開始位置を記録
-        const stroke: Stroke = {
-          id: `stroke-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          tool: 'highlight',
-          color: color,
-          width: 0, // 手動モードでは使用しない
-          points: [
-            { x: normalizedX, y: normalizedY }, // 開始位置
-            { x: normalizedX, y: normalizedY }, // 終了位置（後で更新）
-            { x: normalizedX, y: normalizedY }, // 終了位置（後で更新）
-            { x: normalizedX, y: normalizedY }, // 終了位置（後で更新）
-          ],
-        };
-        
-        setCurrentStroke(stroke);
-        isDrawingRef.current = true;
-        canvas.setPointerCapture(e.pointerId);
-        
         e.preventDefault();
         return;
       }
@@ -4892,6 +4913,32 @@ export default function Home() {
         setTextInputPosition({ x: clickedText.x * pageSize.width, y: clickedText.y * pageSize.height });
         setFontSize(clickedText.fontSize);
         setColor(clickedText.color);
+      }
+    }
+    
+    // 選択ツールの場合もテキスト注釈をクリックして編集可能
+    if (tool === 'select') {
+      const clickedText = textAnnotations.find(text => {
+        const textX = text.x * pageSize.width;
+        const textY = text.y * pageSize.height;
+        const textWidth = text.text.length * text.fontSize * 0.6; // 概算幅
+        const textHeight = text.fontSize * 1.2;
+
+        return (
+          x >= textX - 10 &&
+          x <= textX + textWidth + 10 &&
+          y >= textY - 10 &&
+          y <= textY + textHeight + 10
+        );
+      });
+
+      if (clickedText) {
+        setEditingTextId(clickedText.id);
+        setTextInputValue(clickedText.text);
+        setTextInputPosition({ x: clickedText.x * pageSize.width, y: clickedText.y * pageSize.height });
+        setFontSize(clickedText.fontSize);
+        setColor(clickedText.color);
+        setTool('text'); // テキストツールに切り替え
       }
     }
   };
@@ -7211,6 +7258,37 @@ export default function Home() {
               >
                 <MdHighlight className={`text-base ${tool === 'highlight' ? 'text-slate-800' : 'text-yellow-500'}`} />
                 ハイライト
+              </button>
+              <button
+                onClick={() => {
+                  setTool('redact');
+                  if (textSelectionEnabled) {
+                    setTextSelectionEnabled(false);
+                  }
+                }}
+                title="テキストを非表示にしてコピーします"
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-gray-500 ${
+                  tool === 'redact' ? 'shadow-md' : ''
+                }`}
+                style={{
+                  background: tool === 'redact'
+                    ? 'linear-gradient(to right, #6b7280, #4b5563)'
+                    : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                  color: tool === 'redact' ? 'white' : '#334155',
+                }}
+                onMouseEnter={(e) => {
+                  if (tool === 'redact') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #4b5563, #374151)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (tool === 'redact') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #6b7280, #4b5563)';
+                  }
+                }}
+              >
+                <MdBlock className={`text-base ${tool === 'redact' ? 'text-white' : 'text-gray-500'}`} />
+                墨消し
               </button>
               <div className="relative">
                 <button

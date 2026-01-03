@@ -20,34 +20,15 @@ export function drawStroke(
     ctx.lineJoin = 'round';
   } else if (stroke.tool === 'highlight') {
     // ハイライトの場合は半透明で矩形を描画（テキストの上に直接重なる）
-    // 墨消し機能：黒色の場合は墨消しとして扱う（opacityを低くして黒をデフォルト）
-    // 色の正規化（様々な形式に対応）
-    const normalizedColor = stroke.color.toLowerCase().trim();
-    const isRedact = normalizedColor === '#000000' || 
-                     normalizedColor === 'black' || 
-                     normalizedColor === 'rgb(0, 0, 0)' ||
-                     normalizedColor === 'rgba(0, 0, 0, 1)' ||
-                     normalizedColor === 'rgba(0, 0, 0, 0.5)' ||
-                     normalizedColor === 'rgba(0, 0, 0, 0.3)';
-    
-    // テキスト情報がある場合は墨消しモード（背景と同じ色で見えなくする）
-    if (stroke.text) {
-      // 墨消しモード：背景と同じ色で覆う
-      // PDFの背景色を取得するか、白をデフォルトとする
-      ctx.globalAlpha = 1.0; // 完全に不透明
-      ctx.globalCompositeOperation = 'source-over'; // 通常の描画モード
-      ctx.fillStyle = '#FFFFFF'; // 白で固定（背景色と同じ）
-    } else if (isRedact) {
-      // 墨消しモード：黒で覆う（opacityを低く）
-      ctx.globalAlpha = 0.5; // 墨消し用のopacity
-      ctx.globalCompositeOperation = 'source-over'; // 通常の描画モード
-      ctx.fillStyle = '#000000'; // 黒で固定
-    } else {
-      // 通常のハイライトモード
-      ctx.globalAlpha = 0.3;
-      ctx.globalCompositeOperation = 'multiply'; // 下のPDFと乗算
-      ctx.fillStyle = stroke.color;
-    }
+    // 通常のハイライトモード
+    ctx.globalAlpha = 0.3;
+    ctx.globalCompositeOperation = 'multiply'; // 下のPDFと乗算
+    ctx.fillStyle = stroke.color;
+  } else if (stroke.tool === 'redact') {
+    // 墨消しモード：背景と同じ色で覆う（テキストを非表示にする）
+    ctx.globalAlpha = 1.0; // 完全に不透明
+    ctx.globalCompositeOperation = 'source-over'; // 通常の描画モード
+    ctx.fillStyle = '#FFFFFF'; // 白で固定（背景色と同じ）
     
     // pointsが4つ以上ある場合（矩形の4つの角）は矩形として描画
     if (stroke.points.length >= 4) {
