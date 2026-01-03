@@ -348,6 +348,10 @@ export default function Home() {
   const [signaturePosition, setSignaturePosition] = useState<'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'>('bottom-left'); // 署名位置
   const [signatureImageScale, setSignatureImageScale] = useState(100); // 署名画像のサイズ比率（%、縦横一括）
   const [signatureFontSize, setSignatureFontSize] = useState(10); // 署名フォントサイズ
+  const [signatureX, setSignatureX] = useState(0.1); // 署名のX位置（0-1の比率）
+  const [signatureY, setSignatureY] = useState(0.1); // 署名のY位置（0-1の比率）
+  const [signatureWidth, setSignatureWidth] = useState(0.3); // 署名の幅（0-1の比率）
+  const [signatureHeight, setSignatureHeight] = useState(0.15); // 署名の高さ（0-1の比率）
   const [showSignaturePreview, setShowSignaturePreview] = useState(false); // 署名プレビューの表示状態
   const [signaturePdfPreviewUrl, setSignaturePdfPreviewUrl] = useState<string | null>(null); // PDFプレビューのURL
   const [showSplitDialog, setShowSplitDialog] = useState(false); // PDF分割ダイアログ
@@ -1286,18 +1290,18 @@ export default function Home() {
       ctx.fillText(watermarkText, 0, 0);
       ctx.restore();
     } else if (pattern === 'bottom-right') {
-      // 右下1箇所
+      // 右下1箇所（Canvas座標系では下から15% = 上から85%）
       ctx.save();
-      ctx.translate(canvasWidth * 0.85, canvasHeight * 0.15);
+      ctx.translate(canvasWidth * 0.85, canvasHeight * 0.85);
       if (angle !== 0) {
         ctx.rotate(angle * Math.PI / 180);
       }
       ctx.fillText(watermarkText, 0, 0);
       ctx.restore();
     } else if (pattern === 'top-right') {
-      // 右上1箇所
+      // 右上1箇所（Canvas座標系では上から15% = 下から85%）
       ctx.save();
-      ctx.translate(canvasWidth * 0.85, canvasHeight * 0.85);
+      ctx.translate(canvasWidth * 0.85, canvasHeight * 0.15);
       if (angle !== 0) {
         ctx.rotate(angle * Math.PI / 180);
       }
@@ -9741,175 +9745,178 @@ export default function Home() {
                   className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
                 />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="p-4 bg-white/60 rounded-lg border-2 border-slate-200">
+                <label className="block text-sm font-semibold text-slate-800 mb-3">
+                  X位置: {Math.round(signatureX * 100)}% (左から)
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={signatureX * 100}
+                  onChange={(e) => setSignatureX(parseInt(e.target.value) / 100)}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+                <label className="block text-sm font-semibold text-slate-800 mb-3 mt-4">
+                  Y位置: {Math.round(signatureY * 100)}% (下から)
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={signatureY * 100}
+                  onChange={(e) => setSignatureY(parseInt(e.target.value) / 100)}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+                <label className="block text-sm font-semibold text-slate-800 mb-3 mt-4">
+                  幅: {Math.round(signatureWidth * 100)}% (ページ幅に対する比率)
+                </label>
+                <input
+                  type="range"
+                  min="5"
+                  max="50"
+                  step="1"
+                  value={signatureWidth * 100}
+                  onChange={(e) => setSignatureWidth(parseInt(e.target.value) / 100)}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+                <label className="block text-sm font-semibold text-slate-800 mb-3 mt-4">
+                  高さ: {Math.round(signatureHeight * 100)}% (ページ高さに対する比率)
+                </label>
+                <input
+                  type="range"
+                  min="5"
+                  max="30"
+                  step="1"
+                  value={signatureHeight * 100}
+                  onChange={(e) => setSignatureHeight(parseInt(e.target.value) / 100)}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg border-2 border-slate-200">
                 <input
                   type="checkbox"
                   id="showSignaturePreview"
                   checked={showSignaturePreview}
                   onChange={(e) => setShowSignaturePreview(e.target.checked)}
-                  className="w-5 h-5 text-blue-600"
+                  className="w-5 h-5 text-blue-600 border-2 border-slate-300 rounded focus:ring-2 focus:ring-blue-200"
                 />
-                <label htmlFor="showSignaturePreview" className="text-base font-semibold text-slate-800 cursor-pointer">
+                <label htmlFor="showSignaturePreview" className="text-sm font-semibold text-slate-800 cursor-pointer">
                   プレビューを表示
                 </label>
               </div>
-              {showSignaturePreview && (
-                <div className="p-4 bg-white rounded-lg border-2 border-blue-300">
-                  <div className="text-sm font-semibold text-slate-700 mb-2">プレビュー</div>
-                  {signaturePdfPreviewUrl ? (
-                    <div className="space-y-2">
-                      <iframe
-                        src={signaturePdfPreviewUrl}
-                        className="w-full border-2 border-slate-300 rounded"
-                        style={{ height: '400px' }}
-                        title="PDFプレビュー"
-                      />
-                      <button
-                        onClick={() => {
-                          if (signaturePdfPreviewUrl) {
-                            URL.revokeObjectURL(signaturePdfPreviewUrl);
-                          }
-                          setSignaturePdfPreviewUrl(null);
-                        }}
-                        className="w-full px-3 py-1.5 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors shadow-sm"
-                      >
-                        プレビューを閉じる
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="relative border-2 border-slate-300 rounded" style={{ width: '300px', height: '150px', margin: '0 auto' }}>
-                        {signatureImage && (
-                          <img
-                            src={signatureImage}
-                            alt="プレビュー"
-                            className="absolute object-contain"
-                            style={{
-                              width: `${signatureImageScale}%`,
-                              height: `${signatureImageScale}%`,
-                              top: '50%',
-                              left: '50%',
-                              transform: 'translate(-50%, -50%)',
-                            }}
-                          />
-                        )}
-                        {!signatureImage && signatureText && (
-                          <div
-                            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
-                            style={{ fontSize: `${signatureFontSize}px` }}
-                          >
-                            {signatureText}
-                          </div>
-                        )}
-                        {signatureName && (
-                          <div
-                            className="absolute bottom-2 left-2"
-                            style={{ fontSize: `${signatureFontSize}px` }}
-                          >
-                            {signatureName}
-                          </div>
-                        )}
-                        <div
-                          className="absolute bottom-2 right-2 text-black"
-                          style={{ fontSize: `${signatureFontSize - 1}px` }}
-                        >
-                          署名日時: {new Date().toLocaleDateString('ja-JP', {
-                            year: 'numeric',
-                            month: '2-digit',
-                            day: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </div>
-                      </div>
-                      <button
-                        onClick={async () => {
-                          if (!signatureName || !docId || !pageSize || !originalPdfBytes) {
-                            toast({
-                              title: "エラー",
-                              description: "PDFプレビューを生成するには署名者名が必要です",
-                              variant: "destructive",
-                            });
-                            return;
-                          }
-                          
-                          try {
-                            // 署名位置を計算
-                            let x = 0.1, y = 0.1;
-                            if (signaturePosition === 'bottom-right') {
-                              x = 0.6;
-                              y = 0.1;
-                            } else if (signaturePosition === 'top-left') {
-                              x = 0.1;
-                              y = 0.75;
-                            } else if (signaturePosition === 'top-right') {
-                              x = 0.6;
-                              y = 0.75;
-                            }
-                            
-                            const previewSignature: Signature = {
-                              id: generateSignatureId(),
-                              signerName: signatureName,
-                              signerEmail: signatureEmail || undefined,
-                              signDate: new Date(),
-                              signatureImage: signatureImage || undefined,
-                              signatureText: signatureText || undefined,
-                              position: {
-                                pageNumber: currentPage,
-                                x,
-                                y,
-                                width: 0.3,
-                                height: 0.15,
-                              },
-                              reason: signatureReason || undefined,
-                              location: signatureLocation || undefined,
-                              imageWidth: signatureImageScale,
-                              imageHeight: signatureImageScale,
-                              fontSize: signatureFontSize,
-                            };
-                            
-                            // 現在のページの注釈を取得
-                            const actualPageNum = getActualPageNum(currentPage);
-                            const pageAnnotations = await loadAnnotations(docId, actualPageNum);
-                            const pageTextAnnotations = await loadTextAnnotations(docId, actualPageNum);
-                            const pageShapeAnnotations = await loadShapeAnnotations(docId, actualPageNum);
-                            
-                            // PDFをエクスポート（署名を含む）
-                            const pdfBytes = await exportAnnotatedPDFV2(
-                              originalPdfBytes,
-                              { [currentPage]: pageAnnotations },
-                              { [currentPage]: pageSize },
-                              { [currentPage]: pageTextAnnotations },
-                              { [currentPage]: pageShapeAnnotations },
-                              undefined,
-                              undefined,
-                              [previewSignature]
-                            );
-                            
-                            // Blob URLを作成
-                            const blob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
-                            const url = URL.createObjectURL(blob);
-                            setSignaturePdfPreviewUrl(url);
-                          } catch (error) {
-                            console.error('PDFプレビューの生成に失敗:', error);
-                            toast({
-                              title: "エラー",
-                              description: "PDFプレビューの生成に失敗しました",
-                              variant: "destructive",
-                            });
-                          }
-                        }}
-                        className="w-full px-3 py-1.5 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors shadow-sm"
-                      >
-                        PDFでプレビュー
-                      </button>
-                    </div>
-                  )}
+              {showSignaturePreview && signaturePdfPreviewUrl && (
+                <div className="p-4 bg-white/60 rounded-lg border-2 border-slate-200">
+                  <label className="block text-sm font-semibold text-slate-800 mb-2">PDFプレビュー</label>
+                  <iframe
+                    src={signaturePdfPreviewUrl}
+                    className="w-full h-96 border-2 border-slate-300 rounded-lg"
+                    title="署名PDFプレビュー"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (signaturePdfPreviewUrl) {
+                        URL.revokeObjectURL(signaturePdfPreviewUrl);
+                        setSignaturePdfPreviewUrl(null);
+                      }
+                    }}
+                    variant="outline"
+                    className="mt-2 h-9 px-4 text-sm font-semibold border-2 border-slate-300 hover:bg-slate-50"
+                  >
+                    プレビューを閉じる
+                  </Button>
                 </div>
               )}
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    if (!pdfDoc || !signatureName.trim() || !docId || !pageSize || !originalPdfBytes) {
+                      toast({
+                        title: "エラー",
+                        description: "PDFが読み込まれていないか、署名者名が入力されていません。",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    try {
+                      const previewSignature: Signature = {
+                        id: generateSignatureId(),
+                        signerName: signatureName,
+                        signerEmail: signatureEmail || undefined,
+                        signDate: new Date(),
+                        signatureImage: signatureImage || undefined,
+                        signatureText: signatureText || undefined,
+                        position: {
+                          pageNumber: currentPage,
+                          x: signatureX,
+                          y: signatureY,
+                          width: signatureWidth,
+                          height: signatureHeight,
+                        },
+                        reason: signatureReason || undefined,
+                        location: signatureLocation || undefined,
+                        imageWidth: signatureImageScale,
+                        imageHeight: signatureImageScale,
+                        fontSize: signatureFontSize,
+                      };
+                      
+                      // 現在のページの注釈を取得
+                      const actualPageNum = getActualPageNum(currentPage);
+                      const pageAnnotations = await loadAnnotations(docId, actualPageNum);
+                      const pageTextAnnotations = await loadTextAnnotations(docId, actualPageNum);
+                      const pageShapeAnnotations = await loadShapeAnnotations(docId, actualPageNum);
+                      
+                      // PDFをエクスポート（署名を含む）
+                      const pdfBytes = await exportAnnotatedPDFV2(
+                        originalPdfBytes,
+                        { [currentPage]: pageAnnotations },
+                        { [currentPage]: pageSize },
+                        { [currentPage]: pageTextAnnotations },
+                        { [currentPage]: pageShapeAnnotations },
+                        undefined,
+                        undefined,
+                        [previewSignature]
+                      );
+                      
+                      // PDFプレビュー用のURLを生成
+                      const arrayBuffer = pdfBytes.buffer instanceof ArrayBuffer 
+                        ? pdfBytes.buffer 
+                        : new Uint8Array(pdfBytes).buffer;
+                      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+                      const url = URL.createObjectURL(blob);
+                      if (signaturePdfPreviewUrl) {
+                        URL.revokeObjectURL(signaturePdfPreviewUrl);
+                      }
+                      setSignaturePdfPreviewUrl(url);
+                      setShowSignaturePreview(true);
+                      
+                      toast({
+                        title: "成功",
+                        description: "PDFプレビューを生成しました。",
+                        variant: "success",
+                      });
+                    } catch (error) {
+                      console.error('PDFプレビュー生成エラー:', error);
+                      toast({
+                        title: "エラー",
+                        description: "PDFプレビューの生成に失敗しました。",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                  variant="outline"
+                  className="h-9 px-4 text-sm font-semibold border-2 border-blue-400 hover:bg-blue-50"
+                >
+                  PDFでプレビュー
+                </Button>
+              </div>
               <div>
                 <label className="block text-base font-semibold text-slate-800 mb-3">
-                  署名位置
+                  署名位置（クイック選択）
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <label className="flex items-center gap-3 p-3 border-2 border-slate-300 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-all shadow-sm">
@@ -9918,7 +9925,11 @@ export default function Home() {
                       name="signaturePosition"
                       value="bottom-left"
                       checked={signaturePosition === 'bottom-left'}
-                      onChange={(e) => setSignaturePosition(e.target.value as 'bottom-left')}
+                      onChange={(e) => {
+                        setSignaturePosition(e.target.value as 'bottom-left');
+                        setSignatureX(0.1);
+                        setSignatureY(0.1);
+                      }}
                       className="w-5 h-5 text-blue-600"
                     />
                     <span className="text-base font-medium text-slate-700">左下</span>
@@ -9929,7 +9940,11 @@ export default function Home() {
                       name="signaturePosition"
                       value="bottom-right"
                       checked={signaturePosition === 'bottom-right'}
-                      onChange={(e) => setSignaturePosition(e.target.value as 'bottom-right')}
+                      onChange={(e) => {
+                        setSignaturePosition(e.target.value as 'bottom-right');
+                        setSignatureX(0.6);
+                        setSignatureY(0.1);
+                      }}
                       className="w-5 h-5 text-blue-600"
                     />
                     <span className="text-base font-medium text-slate-700">右下</span>
@@ -9940,7 +9955,11 @@ export default function Home() {
                       name="signaturePosition"
                       value="top-left"
                       checked={signaturePosition === 'top-left'}
-                      onChange={(e) => setSignaturePosition(e.target.value as 'top-left')}
+                      onChange={(e) => {
+                        setSignaturePosition(e.target.value as 'top-left');
+                        setSignatureX(0.1);
+                        setSignatureY(0.75);
+                      }}
                       className="w-5 h-5 text-blue-600"
                     />
                     <span className="text-base font-medium text-slate-700">左上</span>
@@ -9951,7 +9970,11 @@ export default function Home() {
                       name="signaturePosition"
                       value="top-right"
                       checked={signaturePosition === 'top-right'}
-                      onChange={(e) => setSignaturePosition(e.target.value as 'top-right')}
+                      onChange={(e) => {
+                        setSignaturePosition(e.target.value as 'top-right');
+                        setSignatureX(0.6);
+                        setSignatureY(0.75);
+                      }}
                       className="w-5 h-5 text-blue-600"
                     />
                     <span className="text-base font-medium text-slate-700">右上</span>
@@ -9987,21 +10010,29 @@ export default function Home() {
                     return;
                   }
                   
-                  // 署名位置を計算
-                  let x = 0.1, y = 0.1;
+                  // 署名位置を計算（位置選択ボタンが変更された場合は更新）
+                  let x = signatureX, y = signatureY;
                   if (signaturePosition === 'bottom-right') {
                     x = 0.6; // 右側
                     y = 0.1; // 下側
+                    setSignatureX(0.6);
+                    setSignatureY(0.1);
                   } else if (signaturePosition === 'top-left') {
                     x = 0.1; // 左側
                     y = 0.75; // 上側（PDF座標系は下から上）
+                    setSignatureX(0.1);
+                    setSignatureY(0.75);
                   } else if (signaturePosition === 'top-right') {
                     x = 0.6; // 右側
                     y = 0.75; // 上側
+                    setSignatureX(0.6);
+                    setSignatureY(0.75);
                   } else {
                     // bottom-left (デフォルト)
                     x = 0.1;
                     y = 0.1;
+                    setSignatureX(0.1);
+                    setSignatureY(0.1);
                   }
                   
                   const signature: Signature = {
@@ -10015,8 +10046,8 @@ export default function Home() {
                       pageNumber: currentPage,
                       x,
                       y,
-                      width: 0.3,
-                      height: 0.15,
+                      width: signatureWidth,
+                      height: signatureHeight,
                     },
                     reason: signatureReason || undefined,
                     location: signatureLocation || undefined,
@@ -10052,6 +10083,10 @@ export default function Home() {
                   setSignatureImage(null);
                   setSignatureText('');
                   setSignaturePosition('bottom-left');
+                  setSignatureX(0.1);
+                  setSignatureY(0.1);
+                  setSignatureWidth(0.3);
+                  setSignatureHeight(0.15);
                   setSignaturePdfPreviewUrl(null);
                   setShowSignaturePreview(false);
                 }}
