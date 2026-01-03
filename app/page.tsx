@@ -1335,14 +1335,13 @@ export default function Home() {
         laserPointerTimeoutRef.current = null;
       }
       // プレゼンモード終了時にメイン画面のPDFを再レンダリング
-      // currentPageを強制的に更新してuseEffectをトリガーする
+      // 確実に再レンダリングするため、少し待ってから明示的にrenderCurrentPage()を呼ぶ
       (async () => {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        // currentPageを一度更新してから元に戻すことで、useEffectを確実にトリガー
-        const currentPageValue = currentPage;
-        setCurrentPage(0); // 一時的に0に設定
-        await new Promise(resolve => setTimeout(resolve, 50));
-        setCurrentPage(currentPageValue); // 元の値に戻す（これでuseEffectが確実に実行される）
+        await new Promise(resolve => setTimeout(resolve, 200));
+        // 明示的にrenderCurrentPage()を呼ぶ
+        if (pdfDoc && pdfCanvasRef.current && inkCanvasRef.current) {
+          await renderCurrentPage();
+        }
       })();
     }
   }, [isPresentationMode]);
@@ -3671,10 +3670,10 @@ export default function Home() {
     setShowTableOfContentsDialog(false);
     console.log('目次ジャンプ デバッグ: ダイアログを閉じました');
     // useEffectで自動的にrenderCurrentPage()が呼ばれるが、確実に実行されるように少し待ってから明示的に呼ぶ
-    if (pdfDoc) {
+    if (pdfDoc && pdfCanvasRef.current && inkCanvasRef.current) {
       setTimeout(async () => {
         await renderCurrentPage();
-      }, 100);
+      }, 150);
     }
   };
 
