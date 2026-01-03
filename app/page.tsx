@@ -1343,17 +1343,15 @@ export default function Home() {
         await new Promise(resolve => setTimeout(resolve, 200));
         const currentPageValue = currentPage;
         if (currentPageValue > 0 && pdfDoc && currentPageValue <= pdfDoc.numPages) {
-          // 一時的に別のページに設定してから元に戻すことで、useEffectを確実にトリガー
-          // ただし、0に設定すると無効なページになるので、1に設定してから元に戻す
-          const tempPage = currentPageValue === 1 ? 2 : 1;
-          setCurrentPage(tempPage);
-          await new Promise(resolve => setTimeout(resolve, 150));
-          setCurrentPage(currentPageValue);
-          console.log('プレゼンモード終了: currentPageを更新して再レンダリングをトリガー', { currentPageValue });
-          // さらに確実にするため、明示的にrenderCurrentPage()を呼ぶ
-          await new Promise(resolve => setTimeout(resolve, 200));
-          if (pdfDoc && pdfCanvasRef.current && inkCanvasRef.current && !isPresentationMode) {
-            console.log('プレゼンモード終了: 明示的にrenderCurrentPage()を呼び出し');
+          // メイン画面のキャンバスを確実に表示
+          if (pdfCanvasRef.current) {
+            pdfCanvasRef.current.style.display = 'block';
+            pdfCanvasRef.current.style.visibility = 'visible';
+          }
+          // 明示的にrenderCurrentPage()を呼ぶ（useEffectに依存しない）
+          await new Promise(resolve => setTimeout(resolve, 100));
+          if (pdfDoc && pdfCanvasRef.current && inkCanvasRef.current) {
+            console.log('プレゼンモード終了: 明示的にrenderCurrentPage()を呼び出し', { currentPageValue });
             await renderCurrentPage();
           }
         } else if (pdfDoc && pdfCanvasRef.current && inkCanvasRef.current) {
@@ -1575,8 +1573,15 @@ export default function Home() {
 
       // プレゼンモードで逆さ表示が発生する場合の自動修正：レンダリングを2回実行
       // 無限ループを防ぐためにフラグで制御し、直接レンダリングを再実行
+      // 逆さ表示をユーザーに見せないため、レンダリング中はキャンバスを非表示にする
       if (isPresentationMode && !isFixingRotationRef.current && pdfDoc && pdfCanvas) {
         isFixingRotationRef.current = true;
+        // レンダリング中はキャンバスを非表示にして、逆さ表示を見せない
+        const originalDisplay = pdfCanvas.style.display;
+        const originalVisibility = pdfCanvas.style.visibility;
+        pdfCanvas.style.display = 'none';
+        pdfCanvas.style.visibility = 'hidden';
+        
         // 一度レンダリングを完了させてから、再度レンダリングを実行
         await new Promise(resolve => setTimeout(resolve, 300));
         // 同じページを再度レンダリング（これにより逆さ表示が修正される）
@@ -1584,8 +1589,14 @@ export default function Home() {
           const samePage = await pdfDoc.getPage(actualPageNum);
           const fixResult = await renderPage(samePage, pdfCanvas, renderScale, 0, renderTaskRef.current);
           renderTaskRef.current = fixResult.task;
+          // レンダリング完了後にキャンバスを表示
+          pdfCanvas.style.display = originalDisplay || 'block';
+          pdfCanvas.style.visibility = originalVisibility || 'visible';
         } catch (error) {
           console.log('回転修正レンダリングエラー:', error);
+          // エラー時もキャンバスを表示
+          pdfCanvas.style.display = originalDisplay || 'block';
+          pdfCanvas.style.visibility = originalVisibility || 'visible';
         }
         // フラグをリセット
         setTimeout(() => {
@@ -5423,6 +5434,27 @@ export default function Home() {
                 <MdNavigateNext className="text-base" />
               </button>
               
+              {/* ページ直接指定（プレゼンモード） */}
+              <input
+                type="number"
+                min={1}
+                max={totalPages}
+                value={presentationPage}
+                onChange={(e) => {
+                  const page = parseInt(e.target.value);
+                  if (page >= 1 && page <= totalPages) {
+                    setPresentationPage(page);
+                  }
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="px-1.5 py-0.5 text-xs bg-white/20 hover:bg-white/30 rounded border border-white/30 text-white flex-shrink-0 w-12 text-center"
+                style={{ fontSize: '0.7rem', height: '24px' }}
+                title="ページ番号を直接入力"
+              />
+              <span className="text-xs text-white/70 flex-shrink-0" style={{ fontSize: '0.7rem' }}>
+                / {totalPages}
+              </span>
+              
               {/* タイマー */}
               <div 
                 className="flex items-center gap-1 px-1.5 py-0.5 bg-black/70 border border-white/40 rounded flex-shrink-0"
@@ -6349,9 +6381,25 @@ export default function Home() {
               <MdNavigateBefore className={`text-lg ${currentPage === 1 ? 'text-slate-400' : 'text-white'}`} />
               前へ
             </button>
-            <span className="text-sm font-semibold bg-gradient-to-r from-slate-600 to-slate-700 bg-clip-text text-transparent px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
-              ページ {currentPage} / {totalPages}
-            </span>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={totalPages}
+                value={currentPage}
+                onChange={(e) => {
+                  const page = parseInt(e.target.value);
+                  if (page >= 1 && page <= totalPages) {
+                    setCurrentPage(page);
+                  }
+                }}
+                className="px-2 py-1 text-sm border rounded-lg text-center w-16 bg-white border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                title="ページ番号を直接入力"
+              />
+              <span className="text-sm font-semibold bg-gradient-to-r from-slate-600 to-slate-700 bg-clip-text text-transparent">
+                / {totalPages}
+              </span>
+            </div>
             <button
               onClick={goToNextPage}
               disabled={currentPage === totalPages}
