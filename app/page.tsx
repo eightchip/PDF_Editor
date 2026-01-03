@@ -3262,12 +3262,15 @@ export default function Home() {
       
       // 折れ線矢印の場合はpoints配列を更新
       let updatedShape;
-      if (tool === 'polyline-arrow' && currentShape.points) {
-        // 最後の点を更新（または新しい点を追加）
-        const points = [...currentShape.points];
+      if (tool === 'polyline-arrow') {
+        // points配列を更新
+        const points = currentShape.points ? [...currentShape.points] : [{ x: currentShape.x1, y: currentShape.y1 }];
         if (points.length > 0) {
-          // 最後の点を更新
+          // 最後の点を更新（ドラッグ中は最後の点を更新）
           points[points.length - 1] = { x: normalizedX, y: normalizedY };
+        } else {
+          // pointsが空の場合は最初の点を追加
+          points.push({ x: normalizedX, y: normalizedY });
         }
         updatedShape = {
           ...currentShape,
