@@ -344,10 +344,10 @@ export default function Home() {
   const [signatureImage, setSignatureImage] = useState<string | null>(null); // Base64画像
   const [signatureText, setSignatureText] = useState(''); // テキスト署名
   const [signaturePosition, setSignaturePosition] = useState<'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'>('bottom-left'); // 署名位置
-  const [signatureImageWidth, setSignatureImageWidth] = useState(100); // 署名画像の幅（%）
-  const [signatureImageHeight, setSignatureImageHeight] = useState(100); // 署名画像の高さ（%）
+  const [signatureImageScale, setSignatureImageScale] = useState(100); // 署名画像のサイズ比率（%、縦横一括）
   const [signatureFontSize, setSignatureFontSize] = useState(10); // 署名フォントサイズ
   const [showSignaturePreview, setShowSignaturePreview] = useState(false); // 署名プレビューの表示状態
+  const [signaturePdfPreviewUrl, setSignaturePdfPreviewUrl] = useState<string | null>(null); // PDFプレビューのURL
   const [showSplitDialog, setShowSplitDialog] = useState(false); // PDF分割ダイアログ
   const [showOCRDialog, setShowOCRDialog] = useState(false); // OCRダイアログ
   const [showTableOfContentsDialog, setShowTableOfContentsDialog] = useState(false); // 目次ダイアログ
@@ -9574,6 +9574,9 @@ export default function Home() {
             background: 'linear-gradient(135deg, #dbeafe 0%, #e0f2fe 50%, #bae6fd 100%)',
           }}
           onClose={() => {
+            if (signaturePdfPreviewUrl) {
+              URL.revokeObjectURL(signaturePdfPreviewUrl);
+            }
             setShowSignatureDialog(false);
             setSignatureName('');
             setSignatureEmail('');
@@ -9581,6 +9584,8 @@ export default function Home() {
             setSignatureLocation('');
             setSignatureImage(null);
             setSignatureText('');
+            setSignaturePdfPreviewUrl(null);
+            setShowSignaturePreview(false);
           }}
         >
             <DialogHeader className="pb-4 border-b border-blue-200 mb-4">
@@ -9684,30 +9689,17 @@ export default function Home() {
                       className="max-w-full max-h-48 border-2 border-slate-300 rounded-lg object-contain shadow-sm" 
                       style={{ maxWidth: '400px', maxHeight: '200px' }}
                     />
-                    <div className="mt-3 space-y-3">
+                    <div className="mt-3">
                       <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">
-                          画像サイズ（幅）: {signatureImageWidth}%
+                          画像サイズ: {signatureImageScale}%
                         </label>
                         <input
                           type="range"
                           min="20"
                           max="200"
-                          value={signatureImageWidth}
-                          onChange={(e) => setSignatureImageWidth(parseInt(e.target.value))}
-                          className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                          画像サイズ（高さ）: {signatureImageHeight}%
-                        </label>
-                        <input
-                          type="range"
-                          min="20"
-                          max="200"
-                          value={signatureImageHeight}
-                          onChange={(e) => setSignatureImageHeight(parseInt(e.target.value))}
+                          value={signatureImageScale}
+                          onChange={(e) => setSignatureImageScale(parseInt(e.target.value))}
                           className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
                         />
                       </div>
@@ -9760,50 +9752,155 @@ export default function Home() {
               {showSignaturePreview && (
                 <div className="p-4 bg-white rounded-lg border-2 border-blue-300">
                   <div className="text-sm font-semibold text-slate-700 mb-2">プレビュー</div>
-                  <div className="relative border-2 border-slate-300 rounded" style={{ width: '300px', height: '150px', margin: '0 auto' }}>
-                    {signatureImage && (
-                      <img
-                        src={signatureImage}
-                        alt="プレビュー"
-                        className="absolute object-contain"
-                        style={{
-                          width: `${signatureImageWidth}%`,
-                          height: `${signatureImageHeight}%`,
-                          top: '50%',
-                          left: '50%',
-                          transform: 'translate(-50%, -50%)',
-                        }}
+                  {signaturePdfPreviewUrl ? (
+                    <div className="space-y-2">
+                      <iframe
+                        src={signaturePdfPreviewUrl}
+                        className="w-full border-2 border-slate-300 rounded"
+                        style={{ height: '400px' }}
+                        title="PDFプレビュー"
                       />
-                    )}
-                    {!signatureImage && signatureText && (
-                      <div
-                        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
-                        style={{ fontSize: `${signatureFontSize}px` }}
+                      <button
+                        onClick={() => {
+                          if (signaturePdfPreviewUrl) {
+                            URL.revokeObjectURL(signaturePdfPreviewUrl);
+                          }
+                          setSignaturePdfPreviewUrl(null);
+                        }}
+                        className="w-full px-3 py-1.5 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors shadow-sm"
                       >
-                        {signatureText}
-                      </div>
-                    )}
-                    {signatureName && (
-                      <div
-                        className="absolute bottom-2 left-2"
-                        style={{ fontSize: `${signatureFontSize}px` }}
-                      >
-                        {signatureName}
-                      </div>
-                    )}
-                    <div
-                      className="absolute bottom-2 right-2 text-black"
-                      style={{ fontSize: `${signatureFontSize - 1}px` }}
-                    >
-                      署名日時: {new Date().toLocaleDateString('ja-JP', {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                        プレビューを閉じる
+                      </button>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="relative border-2 border-slate-300 rounded" style={{ width: '300px', height: '150px', margin: '0 auto' }}>
+                        {signatureImage && (
+                          <img
+                            src={signatureImage}
+                            alt="プレビュー"
+                            className="absolute object-contain"
+                            style={{
+                              width: `${signatureImageScale}%`,
+                              height: `${signatureImageScale}%`,
+                              top: '50%',
+                              left: '50%',
+                              transform: 'translate(-50%, -50%)',
+                            }}
+                          />
+                        )}
+                        {!signatureImage && signatureText && (
+                          <div
+                            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
+                            style={{ fontSize: `${signatureFontSize}px` }}
+                          >
+                            {signatureText}
+                          </div>
+                        )}
+                        {signatureName && (
+                          <div
+                            className="absolute bottom-2 left-2"
+                            style={{ fontSize: `${signatureFontSize}px` }}
+                          >
+                            {signatureName}
+                          </div>
+                        )}
+                        <div
+                          className="absolute bottom-2 right-2 text-black"
+                          style={{ fontSize: `${signatureFontSize - 1}px` }}
+                        >
+                          署名日時: {new Date().toLocaleDateString('ja-JP', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </div>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (!signatureName || !docId || !pageSize || !originalPdfBytes) {
+                            toast({
+                              title: "エラー",
+                              description: "PDFプレビューを生成するには署名者名が必要です",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          
+                          try {
+                            // 署名位置を計算
+                            let x = 0.1, y = 0.1;
+                            if (signaturePosition === 'bottom-right') {
+                              x = 0.6;
+                              y = 0.1;
+                            } else if (signaturePosition === 'top-left') {
+                              x = 0.1;
+                              y = 0.75;
+                            } else if (signaturePosition === 'top-right') {
+                              x = 0.6;
+                              y = 0.75;
+                            }
+                            
+                            const previewSignature: Signature = {
+                              id: generateSignatureId(),
+                              signerName: signatureName,
+                              signerEmail: signatureEmail || undefined,
+                              signDate: new Date(),
+                              signatureImage: signatureImage || undefined,
+                              signatureText: signatureText || undefined,
+                              position: {
+                                pageNumber: currentPage,
+                                x,
+                                y,
+                                width: 0.3,
+                                height: 0.15,
+                              },
+                              reason: signatureReason || undefined,
+                              location: signatureLocation || undefined,
+                              imageWidth: signatureImageScale,
+                              imageHeight: signatureImageScale,
+                              fontSize: signatureFontSize,
+                            };
+                            
+                            // 現在のページの注釈を取得
+                            const actualPageNum = getActualPageNum(currentPage);
+                            const pageAnnotations = await loadAnnotations(docId, actualPageNum);
+                            const pageTextAnnotations = await loadTextAnnotations(docId, actualPageNum);
+                            const pageShapeAnnotations = await loadShapeAnnotations(docId, actualPageNum);
+                            
+                            // PDFをエクスポート（署名を含む）
+                            const pdfBytes = await exportAnnotatedPDFV2(
+                              originalPdfBytes,
+                              { [currentPage]: pageAnnotations },
+                              { [currentPage]: pageSize },
+                              { [currentPage]: pageTextAnnotations },
+                              { [currentPage]: pageShapeAnnotations },
+                              undefined,
+                              undefined,
+                              [previewSignature]
+                            );
+                            
+                            // Blob URLを作成
+                            const blob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
+                            const url = URL.createObjectURL(blob);
+                            setSignaturePdfPreviewUrl(url);
+                          } catch (error) {
+                            console.error('PDFプレビューの生成に失敗:', error);
+                            toast({
+                              title: "エラー",
+                              description: "PDFプレビューの生成に失敗しました",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        className="w-full px-3 py-1.5 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors shadow-sm"
+                      >
+                        PDFでプレビュー
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
               <div>
@@ -9919,13 +10016,20 @@ export default function Home() {
                     },
                     reason: signatureReason || undefined,
                     location: signatureLocation || undefined,
-                    imageWidth: signatureImageWidth,
-                    imageHeight: signatureImageHeight,
+                    imageWidth: signatureImageScale,
+                    imageHeight: signatureImageScale,
                     fontSize: signatureFontSize,
                   };
                   
                   await saveSignature(docId, signature);
-                  setSignatures(prev => [...prev, signature]);
+                  // 重複チェック: 同じIDの署名が既に存在する場合は追加しない
+                  setSignatures(prev => {
+                    const exists = prev.some(sig => sig.id === signature.id);
+                    if (exists) {
+                      return prev;
+                    }
+                    return [...prev, signature];
+                  });
                   
                   toast({
                     title: "成功",
@@ -9933,6 +10037,9 @@ export default function Home() {
                     variant: "success",
                   });
                   
+                  if (signaturePdfPreviewUrl) {
+                    URL.revokeObjectURL(signaturePdfPreviewUrl);
+                  }
                   setShowSignatureDialog(false);
                   setSignatureName('');
                   setSignatureEmail('');
@@ -9941,6 +10048,8 @@ export default function Home() {
                   setSignatureImage(null);
                   setSignatureText('');
                   setSignaturePosition('bottom-left');
+                  setSignaturePdfPreviewUrl(null);
+                  setShowSignaturePreview(false);
                 }}
                 disabled={!signatureName}
               >
@@ -11387,10 +11496,14 @@ export default function Home() {
               <label className="block text-sm font-semibold text-slate-800 mb-2">配置パターン</label>
               <select
                 value={watermarkPattern}
-                onChange={(e) => setWatermarkPattern(e.target.value as 'center' | 'grid' | 'tile')}
+                onChange={(e) => setWatermarkPattern(e.target.value as 'center' | 'grid' | 'tile' | 'bottom-right' | 'top-right' | 'bottom-left' | 'top-left')}
                 className="w-full px-4 py-2.5 text-base border-2 border-slate-300 rounded-lg bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-200"
               >
                 <option value="center">中央1箇所</option>
+                <option value="bottom-right">右下1箇所</option>
+                <option value="top-right">右上1箇所</option>
+                <option value="bottom-left">左下1箇所</option>
+                <option value="top-left">左上1箇所</option>
                 <option value="grid">グリッド状（均等配置）</option>
                 <option value="tile">タイル状（繰り返し配置）</option>
               </select>

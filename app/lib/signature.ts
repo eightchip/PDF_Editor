@@ -113,30 +113,19 @@ export async function addSignatureToPDF(
       const imageAspectRatio = pdfImage.width / pdfImage.height;
       const boxAspectRatio = (width - 10) / (height - 10);
       
-      // ユーザーが指定したサイズ比率を適用
-      const imageWidthRatio = (signature.imageWidth || 100) / 100;
-      const imageHeightRatio = (signature.imageHeight || 100) / 100;
+      // ユーザーが指定したサイズ比率を適用（縦横一括）
+      const imageScale = (signature.imageWidth || 100) / 100; // imageWidthとimageHeightは同じ値（縦横一括）
       
-      let drawWidth = (width - 10) * imageWidthRatio;
-      let drawHeight = (height - 10) * imageHeightRatio;
+      let drawWidth = (width - 10) * imageScale;
+      let drawHeight = (height - 10) * imageScale;
       
       // アスペクト比を保持しながら、指定されたサイズ比率内に収める
       if (imageAspectRatio > boxAspectRatio) {
         // 画像の方が横長 → 幅に合わせる
-        const adjustedHeight = drawWidth / imageAspectRatio;
-        if (adjustedHeight > drawHeight) {
-          drawWidth = drawHeight * imageAspectRatio;
-        } else {
-          drawHeight = adjustedHeight;
-        }
+        drawHeight = drawWidth / imageAspectRatio;
       } else {
         // 画像の方が縦長 → 高さに合わせる
-        const adjustedWidth = drawHeight * imageAspectRatio;
-        if (adjustedWidth > drawWidth) {
-          drawHeight = drawWidth / imageAspectRatio;
-        } else {
-          drawWidth = adjustedWidth;
-        }
+        drawWidth = drawHeight * imageAspectRatio;
       }
       
       // 画像を中央に配置（PDF座標系は左下が原点）
