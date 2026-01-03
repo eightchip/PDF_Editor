@@ -1340,10 +1340,17 @@ export default function Home() {
       // プレゼンモード終了時にメイン画面のPDFを再レンダリング
       // 確実にメイン画面のPDFが表示されるように、少し待ってから強制的に再レンダリング
       (async () => {
-        await new Promise(resolve => setTimeout(resolve, 300));
         const currentPageValue = currentPage;
+        console.log('プレゼンモード終了: メイン画面への遷移を開始', { currentPageValue });
         
-        // メイン画面のキャンバスを確実に表示（DOMに存在することを確認）
+        // まず、メイン画面のキャンバスを確実に表示（DOMに存在することを確認）
+        // プレゼンモード用のキャンバスを非表示にする
+        if (presentationCanvasRef.current) {
+          presentationCanvasRef.current.style.display = 'none';
+          presentationCanvasRef.current.style.visibility = 'hidden';
+        }
+        
+        // メイン画面のキャンバスを表示
         if (pdfCanvasRef.current) {
           pdfCanvasRef.current.style.display = 'block';
           pdfCanvasRef.current.style.visibility = 'visible';
@@ -1363,25 +1370,52 @@ export default function Home() {
           inkCanvasRef.current.style.opacity = '1';
         }
         
-        // キャンバスが取得できるまで待機（最大1秒）
+        // キャンバスが取得できるまで待機（最大2秒）
         let retryCount = 0;
-        while ((!pdfCanvasRef.current || !inkCanvasRef.current) && retryCount < 10) {
+        while ((!pdfCanvasRef.current || !inkCanvasRef.current) && retryCount < 20) {
           await new Promise(resolve => setTimeout(resolve, 100));
           retryCount++;
+          if (retryCount % 5 === 0) {
+            console.log('プレゼンモード終了: キャンバス取得待機中...', { retryCount });
+          }
+        }
+        
+        if (!pdfCanvasRef.current || !inkCanvasRef.current) {
+          console.error('プレゼンモード終了: キャンバスが取得できませんでした', {
+            hasPdfCanvas: !!pdfCanvasRef.current,
+            hasInkCanvas: !!inkCanvasRef.current
+          });
+          return;
         }
         
         // currentPageを強制的に更新してuseEffectを確実にトリガー
         if (currentPageValue > 0 && pdfDoc && currentPageValue <= pdfDoc.numPages) {
           // 一時的に別のページに設定してから元に戻すことで、useEffectを確実にトリガー
           const tempPage = currentPageValue === 1 ? 2 : 1;
+          console.log('プレゼンモード終了: currentPageを一時的に変更', { from: currentPageValue, to: tempPage });
           setCurrentPage(tempPage);
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise(resolve => setTimeout(resolve, 150));
+          console.log('プレゼンモード終了: currentPageを元に戻す', { to: currentPageValue });
           setCurrentPage(currentPageValue);
-          console.log('プレゼンモード終了: currentPageを更新して再レンダリングをトリガー', { currentPageValue });
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+          // さらに、直接renderCurrentPage()も呼び出す（二重の保険）
+          if (pdfDoc && pdfCanvasRef.current && inkCanvasRef.current) {
+            console.log('プレゼンモード終了: 直接renderCurrentPage()を呼び出し', { currentPageValue });
+            try {
+              await renderCurrentPage();
+            } catch (error) {
+              console.error('プレゼンモード終了: renderCurrentPage()エラー', error);
+            }
+          }
         } else if (pdfDoc && pdfCanvasRef.current && inkCanvasRef.current) {
           // currentPageが無効な場合は、直接renderCurrentPage()を呼ぶ
-          console.log('プレゼンモード終了: 直接renderCurrentPage()を呼び出し');
-          await renderCurrentPage();
+          console.log('プレゼンモード終了: 直接renderCurrentPage()を呼び出し（currentPage無効）');
+          try {
+            await renderCurrentPage();
+          } catch (error) {
+            console.error('プレゼンモード終了: renderCurrentPage()エラー', error);
+          }
         }
       })();
     }
@@ -1818,15 +1852,38 @@ export default function Home() {
       });
       // モーダルが開いている場合は、モーダルが閉じるまで待つ
       const checkAndRender = async () => {
+        // メイン画面のキャンバスが確実に表示されていることを確認
+        if (pdfCanvasRef.current) {
+          pdfCanvasRef.current.style.display = 'block';
+          pdfCanvasRef.current.style.visibility = 'visible';
+          pdfCanvasRef.current.style.opacity = '1';
+        }
+        
         // モーダルが開いている場合は、モーダルが閉じるまで待つ（最大1秒）
         let retryCount = 0;
         while ((showThumbnailModal || showTableOfContentsDialog) && retryCount < 10) {
           await new Promise(resolve => setTimeout(resolve, 100));
           retryCount++;
         }
+        
+        // キャンバスが取得できるまで待機（最大1秒）
+        let canvasRetryCount = 0;
+        while ((!pdfCanvasRef.current || !inkCanvasRef.current) && canvasRetryCount < 10) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          canvasRetryCount++;
+        }
+        
+        if (!pdfCanvasRef.current || !inkCanvasRef.current) {
+          console.warn('useEffect: キャンバスが取得できません', {
+            hasPdfCanvas: !!pdfCanvasRef.current,
+            hasInkCanvas: !!inkCanvasRef.current
+          });
+          return;
+        }
+        
         // 確実に実行されるように、少し待ってから呼び出す
         await new Promise(resolve => setTimeout(resolve, 50));
-        console.log('useEffect: renderCurrentPage()を実行', { currentPage, retryCount });
+        console.log('useEffect: renderCurrentPage()を実行', { currentPage, retryCount, canvasRetryCount });
         renderCurrentPage().catch(error => {
           console.error('useEffect: renderCurrentPage()エラー', error);
         });
