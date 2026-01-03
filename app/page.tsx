@@ -1386,10 +1386,8 @@ export default function Home() {
     try {
       // pageOrderが設定されている場合は、表示順序から実際のページ番号に変換
       const actualPageNum = getActualPageNum(currentPage);
-      // PDF.jsは0ベースのインデックスを期待するので、-1して変換
-      const pageIndex = actualPageNum - 1;
-      console.log('renderCurrentPage:', { currentPage, actualPageNum, pageIndex, totalPages: pdfDoc.numPages });
-      const page = await pdfDoc.getPage(pageIndex);
+      console.log('renderCurrentPage:', { currentPage, actualPageNum, totalPages: pdfDoc.numPages });
+      const page = await pdfDoc.getPage(actualPageNum);
       const pdfCanvas = pdfCanvasRef.current;
       const inkCanvas = inkCanvasRef.current;
 
