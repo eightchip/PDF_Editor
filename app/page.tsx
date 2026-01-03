@@ -1420,14 +1420,29 @@ export default function Home() {
     }
 
     // プレゼンモード中でもレンダリングを実行（プレゼンモード用の表示のため）
+    // ただし、プレゼンモードでない場合は、メイン画面のキャンバスが確実に表示されるようにする
+    if (!isPresentationMode && pdfCanvasRef.current) {
+      // メイン画面のキャンバスが確実に表示されるようにする
+      pdfCanvasRef.current.style.display = 'block';
+      pdfCanvasRef.current.style.visibility = 'visible';
+      console.log('renderCurrentPage: メイン画面のキャンバスを表示', { 
+        display: pdfCanvasRef.current.style.display,
+        visibility: pdfCanvasRef.current.style.visibility 
+      });
+    }
 
     try {
       // pageOrderが設定されている場合は、表示順序から実際のページ番号に変換
       const actualPageNum = getActualPageNum(currentPage);
-      console.log('renderCurrentPage: レンダリング開始', { currentPage, actualPageNum, totalPages: pdfDoc.numPages });
+      console.log('renderCurrentPage: レンダリング開始', { currentPage, actualPageNum, totalPages: pdfDoc.numPages, isPresentationMode });
       const page = await pdfDoc.getPage(actualPageNum);
       const pdfCanvas = pdfCanvasRef.current;
       const inkCanvas = inkCanvasRef.current;
+      
+      if (!pdfCanvas || !inkCanvas) {
+        console.error('renderCurrentPage: キャンバスが取得できません', { pdfCanvas: !!pdfCanvas, inkCanvas: !!inkCanvas });
+        return;
+      }
 
       // スライドショーモードの場合は、画面に収まるようにスケールを計算
       let renderScale = scale;
@@ -1490,10 +1505,25 @@ export default function Home() {
       const currentRotation = isPresentationMode ? 0 : (pageRotations[actualPageNum] || 0);
       
       // 新しいレンダリングタスクを開始（前のタスクは既にキャンセル済みなのでnullを渡す）
+      console.log('renderCurrentPage: renderPageを呼び出し', { 
+        renderScale, 
+        currentRotation, 
+        canvasWidth: pdfCanvas.width, 
+        canvasHeight: pdfCanvas.height,
+        isPresentationMode 
+      });
       const result = await renderPage(page, pdfCanvas, renderScale, currentRotation, null);
       renderTaskRef.current = result.task; // レンダリングタスクを保存
       const size = { width: result.width, height: result.height };
       setPageSize(size);
+      console.log('renderCurrentPage: レンダリング完了', { 
+        width: result.width, 
+        height: result.height,
+        canvasWidth: pdfCanvas.width,
+        canvasHeight: pdfCanvas.height,
+        canvasDisplay: pdfCanvas.style.display,
+        canvasVisibility: pdfCanvas.style.visibility
+      });
 
       // プレゼンモードで逆さ表示が発生する場合の自動修正：レンダリングを2回実行
       // 無限ループを防ぐためにフラグで制御し、直接レンダリングを再実行
