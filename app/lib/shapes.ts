@@ -246,7 +246,7 @@ export function drawShapeAnnotation(
         const radius = Math.min(stampW, stampH) / 2;
 
         // 外側の円
-        ctx.strokeStyle = shape.color || '#3b82f6';
+        ctx.strokeStyle = shape.color || '#000000';
         ctx.lineWidth = shape.width * 2;
         ctx.beginPath();
         ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
@@ -254,7 +254,7 @@ export function drawShapeAnnotation(
 
         // 日付テキスト
         const dateText = shape.stampText || new Date().toLocaleDateString('ja-JP');
-        ctx.fillStyle = shape.color || '#3b82f6';
+        ctx.fillStyle = shape.color || '#000000';
         ctx.font = `bold ${Math.min(stampW, stampH) * 0.2}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';

@@ -20,6 +20,9 @@ export interface Signature {
   };
   reason?: string; // 署名理由
   location?: string; // 署名場所
+  imageWidth?: number; // 署名画像の幅（%、デフォルト100）
+  imageHeight?: number; // 署名画像の高さ（%、デフォルト100）
+  fontSize?: number; // フォントサイズ（デフォルト10）
 }
 
 export interface ApprovalWorkflow {
@@ -67,12 +70,13 @@ export async function addSignatureToPDF(
   const width = signature.position.width * pageWidth;
   const height = signature.position.height * pageHeight;
   
-  // 署名ボックスを描画
+  // 署名ボックスを描画（外枠は既存のフォーマットの線と重ならないように、少し内側に描画）
+  const borderOffset = 2; // 外枠のオフセット（既存の線と重ならないように）
   page.drawRectangle({
-    x,
-    y,
-    width,
-    height,
+    x: x + borderOffset,
+    y: y + borderOffset,
+    width: width - borderOffset * 2,
+    height: height - borderOffset * 2,
     borderColor: rgb(0, 0, 0),
     borderWidth: 1,
     color: rgb(1, 1, 1), // 白背景
@@ -109,15 +113,30 @@ export async function addSignatureToPDF(
       const imageAspectRatio = pdfImage.width / pdfImage.height;
       const boxAspectRatio = (width - 10) / (height - 10);
       
-      let drawWidth = width - 10;
-      let drawHeight = height - 10;
+      // ユーザーが指定したサイズ比率を適用
+      const imageWidthRatio = (signature.imageWidth || 100) / 100;
+      const imageHeightRatio = (signature.imageHeight || 100) / 100;
       
+      let drawWidth = (width - 10) * imageWidthRatio;
+      let drawHeight = (height - 10) * imageHeightRatio;
+      
+      // アスペクト比を保持しながら、指定されたサイズ比率内に収める
       if (imageAspectRatio > boxAspectRatio) {
         // 画像の方が横長 → 幅に合わせる
-        drawHeight = drawWidth / imageAspectRatio;
+        const adjustedHeight = drawWidth / imageAspectRatio;
+        if (adjustedHeight > drawHeight) {
+          drawWidth = drawHeight * imageAspectRatio;
+        } else {
+          drawHeight = adjustedHeight;
+        }
       } else {
         // 画像の方が縦長 → 高さに合わせる
-        drawWidth = drawHeight * imageAspectRatio;
+        const adjustedWidth = drawHeight * imageAspectRatio;
+        if (adjustedWidth > drawWidth) {
+          drawHeight = drawWidth / imageAspectRatio;
+        } else {
+          drawWidth = adjustedWidth;
+        }
       }
       
       // 画像を中央に配置（PDF座標系は左下が原点）
@@ -152,7 +171,7 @@ export async function addSignatureToPDF(
   
   // 署名情報をテキストで表示
   // 日本語文字をサポートするため、テキストを画像として描画
-  const fontSize = 10;
+  const fontSize = signature.fontSize || 10;
   const lineHeight = fontSize * 1.3;
   
   // PDF座標系ではyは下から上に向かって増える
@@ -301,7 +320,7 @@ export async function addSignatureToPDF(
       
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.font = `${fontSize - 1}px Arial, sans-serif`;
-      ctx.fillStyle = '#808080';
+      ctx.fillStyle = '#000000'; // 日付を黒に変更
       ctx.fillText(dateText, 5, fontSize - 1 + 5);
       
       const imageData = canvas.toDataURL('image/png');

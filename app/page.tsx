@@ -199,7 +199,7 @@ export default function Home() {
   const [showWatermarkDialog, setShowWatermarkDialog] = useState(false);
   const [watermarkText, setWatermarkText] = useState('');
   const [watermarkHistory, setWatermarkHistory] = useState<string[]>([]);
-  const [watermarkPattern, setWatermarkPattern] = useState<'center' | 'grid' | 'tile'>('center'); // 透かしの配置パターン
+  const [watermarkPattern, setWatermarkPattern] = useState<'center' | 'grid' | 'tile' | 'bottom-right' | 'top-right' | 'bottom-left' | 'top-left'>('center'); // 透かしの配置パターン
   const [watermarkDensity, setWatermarkDensity] = useState(3); // 透かしの密度（グリッド/タイルの場合の列数・行数）
   const [watermarkAngle, setWatermarkAngle] = useState(45); // 透かしの角度（度）
   const [watermarkOpacity, setWatermarkOpacity] = useState(0.5); // 透かしの濃度（0-1、デフォルト0.5）
@@ -324,7 +324,9 @@ export default function Home() {
   const [shapeStartPoint, setShapeStartPoint] = useState<{ x: number; y: number } | null>(null);
 
   // スタンプ関連
-  const [selectedStampType, setSelectedStampType] = useState<'date' | 'approved' | 'rejected'>('date');
+  const [selectedStampType, setSelectedStampType] = useState<'date'>('date');
+  const [stampColor, setStampColor] = useState<'black' | 'red'>('black'); // 日付スタンプの色
+  const [stampSize, setStampSize] = useState(100); // スタンプのサイズ（%）
 
   // フォームフィールド関連
   const [formFields, setFormFields] = useState<FormField[]>([]);
@@ -342,6 +344,10 @@ export default function Home() {
   const [signatureImage, setSignatureImage] = useState<string | null>(null); // Base64画像
   const [signatureText, setSignatureText] = useState(''); // テキスト署名
   const [signaturePosition, setSignaturePosition] = useState<'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'>('bottom-left'); // 署名位置
+  const [signatureImageWidth, setSignatureImageWidth] = useState(100); // 署名画像の幅（%）
+  const [signatureImageHeight, setSignatureImageHeight] = useState(100); // 署名画像の高さ（%）
+  const [signatureFontSize, setSignatureFontSize] = useState(10); // 署名フォントサイズ
+  const [showSignaturePreview, setShowSignaturePreview] = useState(false); // 署名プレビューの表示状態
   const [showSplitDialog, setShowSplitDialog] = useState(false); // PDF分割ダイアログ
   const [showOCRDialog, setShowOCRDialog] = useState(false); // OCRダイアログ
   const [showTableOfContentsDialog, setShowTableOfContentsDialog] = useState(false); // 目次ダイアログ
@@ -1055,7 +1061,7 @@ export default function Home() {
         const pdfCount = imageFiles.filter(f => f.type === 'application/pdf').length;
         toast({
           title: "成功",
-          description: `ファイルをコレクションに追加しました（画像: ${imageCount}枚、PDF: ${pdfCount}件、合計: ${length}件）`,
+          description: `コレクションに追加（複数ファイル結合）しました（画像: ${imageCount}枚、PDF: ${pdfCount}件、合計: ${length}件）`,
           variant: "success",
         });
       }, 100);
@@ -1271,6 +1277,42 @@ export default function Home() {
       // 中央1箇所
       ctx.save();
       ctx.translate(canvasWidth / 2, canvasHeight / 2);
+      if (angle !== 0) {
+        ctx.rotate(angle * Math.PI / 180);
+      }
+      ctx.fillText(watermarkText, 0, 0);
+      ctx.restore();
+    } else if (pattern === 'bottom-right') {
+      // 右下1箇所
+      ctx.save();
+      ctx.translate(canvasWidth * 0.85, canvasHeight * 0.15);
+      if (angle !== 0) {
+        ctx.rotate(angle * Math.PI / 180);
+      }
+      ctx.fillText(watermarkText, 0, 0);
+      ctx.restore();
+    } else if (pattern === 'top-right') {
+      // 右上1箇所
+      ctx.save();
+      ctx.translate(canvasWidth * 0.85, canvasHeight * 0.85);
+      if (angle !== 0) {
+        ctx.rotate(angle * Math.PI / 180);
+      }
+      ctx.fillText(watermarkText, 0, 0);
+      ctx.restore();
+    } else if (pattern === 'bottom-left') {
+      // 左下1箇所
+      ctx.save();
+      ctx.translate(canvasWidth * 0.15, canvasHeight * 0.15);
+      if (angle !== 0) {
+        ctx.rotate(angle * Math.PI / 180);
+      }
+      ctx.fillText(watermarkText, 0, 0);
+      ctx.restore();
+    } else if (pattern === 'top-left') {
+      // 左上1箇所
+      ctx.save();
+      ctx.translate(canvasWidth * 0.15, canvasHeight * 0.85);
       if (angle !== 0) {
         ctx.rotate(angle * Math.PI / 180);
       }
@@ -2633,34 +2675,25 @@ export default function Home() {
       const normalizedX = x / pageSize.width;
       const normalizedY = y / pageSize.height;
       
-      // スタンプのサイズ（デフォルト: 100x100px相当）
-      const stampSize = 100 / Math.max(pageSize.width, pageSize.height);
+      // スタンプのサイズ（ユーザーが指定したサイズ比率を適用）
+      const baseSize = 100 / Math.max(pageSize.width, pageSize.height);
+      const stampSizeRatio = stampSize / 100;
+      const stampSizeValue = baseSize * stampSizeRatio;
       
-      // 選択されたスタンプタイプに応じてスタンプを作成
-      let stampText = '';
-      let stampColor = '#3b82f6';
-      
-      if (selectedStampType === 'date') {
-        stampText = new Date().toLocaleDateString('ja-JP');
-        stampColor = '#3b82f6';
-      } else if (selectedStampType === 'approved') {
-        stampText = '承認';
-        stampColor = '#10b981';
-      } else if (selectedStampType === 'rejected') {
-        stampText = '却下';
-        stampColor = '#ef4444';
-      }
+      // 日付スタンプを作成
+      const stampText = new Date().toLocaleDateString('ja-JP');
+      const stampColorValue = stampColor === 'black' ? '#000000' : '#ef4444';
       
       const newStamp: ShapeAnnotation = {
         id: generateShapeId(),
         type: 'stamp',
         x1: normalizedX,
         y1: normalizedY,
-        x2: normalizedX + stampSize,
-        y2: normalizedY + stampSize,
-        color: stampColor,
+        x2: normalizedX + stampSizeValue,
+        y2: normalizedY + stampSizeValue,
+        color: stampColorValue,
         width: 2,
-        stampType: selectedStampType,
+        stampType: 'date',
         stampText: stampText,
       };
       
@@ -7543,25 +7576,31 @@ export default function Home() {
             
                 {tool === 'stamp' && (
                   <div className="absolute top-full left-0 mt-1 bg-white border border-purple-300 rounded-lg shadow-lg p-2 z-50">
-                    <div className="flex flex-col gap-1">
-                      <button
-                        onClick={() => setSelectedStampType('date')}
-                        className={`px-3 py-1 text-sm rounded ${selectedStampType === 'date' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'}`}
-                      >
-                        日付
-                      </button>
-                      <button
-                        onClick={() => setSelectedStampType('approved')}
-                        className={`px-3 py-1 text-sm rounded ${selectedStampType === 'approved' ? 'bg-green-100 text-green-700' : 'hover:bg-gray-100'}`}
-                      >
-                        承認
-                      </button>
-                      <button
-                        onClick={() => setSelectedStampType('rejected')}
-                        className={`px-3 py-1 text-sm rounded ${selectedStampType === 'rejected' ? 'bg-red-100 text-red-700' : 'hover:bg-gray-100'}`}
-                      >
-                        却下
-                      </button>
+                    <div className="flex flex-col gap-2">
+                      <div className="text-xs font-semibold text-slate-700 mb-1">スタンプの色</div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setStampColor('black')}
+                          className={`px-3 py-1 text-sm rounded ${stampColor === 'black' ? 'bg-slate-200 text-slate-800' : 'bg-white hover:bg-gray-100'}`}
+                        >
+                          黒
+                        </button>
+                        <button
+                          onClick={() => setStampColor('red')}
+                          className={`px-3 py-1 text-sm rounded ${stampColor === 'red' ? 'bg-red-200 text-red-800' : 'bg-white hover:bg-gray-100'}`}
+                        >
+                          赤
+                        </button>
+                      </div>
+                      <div className="text-xs font-semibold text-slate-700 mb-1 mt-2">スタンプのサイズ: {stampSize}%</div>
+                      <input
+                        type="range"
+                        min="50"
+                        max="200"
+                        value={stampSize}
+                        onChange={(e) => setStampSize(parseInt(e.target.value))}
+                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                      />
                     </div>
                   </div>
                 )}
@@ -9645,6 +9684,34 @@ export default function Home() {
                       className="max-w-full max-h-48 border-2 border-slate-300 rounded-lg object-contain shadow-sm" 
                       style={{ maxWidth: '400px', maxHeight: '200px' }}
                     />
+                    <div className="mt-3 space-y-3">
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">
+                          画像サイズ（幅）: {signatureImageWidth}%
+                        </label>
+                        <input
+                          type="range"
+                          min="20"
+                          max="200"
+                          value={signatureImageWidth}
+                          onChange={(e) => setSignatureImageWidth(parseInt(e.target.value))}
+                          className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">
+                          画像サイズ（高さ）: {signatureImageHeight}%
+                        </label>
+                        <input
+                          type="range"
+                          min="20"
+                          max="200"
+                          value={signatureImageHeight}
+                          onChange={(e) => setSignatureImageHeight(parseInt(e.target.value))}
+                          className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                        />
+                      </div>
+                    </div>
                     <button
                       onClick={() => setSignatureImage(null)}
                       className="mt-2 px-3 py-1.5 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors shadow-sm"
@@ -9665,6 +9732,80 @@ export default function Home() {
                   className="w-full h-11 text-base border-2 border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg px-4 transition-all"
                 />
               </div>
+              <div>
+                <label className="block text-base font-semibold text-slate-800 mb-2">
+                  フォントサイズ: {signatureFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min="6"
+                  max="24"
+                  value={signatureFontSize}
+                  onChange={(e) => setSignatureFontSize(parseInt(e.target.value))}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="showSignaturePreview"
+                  checked={showSignaturePreview}
+                  onChange={(e) => setShowSignaturePreview(e.target.checked)}
+                  className="w-5 h-5 text-blue-600"
+                />
+                <label htmlFor="showSignaturePreview" className="text-base font-semibold text-slate-800 cursor-pointer">
+                  プレビューを表示
+                </label>
+              </div>
+              {showSignaturePreview && (
+                <div className="p-4 bg-white rounded-lg border-2 border-blue-300">
+                  <div className="text-sm font-semibold text-slate-700 mb-2">プレビュー</div>
+                  <div className="relative border-2 border-slate-300 rounded" style={{ width: '300px', height: '150px', margin: '0 auto' }}>
+                    {signatureImage && (
+                      <img
+                        src={signatureImage}
+                        alt="プレビュー"
+                        className="absolute object-contain"
+                        style={{
+                          width: `${signatureImageWidth}%`,
+                          height: `${signatureImageHeight}%`,
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                        }}
+                      />
+                    )}
+                    {!signatureImage && signatureText && (
+                      <div
+                        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
+                        style={{ fontSize: `${signatureFontSize}px` }}
+                      >
+                        {signatureText}
+                      </div>
+                    )}
+                    {signatureName && (
+                      <div
+                        className="absolute bottom-2 left-2"
+                        style={{ fontSize: `${signatureFontSize}px` }}
+                      >
+                        {signatureName}
+                      </div>
+                    )}
+                    <div
+                      className="absolute bottom-2 right-2 text-black"
+                      style={{ fontSize: `${signatureFontSize - 1}px` }}
+                    >
+                      署名日時: {new Date().toLocaleDateString('ja-JP', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="block text-base font-semibold text-slate-800 mb-3">
                   署名位置
@@ -9778,6 +9919,9 @@ export default function Home() {
                     },
                     reason: signatureReason || undefined,
                     location: signatureLocation || undefined,
+                    imageWidth: signatureImageWidth,
+                    imageHeight: signatureImageHeight,
+                    fontSize: signatureFontSize,
                   };
                   
                   await saveSignature(docId, signature);

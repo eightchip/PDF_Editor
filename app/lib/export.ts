@@ -36,7 +36,7 @@ export async function exportAnnotatedPDFV2(
   signatures?: Signature[],
   watermarkText?: string,
   pageRotations?: Record<number, number>,
-  watermarkPattern?: 'center' | 'grid' | 'tile',
+  watermarkPattern?: 'center' | 'grid' | 'tile' | 'bottom-right' | 'top-right' | 'bottom-left' | 'top-left',
   watermarkDensity?: number,
   watermarkAngle?: number,
   watermarkOpacity?: number
@@ -508,6 +508,50 @@ export async function exportAnnotatedPDFV2(
               width: imageWidth,
               height: imageHeight,
               opacity: opacity, // 濃度を適用
+            });
+          } else if (pattern === 'bottom-right') {
+            // 右下1箇所
+            const x = pageSize.width * 0.85 - imageWidth / 2;
+            const y = pageSize.height * 0.15 - imageHeight / 2;
+            page.drawImage(watermarkImage, {
+              x,
+              y,
+              width: imageWidth,
+              height: imageHeight,
+              opacity: opacity,
+            });
+          } else if (pattern === 'top-right') {
+            // 右上1箇所
+            const x = pageSize.width * 0.85 - imageWidth / 2;
+            const y = pageSize.height * 0.85 - imageHeight / 2;
+            page.drawImage(watermarkImage, {
+              x,
+              y,
+              width: imageWidth,
+              height: imageHeight,
+              opacity: opacity,
+            });
+          } else if (pattern === 'bottom-left') {
+            // 左下1箇所
+            const x = pageSize.width * 0.15 - imageWidth / 2;
+            const y = pageSize.height * 0.15 - imageHeight / 2;
+            page.drawImage(watermarkImage, {
+              x,
+              y,
+              width: imageWidth,
+              height: imageHeight,
+              opacity: opacity,
+            });
+          } else if (pattern === 'top-left') {
+            // 左上1箇所
+            const x = pageSize.width * 0.15 - imageWidth / 2;
+            const y = pageSize.height * 0.85 - imageHeight / 2;
+            page.drawImage(watermarkImage, {
+              x,
+              y,
+              width: imageWidth,
+              height: imageHeight,
+              opacity: opacity,
             });
           } else if (pattern === 'grid') {
             // グリッド状（均等配置、密度に応じて列数・行数を決定）
