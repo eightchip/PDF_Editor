@@ -1360,7 +1360,7 @@ export default function Home() {
     }
     
     ctx.restore();
-  }, [watermarkText, showWatermarkPreview, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity]);
+  }, [watermarkText, showWatermarkPreview, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, watermarkFontSize]);
 
   // スライドショーモードが変更されたときに再レンダリング
   useEffect(() => {
@@ -9569,7 +9569,7 @@ export default function Home() {
       >
         <DialogContent 
           topPosition="top-[15%]"
-          className="max-w-2xl"
+          className="max-w-2xl max-h-[85vh] flex flex-col"
           style={{
             zIndex: 10001,
             left: '50%',
@@ -9592,11 +9592,11 @@ export default function Home() {
             setShowSignaturePreview(false);
           }}
         >
-            <DialogHeader className="pb-4 border-b border-blue-200 mb-4">
+            <DialogHeader className="pb-4 border-b border-blue-200 mb-4 flex-shrink-0">
               <DialogTitle className="text-2xl font-bold text-slate-900 mb-2">電子署名を追加</DialogTitle>
               <DialogDescription className="text-base text-slate-600">PDFに電子署名を追加します</DialogDescription>
             </DialogHeader>
-            <div className="space-y-5">
+            <div className="space-y-5 overflow-y-auto flex-1 min-h-0">
               <div>
                 <label className="block text-base font-semibold text-slate-800 mb-2">
                   署名者名 <span className="text-red-500 font-bold">*</span>
@@ -9959,7 +9959,7 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <DialogFooter className="pt-4 border-t border-blue-200 mt-4">
+            <DialogFooter className="pt-4 border-t border-blue-200 mt-4 flex-shrink-0">
               <Button
                 variant="outline"
                 onClick={() => {
