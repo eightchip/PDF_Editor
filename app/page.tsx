@@ -1401,15 +1401,12 @@ export default function Home() {
   }, [presentationTimer.isRunning, isPresentationMode, timerAlarms]);
 
   // ページレンダリング
-  const renderCurrentPage = useCallback(async () => {
-    // 最新のcurrentPageを取得（クロージャの問題を回避）
-    const pageToRender = currentPage;
-    
+  const renderCurrentPage = async () => {
     console.log('renderCurrentPage: 開始', { 
       hasPdfDoc: !!pdfDoc, 
       hasPdfCanvas: !!pdfCanvasRef.current, 
       hasInkCanvas: !!inkCanvasRef.current,
-      currentPage: pageToRender,
+      currentPage,
       isPresentationMode 
     });
     
@@ -1426,7 +1423,7 @@ export default function Home() {
 
     try {
       // pageOrderが設定されている場合は、表示順序から実際のページ番号に変換
-      const actualPageNum = getActualPageNum(pageToRender);
+      const actualPageNum = getActualPageNum(currentPage);
       console.log('renderCurrentPage: レンダリング開始', { currentPage, actualPageNum, totalPages: pdfDoc.numPages });
       const page = await pdfDoc.getPage(actualPageNum);
       const pdfCanvas = pdfCanvasRef.current;
@@ -1529,7 +1526,7 @@ export default function Home() {
       // ページサイズを記録（エクスポート用、scale=1.0でのサイズ）
       if (scale === 1.0) {
         // pageOrderが設定されている場合は、実際のページ番号で記録
-        const actualPageNum = getActualPageNum(pageToRender);
+        const actualPageNum = getActualPageNum(currentPage);
         setPageSizes(prev => ({ ...prev, [actualPageNum]: size }));
       }
 
@@ -1579,7 +1576,7 @@ export default function Home() {
       // 注釈を読み込み
       if (docId && !isClearingRef.current) {
         // pageOrderが設定されている場合は、表示順序から実際のページ番号に変換
-        const actualPageNum = getActualPageNum(pageToRender);
+        const actualPageNum = getActualPageNum(currentPage);
         const savedStrokes = await loadAnnotations(docId, actualPageNum);
         console.log('renderCurrentPage: データベースから読み込み', { actualPageNum, savedStrokesCount: savedStrokes.length });
         // 既存のストロークにIDがない場合は生成
@@ -1677,7 +1674,7 @@ export default function Home() {
     } catch (error) {
       console.error('ページレンダリングエラー:', error);
     }
-  }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, drawWatermarkOnCanvas, snapToTextEnabled, textSelectionEnabled, isPresentationMode]);
+  };
 
   // ページ変更時に再レンダリング
   // pageOrderはgetActualPageNum内で参照されるため、依存配列から除外
@@ -1688,7 +1685,7 @@ export default function Home() {
       console.log('useEffect: currentPage変更を検知、renderCurrentPage()を呼び出し', { currentPage, isPresentationMode });
       renderCurrentPage();
     }
-  }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, drawWatermarkOnCanvas, snapToTextEnabled, textSelectionEnabled, isPresentationMode, renderCurrentPage]);
+  }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, drawWatermarkOnCanvas, snapToTextEnabled, textSelectionEnabled, isPresentationMode]);
 
   // strokesの状態変更時に再描画（ハイライトなどが追加/削除されたとき）
   useEffect(() => {
