@@ -2989,16 +2989,32 @@ export default function Home() {
   };
 
   // 前のページ
-  const goToPrevPage = () => {
+  const goToPrevPage = async () => {
     if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
+      const newPage = currentPage - 1;
+      setCurrentPage(newPage);
+      // useEffectで自動的にrenderCurrentPage()が呼ばれるが、プレゼンモードでは確実に反映させるため明示的に呼ぶ
+      if (isPresentationMode && pdfDoc) {
+        // 少し待ってからレンダリング（状態更新を待つ）
+        setTimeout(async () => {
+          await renderCurrentPage();
+        }, 0);
+      }
     }
   };
 
   // 次のページ
-  const goToNextPage = () => {
+  const goToNextPage = async () => {
     if (pdfDoc && currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
+      const newPage = currentPage + 1;
+      setCurrentPage(newPage);
+      // useEffectで自動的にrenderCurrentPage()が呼ばれるが、プレゼンモードでは確実に反映させるため明示的に呼ぶ
+      if (isPresentationMode && pdfDoc) {
+        // 少し待ってからレンダリング（状態更新を待つ）
+        setTimeout(async () => {
+          await renderCurrentPage();
+        }, 0);
+      }
     }
   };
 
@@ -4046,7 +4062,12 @@ export default function Home() {
     console.log('handleClear: 状態をクリア完了');
     
     // ページを再レンダリングして、空の状態を反映
-    await renderCurrentPage();
+    try {
+      await renderCurrentPage();
+    } catch (error) {
+      console.error('handleClear: ページ再レンダリングエラー', error);
+      // エラーが発生しても状態はクリア済みなので、useEffectで再レンダリングされる
+    }
     
     console.log('handleClear: 完了');
   };
