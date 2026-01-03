@@ -150,7 +150,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button"; // Dialog内でのみ使用
-import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections, MdDragHandle, MdLock, MdSecurity, MdCheckCircle, MdInfo, MdLocalOffer, MdAssignment, MdContentCut, MdMenuBook, MdFileCopy, MdSlideshow, MdFullscreen, MdFullscreenExit, MdVisibility, MdVisibilityOff, MdPrint, MdDescription, MdNotes, MdTimer, MdTimerOff, MdPlayArrow, MdPause, MdStop, MdBlock } from 'react-icons/md';
+import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections, MdDragHandle, MdLock, MdSecurity, MdCheckCircle, MdInfo, MdLocalOffer, MdAssignment, MdContentCut, MdMenuBook, MdFileCopy, MdSlideshow, MdFullscreen, MdFullscreenExit, MdVisibility, MdVisibilityOff, MdPrint, MdDescription, MdNotes, MdTimer, MdTimerOff, MdPlayArrow, MdPause, MdStop, MdBlock, MdCallSplit, MdRemoveCircle } from 'react-icons/md';
 import { QRCodeSVG } from 'qrcode.react';
 // PDF.jsの型は動的インポートで取得
 
@@ -288,7 +288,7 @@ export default function Home() {
   };
 
   // 描画関連
-  const [tool, setTool] = useState<'pen' | 'eraser' | 'text' | 'line' | 'rectangle' | 'circle' | 'arrow' | 'highlight' | 'redact' | 'select' | 'stamp'>('pen');
+  const [tool, setTool] = useState<'pen' | 'eraser' | 'text' | 'line' | 'rectangle' | 'circle' | 'arrow' | 'highlight' | 'redact' | 'select' | 'stamp' | 'double-line' | 'polyline-arrow'>('pen');
   const [highlightMode, setHighlightMode] = useState<'auto' | 'manual'>('auto'); // ハイライトモード: 'auto' = 自動（クリックで文字列全体）、'manual' = 手動（ドラッグで範囲指定）
   
   // 選択関連
@@ -2692,7 +2692,7 @@ export default function Home() {
     }
 
     // 図形ツールの場合（ここに到達する時点で、shapeCanvasRefからのイベントであることは確認済み）
-    if (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow') {
+    if (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow' || tool === 'double-line' || tool === 'polyline-arrow') {
       if (!shapeCanvasRef.current || !pageSize) {
         return;
       }
@@ -2707,17 +2707,35 @@ export default function Home() {
       const canvas = shapeCanvasRef.current;
       
       setShapeStartPoint({ x: normalizedX, y: normalizedY });
-      setCurrentShape({
-        id: generateShapeId(),
-        type: tool,
-        x1: normalizedX,
-        y1: normalizedY,
-        x2: normalizedX,
-        y2: normalizedY,
-        color,
-        width,
-        fill: fillShape,
-      });
+      
+      // 折れ線矢印の場合は複数点を記録
+      if (tool === 'polyline-arrow') {
+        setCurrentShape({
+          id: generateShapeId(),
+          type: tool,
+          x1: normalizedX,
+          y1: normalizedY,
+          x2: normalizedX,
+          y2: normalizedY,
+          color,
+          width,
+          fill: fillShape,
+          points: [{ x: normalizedX, y: normalizedY }], // 最初の点
+        });
+      } else {
+        setCurrentShape({
+          id: generateShapeId(),
+          type: tool,
+          x1: normalizedX,
+          y1: normalizedY,
+          x2: normalizedX,
+          y2: normalizedY,
+          color,
+          width,
+          fill: fillShape,
+        });
+      }
+      
       isDrawingRef.current = true;
       canvas.setPointerCapture(e.pointerId);
       e.preventDefault();
@@ -3225,7 +3243,7 @@ export default function Home() {
     if (!isDrawingRef.current || !pageSize) return;
 
     // 図形ツールの場合（スタンプは除く）
-    if (currentShape && (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow')) {
+    if (currentShape && (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow' || tool === 'double-line' || tool === 'polyline-arrow')) {
       // shapeCanvasRefからのイベントであることを確認
       if (e.currentTarget !== shapeCanvasRef.current) {
         return;
@@ -3530,7 +3548,7 @@ export default function Home() {
     if (!isDrawingRef.current || !docId) return;
 
     // 図形ツールの場合（スタンプは除く）
-    if (currentShape && (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow')) {
+    if (currentShape && (tool === 'line' || tool === 'rectangle' || tool === 'circle' || tool === 'arrow' || tool === 'double-line' || tool === 'polyline-arrow')) {
       // shapeCanvasRefからのイベントであることを確認
       if (e.currentTarget !== shapeCanvasRef.current) {
         return;
@@ -7273,6 +7291,68 @@ export default function Home() {
               >
                 <MdArrowForward className={`text-base ${tool === 'arrow' ? 'text-white' : 'text-rose-500'}`} />
                 矢印
+              </button>
+              <button
+                onClick={() => {
+                  setTool('double-line');
+                  if (textSelectionEnabled) {
+                    setTextSelectionEnabled(false);
+                  }
+                }}
+                title="二重線（取り消し線）を描画します"
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-gray-600 ${
+                  tool === 'double-line' ? 'shadow-md' : ''
+                }`}
+                style={{
+                  background: tool === 'double-line'
+                    ? 'linear-gradient(to right, #4b5563, #374151)'
+                    : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                  color: tool === 'double-line' ? 'white' : '#334155',
+                }}
+                onMouseEnter={(e) => {
+                  if (tool === 'double-line') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #374151, #1f2937)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (tool === 'double-line') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #4b5563, #374151)';
+                  }
+                }}
+              >
+                <MdRemoveCircle className={`text-base ${tool === 'double-line' ? 'text-white' : 'text-gray-600'}`} />
+                二重線
+              </button>
+              <button
+                onClick={() => {
+                  setTool('polyline-arrow');
+                  if (textSelectionEnabled) {
+                    setTextSelectionEnabled(false);
+                  }
+                }}
+                title="折れ線矢印を描画します"
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-blue-500 ${
+                  tool === 'polyline-arrow' ? 'shadow-md' : ''
+                }`}
+                style={{
+                  background: tool === 'polyline-arrow'
+                    ? 'linear-gradient(to right, #3b82f6, #2563eb)'
+                    : 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                  color: tool === 'polyline-arrow' ? 'white' : '#334155',
+                }}
+                onMouseEnter={(e) => {
+                  if (tool === 'polyline-arrow') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #2563eb, #1d4ed8)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (tool === 'polyline-arrow') {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #3b82f6, #2563eb)';
+                  }
+                }}
+              >
+                <MdCallSplit className={`text-base ${tool === 'polyline-arrow' ? 'text-white' : 'text-blue-500'}`} />
+                折れ線矢印
               </button>
               <button
                 onClick={() => {

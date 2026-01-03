@@ -83,6 +83,92 @@ export function drawShapeAnnotation(
       ctx.stroke();
       break;
 
+    case 'double-line':
+      // 二重線（取り消し線）を描画
+      const lineLength = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+      const lineAngle = Math.atan2(y2 - y1, x2 - x1);
+      const offset = shape.width * 0.5; // 線の間隔
+      const perpX = -Math.sin(lineAngle) * offset;
+      const perpY = Math.cos(lineAngle) * offset;
+
+      // 1本目の線
+      ctx.beginPath();
+      ctx.moveTo(x1 + perpX, y1 + perpY);
+      ctx.lineTo(x2 + perpX, y2 + perpY);
+      ctx.stroke();
+
+      // 2本目の線
+      ctx.beginPath();
+      ctx.moveTo(x1 - perpX, y1 - perpY);
+      ctx.lineTo(x2 - perpX, y2 - perpY);
+      ctx.stroke();
+      break;
+
+    case 'polyline-arrow':
+      // 折れ線矢印を描画
+      if (shape.points && shape.points.length > 0) {
+        ctx.beginPath();
+        const firstPoint = shape.points[0];
+        ctx.moveTo(firstPoint.x * canvasWidth, firstPoint.y * canvasHeight);
+        
+        for (let i = 1; i < shape.points.length; i++) {
+          const point = shape.points[i];
+          ctx.lineTo(point.x * canvasWidth, point.y * canvasHeight);
+        }
+        ctx.stroke();
+
+        // 最後の点に矢印を描画
+        if (shape.points.length >= 2) {
+          const lastPoint = shape.points[shape.points.length - 1];
+          const prevPoint = shape.points[shape.points.length - 2];
+          const lastX = lastPoint.x * canvasWidth;
+          const lastY = lastPoint.y * canvasHeight;
+          const prevX = prevPoint.x * canvasWidth;
+          const prevY = prevPoint.y * canvasHeight;
+          
+          const arrowAngle = Math.atan2(lastY - prevY, lastX - prevX);
+          const arrowLength = shape.width * 3;
+          const arrowAngleOffset = Math.PI / 6; // 30度
+
+          ctx.beginPath();
+          ctx.moveTo(lastX, lastY);
+          ctx.lineTo(
+            lastX - arrowLength * Math.cos(arrowAngle - arrowAngleOffset),
+            lastY - arrowLength * Math.sin(arrowAngle - arrowAngleOffset)
+          );
+          ctx.moveTo(lastX, lastY);
+          ctx.lineTo(
+            lastX - arrowLength * Math.cos(arrowAngle + arrowAngleOffset),
+            lastY - arrowLength * Math.sin(arrowAngle + arrowAngleOffset)
+          );
+          ctx.stroke();
+        }
+      } else {
+        // フォールバック: 通常の矢印として描画
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const arrowLength = shape.width * 3;
+        const arrowAngle = Math.PI / 6;
+
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(
+          x2 - arrowLength * Math.cos(angle - arrowAngle),
+          y2 - arrowLength * Math.sin(angle - arrowAngle)
+        );
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(
+          x2 - arrowLength * Math.cos(angle + arrowAngle),
+          y2 - arrowLength * Math.sin(angle + arrowAngle)
+        );
+        ctx.stroke();
+      }
+      break;
+
     case 'stamp':
       // スタンプの描画
       const stampX = Math.min(x1, x2);
