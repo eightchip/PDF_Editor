@@ -1351,11 +1351,27 @@ export default function Home() {
         }
         
         // メイン画面のキャンバスを表示
+        // DOMから直接取得してrefを再設定する（プレゼンモード終了時にrefが失われる可能性があるため）
+        const mainPdfCanvas = document.querySelector('canvas[data-pdf-canvas]') as HTMLCanvasElement;
+        const mainInkCanvas = document.querySelector('canvas[data-ink-canvas]') as HTMLCanvasElement;
+        
+        if (mainPdfCanvas && !pdfCanvasRef.current) {
+          // refが失われている場合は、DOMから直接取得した要素を設定
+          (pdfCanvasRef as any).current = mainPdfCanvas;
+          console.log('プレゼンモード終了: DOMからpdfCanvasを取得してrefを再設定');
+        }
+        
+        if (mainInkCanvas && !inkCanvasRef.current) {
+          // refが失われている場合は、DOMから直接取得した要素を設定
+          (inkCanvasRef as any).current = mainInkCanvas;
+          console.log('プレゼンモード終了: DOMからinkCanvasを取得してrefを再設定');
+        }
+        
         if (pdfCanvasRef.current) {
           pdfCanvasRef.current.style.display = 'block';
           pdfCanvasRef.current.style.visibility = 'visible';
           pdfCanvasRef.current.style.opacity = '1';
-          console.log('プレゼンモード終了: メイン画面のキャンバスを表示', {
+          console.log('プレゼンモード終了: メイン画面のpdfCanvasを表示', {
             display: pdfCanvasRef.current.style.display,
             visibility: pdfCanvasRef.current.style.visibility,
             opacity: pdfCanvasRef.current.style.opacity
@@ -1368,22 +1384,53 @@ export default function Home() {
           inkCanvasRef.current.style.display = 'block';
           inkCanvasRef.current.style.visibility = 'visible';
           inkCanvasRef.current.style.opacity = '1';
+          console.log('プレゼンモード終了: メイン画面のinkCanvasを表示', {
+            display: inkCanvasRef.current.style.display,
+            visibility: inkCanvasRef.current.style.visibility,
+            opacity: inkCanvasRef.current.style.opacity
+          });
+        } else {
+          console.warn('プレゼンモード終了: inkCanvasRef.currentがnullです');
         }
         
         // キャンバスが取得できるまで待機（最大2秒）
         let retryCount = 0;
         while ((!pdfCanvasRef.current || !inkCanvasRef.current) && retryCount < 20) {
           await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // 再試行時にDOMから直接取得を試みる
+          if (!pdfCanvasRef.current) {
+            const canvas = document.querySelector('canvas[data-pdf-canvas]') as HTMLCanvasElement;
+            if (canvas) {
+              (pdfCanvasRef as any).current = canvas;
+              console.log('プレゼンモード終了: 再試行でpdfCanvasを取得', { retryCount });
+            }
+          }
+          
+          if (!inkCanvasRef.current) {
+            const canvas = document.querySelector('canvas[data-ink-canvas]') as HTMLCanvasElement;
+            if (canvas) {
+              (inkCanvasRef as any).current = canvas;
+              console.log('プレゼンモード終了: 再試行でinkCanvasを取得', { retryCount });
+            }
+          }
+          
           retryCount++;
           if (retryCount % 5 === 0) {
-            console.log('プレゼンモード終了: キャンバス取得待機中...', { retryCount });
+            console.log('プレゼンモード終了: キャンバス取得待機中...', { 
+              retryCount,
+              hasPdfCanvas: !!pdfCanvasRef.current,
+              hasInkCanvas: !!inkCanvasRef.current
+            });
           }
         }
         
         if (!pdfCanvasRef.current || !inkCanvasRef.current) {
           console.error('プレゼンモード終了: キャンバスが取得できませんでした', {
             hasPdfCanvas: !!pdfCanvasRef.current,
-            hasInkCanvas: !!inkCanvasRef.current
+            hasInkCanvas: !!inkCanvasRef.current,
+            domPdfCanvas: !!document.querySelector('canvas[data-pdf-canvas]'),
+            domInkCanvas: !!document.querySelector('canvas[data-ink-canvas]')
           });
           return;
         }
@@ -1853,6 +1900,23 @@ export default function Home() {
       // モーダルが開いている場合は、モーダルが閉じるまで待つ
       const checkAndRender = async () => {
         // メイン画面のキャンバスが確実に表示されていることを確認
+        // DOMから直接取得してrefを再設定する（refが失われる可能性があるため）
+        if (!pdfCanvasRef.current) {
+          const canvas = document.querySelector('canvas[data-pdf-canvas]') as HTMLCanvasElement;
+          if (canvas) {
+            (pdfCanvasRef as any).current = canvas;
+            console.log('useEffect: DOMからpdfCanvasを取得してrefを再設定');
+          }
+        }
+        
+        if (!inkCanvasRef.current) {
+          const canvas = document.querySelector('canvas[data-ink-canvas]') as HTMLCanvasElement;
+          if (canvas) {
+            (inkCanvasRef as any).current = canvas;
+            console.log('useEffect: DOMからinkCanvasを取得してrefを再設定');
+          }
+        }
+        
         if (pdfCanvasRef.current) {
           pdfCanvasRef.current.style.display = 'block';
           pdfCanvasRef.current.style.visibility = 'visible';
@@ -1870,13 +1934,33 @@ export default function Home() {
         let canvasRetryCount = 0;
         while ((!pdfCanvasRef.current || !inkCanvasRef.current) && canvasRetryCount < 10) {
           await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // 再試行時にDOMから直接取得を試みる
+          if (!pdfCanvasRef.current) {
+            const canvas = document.querySelector('canvas[data-pdf-canvas]') as HTMLCanvasElement;
+            if (canvas) {
+              (pdfCanvasRef as any).current = canvas;
+              console.log('useEffect: 再試行でpdfCanvasを取得', { canvasRetryCount });
+            }
+          }
+          
+          if (!inkCanvasRef.current) {
+            const canvas = document.querySelector('canvas[data-ink-canvas]') as HTMLCanvasElement;
+            if (canvas) {
+              (inkCanvasRef as any).current = canvas;
+              console.log('useEffect: 再試行でinkCanvasを取得', { canvasRetryCount });
+            }
+          }
+          
           canvasRetryCount++;
         }
         
         if (!pdfCanvasRef.current || !inkCanvasRef.current) {
           console.warn('useEffect: キャンバスが取得できません', {
             hasPdfCanvas: !!pdfCanvasRef.current,
-            hasInkCanvas: !!inkCanvasRef.current
+            hasInkCanvas: !!inkCanvasRef.current,
+            domPdfCanvas: !!document.querySelector('canvas[data-pdf-canvas]'),
+            domInkCanvas: !!document.querySelector('canvas[data-ink-canvas]')
           });
           return;
         }
@@ -7708,6 +7792,7 @@ export default function Home() {
           >
             <canvas
               ref={pdfCanvasRef}
+              data-pdf-canvas
               style={{ display: 'block', position: 'relative', zIndex: 1 }}
             />
             {/* テキストレイヤー（テキスト選択可能にする） */}
@@ -7731,6 +7816,7 @@ export default function Home() {
             )}
             <canvas
               ref={inkCanvasRef}
+              data-ink-canvas
               style={{
                 position: 'absolute',
                 top: 0,
