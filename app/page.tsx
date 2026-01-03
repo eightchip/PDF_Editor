@@ -1336,8 +1336,10 @@ export default function Home() {
       }
       // プレゼンモード終了時にメイン画面のPDFを再レンダリング
       // 確実に再レンダリングするため、少し待ってから実行
-      await new Promise(resolve => setTimeout(resolve, 200));
-      await renderCurrentPage();
+      (async () => {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        await renderCurrentPage();
+      })();
     }
   }, [isPresentationMode]);
 
