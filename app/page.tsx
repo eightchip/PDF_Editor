@@ -1323,7 +1323,7 @@ export default function Home() {
       setLaserPointerEnabled(false);
       setLaserPointerPosition(null);
       renderCurrentPage();
-    } else if (!isPresentationMode) {
+    } else if (!isPresentationMode && pdfDoc) {
       // プレゼンモード終了時にタイマーを停止
       setPresentationTimer(prev => ({ ...prev, isRunning: false }));
       if (timerIntervalRef.current) {
@@ -1334,6 +1334,10 @@ export default function Home() {
         clearTimeout(laserPointerTimeoutRef.current);
         laserPointerTimeoutRef.current = null;
       }
+      // プレゼンモード終了時にメイン画面のPDFを再レンダリング
+      setTimeout(async () => {
+        await renderCurrentPage();
+      }, 100); // 少し待ってからレンダリング（状態更新を待つ）
     }
   }, [isPresentationMode]);
 
