@@ -68,10 +68,13 @@ export async function extractTextItems(
       const fontName = (item as any).fontName || 'Arial'; // デフォルトフォント
       
       // PDF座標系のフォントサイズをviewport座標系に変換
-      // transform[0]とtransform[3]はスケール因子
-      const scaleX = Math.sqrt(transform[0] * transform[0] + transform[1] * transform[1]);
-      const scaleY = Math.sqrt(transform[2] * transform[2] + transform[3] * transform[3]);
-      const viewportFontSize = pdfFontSize * Math.max(scaleX, scaleY);
+      // transform配列からスケールを計算
+      // transform[0] = a, transform[3] = d はスケール因子
+      // ただし、PDF.jsのfontSizeは既にPDF座標系でのサイズなので、
+      // viewport座標系に変換する際には、viewportのスケールを考慮する必要がある
+      // しかし、実際のテキストの高さ（height）から逆算する方が正確
+      // テキストの高さは通常フォントサイズの約1.0-1.2倍なので、それを考慮
+      const viewportFontSize = height / 1.15; // adjustedHeightから元のheightに戻し、さらにフォントサイズに変換
       
       textItems.push({
         str: item.str,

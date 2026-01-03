@@ -2835,12 +2835,12 @@ export default function Home() {
         const textNormalizedY = boundingBox.y / pageSize.height;
         
         // フォントサイズを正確に計算
-        // textItem.fontSizeは既にviewport座標系（scale=1.0）に変換されている
-        // しかし、実際の描画時にはscaleが適用されているので、それを考慮する必要がある
-        // ただし、pageSizeは既にscaleが適用されたサイズなので、そのまま使用できる
-        // boundingBox.heightは実際のテキストの高さなので、それを基準にする
-        // テキストの高さは通常フォントサイズの約1.0-1.2倍なので、そのまま使用
-        const actualFontSize = textItem.fontSize || boundingBox.height;
+        // boundingBox.heightは実際のテキストの高さ（adjustedHeight）
+        // テキストの高さは通常フォントサイズの約1.0-1.2倍なので、それを考慮
+        // adjustedHeight = height * 1.15 なので、元のheight = adjustedHeight / 1.15
+        // そして、height = fontSize * scale なので、fontSize = height / scale
+        // ただし、実際のテキストの高さから直接逆算する方が正確
+        const actualFontSize = boundingBox.height / 1.2; // テキストの高さからフォントサイズを逆算
         
         console.log('ハイライト: テキスト情報', {
           text: textItem.str,
