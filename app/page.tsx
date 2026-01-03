@@ -184,7 +184,8 @@ function parsePageRanges(input: string, maxPages: number): Array<{ start: number
 export default function Home() {
   const { toast } = useToast();
   const [pdfDoc, setPdfDoc] = useState<any>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1); // メイン画面用（ページ送り、目次、ページ管理と同期）
+  const [presentationPage, setPresentationPage] = useState(1); // プレゼンモード用（独立管理、常に1ページから開始）
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.0);
   const [docId, setDocId] = useState<string | null>(null);
@@ -1319,10 +1320,11 @@ export default function Home() {
   // スライドショーモードが変更されたときに再レンダリング
   useEffect(() => {
     if (isPresentationMode && pdfDoc) {
-      // プレゼンモード開始時に状態をリセット
+      // プレゼンモード開始時に状態をリセットし、常に1ページから開始
       setPresentationTimer({ isRunning: false, elapsed: 0, totalTime: null });
       setLaserPointerEnabled(false);
       setLaserPointerPosition(null);
+      setPresentationPage(1); // プレゼンモードは常に1ページから開始
       renderCurrentPage();
     } else if (!isPresentationMode && pdfDoc) {
       // プレゼンモード終了時にタイマーを停止
@@ -1403,14 +1405,17 @@ export default function Home() {
 
   // ページレンダリング
   const renderCurrentPage = async () => {
-    // プレゼンモードの場合はプレゼンモード用のキャンバス、そうでない場合はメイン画面用のキャンバスを使用
+    // プレゼンモードの場合はプレゼンモード用のキャンバスとページ、そうでない場合はメイン画面用のキャンバスとページを使用
     const targetCanvasRef = isPresentationMode ? presentationCanvasRef : pdfCanvasRef;
+    const targetPage = isPresentationMode ? presentationPage : currentPage; // プレゼンモードは独立したページ管理
     
     console.log('renderCurrentPage: 開始', { 
       hasPdfDoc: !!pdfDoc, 
       hasPdfCanvas: !!targetCanvasRef.current, 
       hasInkCanvas: !!inkCanvasRef.current,
       currentPage,
+      presentationPage,
+      targetPage,
       isPresentationMode,
       usingPresentationCanvas: isPresentationMode
     });
@@ -1462,8 +1467,16 @@ export default function Home() {
 
     try {
       // pageOrderが設定されている場合は、表示順序から実際のページ番号に変換
-      const actualPageNum = getActualPageNum(currentPage);
-      console.log('renderCurrentPage: レンダリング開始', { currentPage, actualPageNum, totalPages: pdfDoc.numPages, isPresentationMode });
+      // プレゼンモードの場合はpresentationPageを使用、そうでない場合はcurrentPageを使用
+      const actualPageNum = getActualPageNum(targetPage);
+      console.log('renderCurrentPage: レンダリング開始', { 
+        currentPage, 
+        presentationPage, 
+        targetPage,
+        actualPageNum, 
+        totalPages: pdfDoc.numPages, 
+        isPresentationMode 
+      });
       const page = await pdfDoc.getPage(actualPageNum);
       const pdfCanvas = targetCanvasRef.current;
       const inkCanvas = inkCanvasRef.current;
@@ -1591,7 +1604,8 @@ export default function Home() {
       // ページサイズを記録（エクスポート用、scale=1.0でのサイズ）
       if (scale === 1.0) {
         // pageOrderが設定されている場合は、実際のページ番号で記録
-        const actualPageNum = getActualPageNum(currentPage);
+        // プレゼンモードの場合はpresentationPageを使用、そうでない場合はcurrentPageを使用
+        const actualPageNum = getActualPageNum(targetPage);
         setPageSizes(prev => ({ ...prev, [actualPageNum]: size }));
       }
 
@@ -1641,7 +1655,8 @@ export default function Home() {
       // 注釈を読み込み
       if (docId && !isClearingRef.current) {
         // pageOrderが設定されている場合は、表示順序から実際のページ番号に変換
-        const actualPageNum = getActualPageNum(currentPage);
+        // プレゼンモードの場合はpresentationPageを使用、そうでない場合はcurrentPageを使用
+        const actualPageNum = getActualPageNum(targetPage);
         const savedStrokes = await loadAnnotations(docId, actualPageNum);
         console.log('renderCurrentPage: データベースから読み込み', { actualPageNum, savedStrokesCount: savedStrokes.length });
         // 既存のストロークにIDがない場合は生成
@@ -1741,13 +1756,17 @@ export default function Home() {
     }
   };
 
-  // ページ変更時に再レンダリング
+  // ページ変更時に再レンダリング（メイン画面用、プレゼンモードは除外）
   // pageOrderはgetActualPageNum内で参照されるため、依存配列から除外
   // （pageOrderが変更されても、currentPageが変わらない限り再レンダリングしない）
   useEffect(() => {
+    // プレゼンモードの場合はこのuseEffectをスキップ（プレゼンモードは独立管理）
+    if (isPresentationMode) {
+      return;
+    }
     // pdfDocが有効な場合のみレンダリング
     if (pdfDoc && pdfDoc.numPages > 0 && currentPage > 0 && currentPage <= pdfDoc.numPages) {
-      console.log('useEffect: currentPage変更を検知、renderCurrentPage()を呼び出し', { 
+      console.log('useEffect: currentPage変更を検知、renderCurrentPage()を呼び出し（メイン画面）', { 
         currentPage, 
         isPresentationMode,
         showThumbnailModal,
@@ -1772,11 +1791,15 @@ export default function Home() {
     }
   }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, drawWatermarkOnCanvas, snapToTextEnabled, textSelectionEnabled, isPresentationMode, showThumbnailModal, showTableOfContentsDialog]);
   
-  // モーダルが閉じたときに再レンダリング
+  // モーダルが閉じたときに再レンダリング（メイン画面用、プレゼンモードは除外）
   useEffect(() => {
+    // プレゼンモードの場合はこのuseEffectをスキップ（プレゼンモードは独立管理）
+    if (isPresentationMode) {
+      return;
+    }
     if (pdfDoc && pdfDoc.numPages > 0 && currentPage > 0 && currentPage <= pdfDoc.numPages) {
-      if (!showThumbnailModal && !showTableOfContentsDialog && !isPresentationMode) {
-        console.log('useEffect: モーダルが閉じたので再レンダリング', { 
+      if (!showThumbnailModal && !showTableOfContentsDialog) {
+        console.log('useEffect: モーダルが閉じたので再レンダリング（メイン画面）', { 
           currentPage,
           showThumbnailModal,
           showTableOfContentsDialog,
@@ -1792,6 +1815,22 @@ export default function Home() {
       }
     }
   }, [showThumbnailModal, showTableOfContentsDialog, isPresentationMode, pdfDoc, currentPage]);
+  
+  // プレゼンモードのページ変更時に再レンダリング（プレゼンモード専用、メイン画面とは独立）
+  useEffect(() => {
+    // プレゼンモードの場合のみ実行
+    if (!isPresentationMode || !pdfDoc) {
+      return;
+    }
+    // pdfDocが有効な場合のみレンダリング
+    if (pdfDoc.numPages > 0 && presentationPage > 0 && presentationPage <= pdfDoc.numPages) {
+      console.log('useEffect: presentationPage変更を検知、renderCurrentPage()を呼び出し（プレゼンモード）', { 
+        presentationPage, 
+        isPresentationMode
+      });
+      renderCurrentPage();
+    }
+  }, [presentationPage, isPresentationMode, pdfDoc]);
 
   // strokesの状態変更時に再描画（ハイライトなどが追加/削除されたとき）
   useEffect(() => {
@@ -3158,17 +3197,35 @@ export default function Home() {
 
   // 前のページ
   const goToPrevPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-      // useEffectで自動的にrenderCurrentPage()が呼ばれる
+    if (isPresentationMode) {
+      // プレゼンモードの場合はpresentationPageを変更（独立管理）
+      if (presentationPage > 1) {
+        setPresentationPage(presentationPage - 1);
+        renderCurrentPage();
+      }
+    } else {
+      // メイン画面の場合はcurrentPageを変更（ページ送り、目次、ページ管理と同期）
+      if (currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+        // useEffectで自動的にrenderCurrentPage()が呼ばれる
+      }
     }
   };
 
   // 次のページ
   const goToNextPage = () => {
-    if (pdfDoc && currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-      // useEffectで自動的にrenderCurrentPage()が呼ばれる
+    if (isPresentationMode) {
+      // プレゼンモードの場合はpresentationPageを変更（独立管理）
+      if (pdfDoc && presentationPage < totalPages) {
+        setPresentationPage(presentationPage + 1);
+        renderCurrentPage();
+      }
+    } else {
+      // メイン画面の場合はcurrentPageを変更（ページ送り、目次、ページ管理と同期）
+      if (pdfDoc && currentPage < totalPages) {
+        setCurrentPage(currentPage + 1);
+        // useEffectで自動的にrenderCurrentPage()が呼ばれる
+      }
     }
   };
 
@@ -5336,9 +5393,9 @@ export default function Home() {
                   e.stopPropagation();
                   goToPrevPage();
                 }}
-                disabled={currentPage === 1}
+                disabled={presentationPage === 1}
                 className={`px-1.5 py-0.5 rounded transition-colors flex items-center flex-shrink-0 ${
-                  currentPage === 1 
+                  presentationPage === 1 
                     ? 'bg-gray-600 cursor-not-allowed opacity-50' 
                     : 'bg-white/20 hover:bg-white/30'
                 }`}
@@ -5354,9 +5411,9 @@ export default function Home() {
                   e.stopPropagation();
                   goToNextPage();
                 }}
-                disabled={currentPage >= totalPages}
+                disabled={presentationPage >= totalPages}
                 className={`px-1.5 py-0.5 rounded transition-colors flex items-center flex-shrink-0 ${
-                  currentPage >= totalPages 
+                  presentationPage >= totalPages 
                     ? 'bg-gray-600 cursor-not-allowed opacity-50' 
                     : 'bg-white/20 hover:bg-white/30'
                 }`}
@@ -5617,7 +5674,7 @@ export default function Home() {
                     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
                   }}
                 >
-                  {currentPage} / {totalPages}
+                  {presentationPage} / {totalPages}
                 </div>
               )}
             </div>
