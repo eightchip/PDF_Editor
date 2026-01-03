@@ -101,13 +101,19 @@ export function drawTextAnnotation(
   if (annotation.fontName) {
     let fontFamily = annotation.fontName;
     // PDF.jsのフォント名から実際のフォント名を抽出
+    // 例: "+Arial-Bold" → "Arial", "MSゴシック" → "MSゴシック"
     if (fontFamily.includes('+')) {
-      fontFamily = fontFamily.split('+')[1] || fontFamily;
+      const afterPlus = fontFamily.split('+')[1];
+      if (afterPlus) {
+        fontFamily = afterPlus;
+      }
     }
-    if (fontFamily.includes('-')) {
+    // ハイフンで分割するが、日本語フォント名（MSゴシック、明朝体など）は保持
+    if (fontFamily.includes('-') && !fontFamily.match(/[ひらがなカタカナ漢字]/)) {
+      // 英語フォント名の場合のみ分割（例: "Arial-Bold" → "Arial"）
       fontFamily = fontFamily.split('-')[0] || fontFamily;
     }
-    // 日本語フォントのフォールバック
+    // フォールバック（Arialのみ）
     if (!fontFamily || fontFamily === 'Arial') {
       fontFamily = 'sans-serif';
     }

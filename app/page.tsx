@@ -2888,8 +2888,42 @@ export default function Home() {
       }
     }
     
-    // 墨消しツールの場合（テキストを非表示にしてテキスト注釈を作成）
+    // 墨消しツールの場合
     if (tool === 'redact') {
+      // 既存のテキスト注釈をクリックした場合は編集モードに入る
+      if (textCanvasRef.current && pageSize) {
+        const textCanvas = textCanvasRef.current;
+        const rect = textCanvas.getBoundingClientRect();
+        const canvasX = e.clientX - rect.left;
+        const canvasY = e.clientY - rect.top;
+        
+        const clickedText = textAnnotations.find(text => {
+          const textX = text.x * pageSize.width;
+          const textY = text.y * pageSize.height;
+          const textWidth = text.text.length * text.fontSize * 0.6; // 概算幅
+          const textHeight = text.fontSize * 1.2;
+
+          return (
+            canvasX >= textX - 10 &&
+            canvasX <= textX + textWidth + 10 &&
+            canvasY >= textY - 10 &&
+            canvasY <= textY + textHeight + 10
+          );
+        });
+
+        if (clickedText) {
+          setEditingTextId(clickedText.id);
+          setTextInputValue(clickedText.text);
+          setTextInputPosition({ x: clickedText.x * pageSize.width, y: clickedText.y * pageSize.height });
+          setFontSize(clickedText.fontSize);
+          setColor(clickedText.color);
+          setTool('text'); // テキストツールに切り替え
+          e.preventDefault();
+          return;
+        }
+      }
+      
+      // 新しいテキストを墨消しする場合
       if (textItems.length === 0) {
         console.warn('墨消し: テキストアイテムがありません。テキスト抽出が失敗している可能性があります。');
         return;
@@ -2946,14 +2980,22 @@ export default function Home() {
           saveAnnotations(docId, actualPageNum, newStrokes);
         }
         
-        // フォント名を正規化
+        // フォント名を正規化（元のフォント名をできるだけ保持）
         let fontFamily = textItem.fontName || 'Arial';
+        // PDF.jsのフォント名から実際のフォント名を抽出
+        // 例: "+Arial-Bold" → "Arial", "MSゴシック" → "MSゴシック"
         if (fontFamily.includes('+')) {
-          fontFamily = fontFamily.split('+')[1] || fontFamily;
+          const afterPlus = fontFamily.split('+')[1];
+          if (afterPlus) {
+            fontFamily = afterPlus;
+          }
         }
-        if (fontFamily.includes('-')) {
+        // ハイフンで分割するが、日本語フォント名（MSゴシック、明朝体など）は保持
+        if (fontFamily.includes('-') && !fontFamily.match(/[ひらがなカタカナ漢字]/)) {
+          // 英語フォント名の場合のみ分割（例: "Arial-Bold" → "Arial"）
           fontFamily = fontFamily.split('-')[0] || fontFamily;
         }
+        // フォールバック（Arialのみ）
         if (!fontFamily || fontFamily === 'Arial') {
           fontFamily = 'sans-serif';
         }

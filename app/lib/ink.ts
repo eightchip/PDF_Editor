@@ -24,6 +24,33 @@ export function drawStroke(
     ctx.globalAlpha = 0.3;
     ctx.globalCompositeOperation = 'multiply'; // 下のPDFと乗算
     ctx.fillStyle = stroke.color;
+    
+    // pointsが4つ以上ある場合（矩形の4つの角）は矩形として描画
+    if (stroke.points.length >= 4) {
+      // 矩形の左上と右下の点を計算
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      
+      for (const point of stroke.points) {
+        const x = point.x * canvasWidth;
+        const y = point.y * canvasHeight;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+      
+      const rectX = minX;
+      const rectY = minY;
+      const rectW = maxX - minX;
+      const rectH = maxY - minY;
+      
+      ctx.fillRect(rectX, rectY, rectW, rectH);
+      ctx.restore();
+      return; // ハイライトはここで終了
+    }
   } else if (stroke.tool === 'redact') {
     // 墨消しモード：背景と同じ色で覆う（テキストを非表示にする）
     ctx.globalAlpha = 1.0; // 完全に不透明
