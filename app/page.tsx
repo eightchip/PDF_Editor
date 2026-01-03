@@ -4037,15 +4037,16 @@ export default function Home() {
     }
     
     // 状態をクリア（キャンバスをクリアした後に実行）
-    // setTimeoutで状態更新を遅延させ、renderCurrentPageが呼ばれてもデータベースが空であることを保証
-    setTimeout(() => {
-      setStrokes([]);
-      setTextAnnotations([]);
-      setShapeAnnotations([]);
-      // クリア処理完了後、フラグをリセット
-      isClearingRef.current = false;
-      console.log('handleClear: 状態をクリア完了');
-    }, 100); // 100ms待機してからフラグをリセット
+    setStrokes([]);
+    setTextAnnotations([]);
+    setShapeAnnotations([]);
+    
+    // クリア処理完了後、フラグをリセット
+    isClearingRef.current = false;
+    console.log('handleClear: 状態をクリア完了');
+    
+    // ページを再レンダリングして、空の状態を反映
+    await renderCurrentPage();
     
     console.log('handleClear: 完了');
   };
