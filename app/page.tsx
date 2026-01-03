@@ -1335,9 +1335,9 @@ export default function Home() {
         laserPointerTimeoutRef.current = null;
       }
       // プレゼンモード終了時にメイン画面のPDFを再レンダリング
-      setTimeout(async () => {
-        await renderCurrentPage();
-      }, 100); // 少し待ってからレンダリング（状態更新を待つ）
+      // 確実に再レンダリングするため、少し待ってから実行
+      await new Promise(resolve => setTimeout(resolve, 200));
+      await renderCurrentPage();
     }
   }, [isPresentationMode]);
 
@@ -1456,6 +1456,26 @@ export default function Home() {
       renderTaskRef.current = result.task; // レンダリングタスクを保存
       const size = { width: result.width, height: result.height };
       setPageSize(size);
+
+      // プレゼンモードで逆さ表示が発生する場合の自動修正：レンダリングを2回実行
+      // 無限ループを防ぐためにフラグで制御し、直接レンダリングを再実行
+      if (isPresentationMode && !isFixingRotationRef.current && pdfDoc && pdfCanvas) {
+        isFixingRotationRef.current = true;
+        // 一度レンダリングを完了させてから、再度レンダリングを実行
+        await new Promise(resolve => setTimeout(resolve, 300));
+        // 同じページを再度レンダリング（これにより逆さ表示が修正される）
+        try {
+          const samePage = await pdfDoc.getPage(actualPageNum);
+          const fixResult = await renderPage(samePage, pdfCanvas, renderScale, 0, renderTaskRef.current);
+          renderTaskRef.current = fixResult.task;
+        } catch (error) {
+          console.log('回転修正レンダリングエラー:', error);
+        }
+        // フラグをリセット
+        setTimeout(() => {
+          isFixingRotationRef.current = false;
+        }, 1000);
+      }
 
       // テキストレイヤーを生成（テキスト選択可能にする）
       if (textLayerRef.current) {
@@ -4054,32 +4074,41 @@ export default function Home() {
     // フラグをリセット（次のページ遷移時に正常に動作するように）
     isClearingRef.current = false;
     
-    // データベースが空であることを再確認
-    const finalVerifyStrokes = await loadAnnotations(docId, actualPageNum);
-    const finalVerifyTexts = await loadTextAnnotations(docId, actualPageNum);
-    const finalVerifyShapes = await loadShapeAnnotations(docId, actualPageNum);
-    
-    if (finalVerifyStrokes.length > 0 || finalVerifyTexts.length > 0 || finalVerifyShapes.length > 0) {
-      console.warn('handleClear: データベースがまだ空でない、再度削除を試みる', { 
-        strokes: finalVerifyStrokes.length, 
-        texts: finalVerifyTexts.length, 
-        shapes: finalVerifyShapes.length 
-      });
-      // 再度削除を試みる
-      await deleteAnnotations(docId, actualPageNum);
-      await deleteTextAnnotations(docId, actualPageNum);
-      await deleteShapeAnnotations(docId, actualPageNum);
-      // 状態を確実にクリア
-      setStrokes([]);
-      setTextAnnotations([]);
-      setShapeAnnotations([]);
-    } else {
-      // データベースが空であることを確認
-      setStrokes([]);
-      setTextAnnotations([]);
-      setShapeAnnotations([]);
-      console.log('handleClear: データベースが空であることを確認し、状態をクリア');
+    // データベースが空であることを再確認（複数回確認して確実に削除）
+    let retryCount = 0;
+    const maxRetries = 3;
+    while (retryCount < maxRetries) {
+      const finalVerifyStrokes = await loadAnnotations(docId, actualPageNum);
+      const finalVerifyTexts = await loadTextAnnotations(docId, actualPageNum);
+      const finalVerifyShapes = await loadShapeAnnotations(docId, actualPageNum);
+      
+      if (finalVerifyStrokes.length === 0 && finalVerifyTexts.length === 0 && finalVerifyShapes.length === 0) {
+        // データベースが空であることを確認
+        setStrokes([]);
+        setTextAnnotations([]);
+        setShapeAnnotations([]);
+        console.log('handleClear: データベースが空であることを確認し、状態をクリア');
+        break;
+      } else {
+        console.warn(`handleClear: データベースがまだ空でない（リトライ ${retryCount + 1}/${maxRetries}）`, { 
+          strokes: finalVerifyStrokes.length, 
+          texts: finalVerifyTexts.length, 
+          shapes: finalVerifyShapes.length 
+        });
+        // 再度削除を試みる
+        await deleteAnnotations(docId, actualPageNum);
+        await deleteTextAnnotations(docId, actualPageNum);
+        await deleteShapeAnnotations(docId, actualPageNum);
+        // 少し待ってから再確認
+        await new Promise(resolve => setTimeout(resolve, 100));
+        retryCount++;
+      }
     }
+    
+    // 最終的に状態を確実にクリア
+    setStrokes([]);
+    setTextAnnotations([]);
+    setShapeAnnotations([]);
     
     console.log('handleClear: 完了');
   };
