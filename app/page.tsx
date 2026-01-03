@@ -203,7 +203,9 @@ export default function Home() {
   const [watermarkDensity, setWatermarkDensity] = useState(3); // 透かしの密度（グリッド/タイルの場合の列数・行数）
   const [watermarkAngle, setWatermarkAngle] = useState(45); // 透かしの角度（度）
   const [watermarkOpacity, setWatermarkOpacity] = useState(0.5); // 透かしの濃度（0-1、デフォルト0.5）
+  const [watermarkFontSize, setWatermarkFontSize] = useState(0.1); // 透かしのフォントサイズ（ページサイズに対する比率、デフォルト0.1=10%）
   const [showWatermarkPreview, setShowWatermarkPreview] = useState(false); // 透かしプレビューの表示状態
+  const [watermarkPdfPreviewUrl, setWatermarkPdfPreviewUrl] = useState<string | null>(null); // 透かしPDFプレビューのURL
   const [showThumbnails, setShowThumbnails] = useState(false);
   const [showThumbnailModal, setShowThumbnailModal] = useState(false); // 全画面サムネイルモーダルの表示状態
   const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
@@ -1260,8 +1262,9 @@ export default function Home() {
     const density = watermarkDensity || 3;
     const angle = watermarkAngle ?? 45; // 0度も有効な値として扱うため、??を使用
     const opacity = watermarkOpacity ?? 0.5; // 濃度（0-1）
+    const fontSizeRatio = watermarkFontSize ?? 0.1; // フォントサイズ比率（デフォルト0.1=10%）
     
-    const fontSize = Math.min(canvasWidth, canvasHeight) * 0.1;
+    const fontSize = Math.min(canvasWidth, canvasHeight) * fontSizeRatio;
     ctx.font = `${fontSize}px Arial, sans-serif`;
     const textMetrics = ctx.measureText(watermarkText);
     const textWidth = textMetrics.width;
@@ -1301,18 +1304,18 @@ export default function Home() {
       ctx.fillText(watermarkText, 0, 0);
       ctx.restore();
     } else if (pattern === 'bottom-left') {
-      // 左下1箇所
+      // 左下1箇所（Canvas座標系では下から15% = 上から85%）
       ctx.save();
-      ctx.translate(canvasWidth * 0.15, canvasHeight * 0.15);
+      ctx.translate(canvasWidth * 0.15, canvasHeight * 0.85);
       if (angle !== 0) {
         ctx.rotate(angle * Math.PI / 180);
       }
       ctx.fillText(watermarkText, 0, 0);
       ctx.restore();
     } else if (pattern === 'top-left') {
-      // 左上1箇所
+      // 左上1箇所（Canvas座標系では上から15% = 下から85%）
       ctx.save();
-      ctx.translate(canvasWidth * 0.15, canvasHeight * 0.85);
+      ctx.translate(canvasWidth * 0.15, canvasHeight * 0.15);
       if (angle !== 0) {
         ctx.rotate(angle * Math.PI / 180);
       }
@@ -2016,7 +2019,7 @@ export default function Home() {
       };
       checkAndRender();
     }
-  }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, drawWatermarkOnCanvas, snapToTextEnabled, textSelectionEnabled, isPresentationMode, showThumbnailModal, showTableOfContentsDialog]);
+  }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, watermarkFontSize, drawWatermarkOnCanvas, snapToTextEnabled, textSelectionEnabled, isPresentationMode, showThumbnailModal, showTableOfContentsDialog]);
   
   // モーダルが閉じたときに再レンダリング（メイン画面用、プレゼンモードは除外）
   useEffect(() => {
@@ -2087,7 +2090,7 @@ export default function Home() {
         }
       }
     }
-  }, [strokes, pageSize, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, drawWatermarkOnCanvas]);
+  }, [strokes, pageSize, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, watermarkFontSize, drawWatermarkOnCanvas]);
 
   // サムネイル生成（注釈なし）
   const generateThumbnails = async () => {
@@ -5158,7 +5161,8 @@ export default function Home() {
         watermarkPattern,
         watermarkDensity,
         watermarkAngle,
-        watermarkOpacity
+        watermarkOpacity,
+        watermarkFontSize
       );
 
       return pdfBytes;
@@ -11458,6 +11462,10 @@ export default function Home() {
           onClose={() => {
             setShowWatermarkDialog(false);
             setWatermarkText('');
+            if (watermarkPdfPreviewUrl) {
+              URL.revokeObjectURL(watermarkPdfPreviewUrl);
+              setWatermarkPdfPreviewUrl(null);
+            }
           }}
         >
           <DialogHeader className="pb-4 border-b border-teal-200 mb-4">
@@ -11611,6 +11619,49 @@ export default function Home() {
                 ))}
               </div>
             </div>
+            <div className="p-4 bg-white/60 rounded-lg border-2 border-slate-200">
+              <label className="block text-sm font-semibold text-slate-800 mb-3">
+                表示サイズ: {Math.round(watermarkFontSize * 100)}% (ページサイズに対する比率)
+              </label>
+              <div className="flex items-center gap-4 mb-3">
+                <input
+                  type="range"
+                  min="5"
+                  max="30"
+                  step="1"
+                  value={watermarkFontSize * 100}
+                  onChange={(e) => setWatermarkFontSize(parseInt(e.target.value) / 100)}
+                  className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-500"
+                />
+                <Input
+                  type="number"
+                  min="5"
+                  max="30"
+                  value={Math.round(watermarkFontSize * 100)}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 10;
+                    setWatermarkFontSize(Math.max(5, Math.min(30, val)) / 100);
+                  }}
+                  className="w-20 px-3 py-2 text-base border-2 border-slate-300 rounded-lg bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-200"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[5, 10, 15, 20, 25, 30].map((percent) => (
+                  <button
+                    key={percent}
+                    type="button"
+                    onClick={() => setWatermarkFontSize(percent / 100)}
+                    className={`px-3 py-1.5 text-xs font-semibold border-2 rounded-lg transition-all shadow-sm ${
+                      Math.round(watermarkFontSize * 100) === percent
+                        ? 'bg-teal-500 text-white border-teal-500 shadow-md'
+                        : 'bg-white border-slate-300 hover:bg-teal-50 hover:border-teal-400'
+                    }`}
+                  >
+                    {percent}%
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg border-2 border-slate-200">
               <input
                 type="checkbox"
@@ -11622,6 +11673,98 @@ export default function Home() {
               <label htmlFor="watermark-preview" className="text-sm font-semibold text-slate-800 cursor-pointer">
                 プレビューを表示
               </label>
+            </div>
+            {watermarkPdfPreviewUrl && (
+              <div className="p-4 bg-white/60 rounded-lg border-2 border-slate-200">
+                <label className="block text-sm font-semibold text-slate-800 mb-2">PDFプレビュー</label>
+                <iframe
+                  src={watermarkPdfPreviewUrl}
+                  className="w-full h-96 border-2 border-slate-300 rounded-lg"
+                  title="透かしPDFプレビュー"
+                />
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (watermarkPdfPreviewUrl) {
+                      URL.revokeObjectURL(watermarkPdfPreviewUrl);
+                      setWatermarkPdfPreviewUrl(null);
+                    }
+                  }}
+                  variant="outline"
+                  className="mt-2 h-9 px-4 text-sm font-semibold border-2 border-slate-300 hover:bg-slate-50"
+                >
+                  プレビューを閉じる
+                </Button>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                onClick={async () => {
+                  if (!pdfDoc || !watermarkText.trim() || !originalPdfBytes || !pageSize || !docId) {
+                    toast({
+                      title: "エラー",
+                      description: "PDFが読み込まれていないか、透かし文字が入力されていません。",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  try {
+                    // 現在のページの注釈を取得
+                    const actualPageNum = getActualPageNum(currentPage);
+                    const pageAnnotations = await loadAnnotations(docId, actualPageNum);
+                    const pageTextAnnotations = await loadTextAnnotations(docId, actualPageNum);
+                    const pageShapeAnnotations = await loadShapeAnnotations(docId, actualPageNum);
+                    
+                    // PDFをエクスポート（透かしを含む）
+                    const pdfBytes = await exportAnnotatedPDFV2(
+                      originalPdfBytes,
+                      { [currentPage]: pageAnnotations },
+                      { [currentPage]: pageSize },
+                      { [currentPage]: pageTextAnnotations },
+                      { [currentPage]: pageShapeAnnotations },
+                      undefined,
+                      undefined,
+                      undefined,
+                      watermarkText || undefined,
+                      undefined,
+                      watermarkPattern,
+                      watermarkDensity,
+                      watermarkAngle,
+                      watermarkOpacity,
+                      watermarkFontSize
+                    );
+                    
+                    // PDFプレビュー用のURLを生成
+                    const arrayBuffer = pdfBytes.buffer instanceof ArrayBuffer 
+                      ? pdfBytes.buffer 
+                      : new Uint8Array(pdfBytes).buffer;
+                    const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    if (watermarkPdfPreviewUrl) {
+                      URL.revokeObjectURL(watermarkPdfPreviewUrl);
+                    }
+                    setWatermarkPdfPreviewUrl(url);
+                    
+                    toast({
+                      title: "成功",
+                      description: "PDFプレビューを生成しました。",
+                      variant: "success",
+                    });
+                  } catch (error) {
+                    console.error('PDFプレビュー生成エラー:', error);
+                    toast({
+                      title: "エラー",
+                      description: "PDFプレビューの生成に失敗しました。",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                variant="outline"
+                className="h-9 px-4 text-sm font-semibold border-2 border-teal-400 hover:bg-teal-50"
+              >
+                PDFでプレビュー
+              </Button>
             </div>
           </div>
           <DialogFooter className="pt-4 border-t border-teal-200 mt-4">

@@ -39,7 +39,8 @@ export async function exportAnnotatedPDFV2(
   watermarkPattern?: 'center' | 'grid' | 'tile' | 'bottom-right' | 'top-right' | 'bottom-left' | 'top-left',
   watermarkDensity?: number,
   watermarkAngle?: number,
-  watermarkOpacity?: number
+  watermarkOpacity?: number,
+  watermarkFontSize?: number
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.load(originalPdfBytes);
   const pages = pdfDoc.getPages();
@@ -451,12 +452,13 @@ export async function exportAnnotatedPDFV2(
         const density = watermarkDensity || 3;
         const angle = watermarkAngle ?? 45; // 0度も有効な値として扱うため、??を使用
         const opacity = watermarkOpacity ?? 0.5; // 濃度（0-1、デフォルト0.5）
+        const fontSizeRatio = watermarkFontSize ?? 0.1; // フォントサイズ比率（デフォルト0.1=10%）
         
         // 日本語対応のため、Canvasでテキストを画像化（指定角度で回転）
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          const fontSize = Math.min(pageSize.width, pageSize.height) * 0.1; // ページサイズの10%
+          const fontSize = Math.min(pageSize.width, pageSize.height) * fontSizeRatio; // ページサイズに対する比率
           ctx.font = `${fontSize}px Arial, sans-serif`;
           const textMetrics = ctx.measureText(watermarkText);
           const textWidth = textMetrics.width;
@@ -532,7 +534,7 @@ export async function exportAnnotatedPDFV2(
               opacity: opacity,
             });
           } else if (pattern === 'bottom-left') {
-            // 左下1箇所
+            // 左下1箇所（PDF座標系では下から15%）
             const x = pageSize.width * 0.15 - imageWidth / 2;
             const y = pageSize.height * 0.15 - imageHeight / 2;
             page.drawImage(watermarkImage, {
@@ -543,7 +545,7 @@ export async function exportAnnotatedPDFV2(
               opacity: opacity,
             });
           } else if (pattern === 'top-left') {
-            // 左上1箇所
+            // 左上1箇所（PDF座標系では上から85% = 下から15%）
             const x = pageSize.width * 0.15 - imageWidth / 2;
             const y = pageSize.height * 0.85 - imageHeight / 2;
             page.drawImage(watermarkImage, {
