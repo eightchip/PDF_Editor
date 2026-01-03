@@ -74,15 +74,21 @@ export function drawStroke(
         ctx.globalCompositeOperation = 'source-over'; // 通常の描画モード
         ctx.fillStyle = '#000000'; // テキストは黒色
         
-        // フォントサイズを正しく計算（viewport座標系のフォントサイズをそのまま使用）
-        // stroke.fontSizeは既にviewport座標系に変換されている
-        ctx.font = `${stroke.fontSize}px ${stroke.fontName}`;
-        ctx.textBaseline = 'top'; // 上端基準
+        // フォントサイズを正しく計算
+        // stroke.fontSizeはviewport座標系（scale=1.0）でのサイズ
+        // canvasWidth/canvasHeightは既にスケールされているので、そのまま使用
+        // ただし、devicePixelRatioを考慮する必要がある
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        const actualFontSize = stroke.fontSize; // viewport座標系のフォントサイズをそのまま使用
+        
+        ctx.font = `${actualFontSize}px ${stroke.fontName}`;
+        ctx.textBaseline = 'alphabetic'; // ベースライン基準（元のテキストと同じ）
         ctx.textAlign = 'left'; // 左揃え
         
         // テキストの位置を計算（正規化座標から実際の座標へ）
         const textX = stroke.textX * canvasWidth;
-        const textY = stroke.textY * canvasHeight;
+        // ベースライン基準なので、少し下に調整（フォントサイズの約80%分下げる）
+        const textY = stroke.textY * canvasHeight + actualFontSize * 0.8;
         
         // テキストを描画
         ctx.fillText(stroke.text, textX, textY);

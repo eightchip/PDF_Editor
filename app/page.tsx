@@ -2500,22 +2500,41 @@ export default function Home() {
               clickedStrokes.push(stroke.id);
               
               // ハイライトにテキストが埋め込まれている場合は、テキスト編集モードに入る
+              // ダブルクリックまたはCtrl+クリックで編集モードに入る
               if (stroke.text !== undefined && stroke.textX !== undefined && stroke.textY !== undefined) {
-                setEditingTextId(stroke.id); // ハイライトのIDを編集IDとして設定
-                setTextInputValue(stroke.text || '');
-                setTextInputPosition({ 
-                  x: stroke.textX * pageSize.width, 
-                  y: stroke.textY * pageSize.height 
-                });
-                if (stroke.fontSize) {
-                  setFontSize(stroke.fontSize);
+                const isDoubleClick = (e as any).detail === 2 || e.ctrlKey || e.metaKey;
+                if (isDoubleClick) {
+                  setEditingTextId(stroke.id); // ハイライトのIDを編集IDとして設定
+                  setTextInputValue(stroke.text || '');
+                  setTextInputPosition({ 
+                    x: stroke.textX * pageSize.width, 
+                    y: stroke.textY * pageSize.height 
+                  });
+                  if (stroke.fontSize) {
+                    setFontSize(stroke.fontSize);
+                  }
+                  setColor(stroke.color);
+                  // テキストツールに切り替え（編集モード）
+                  setTool('text');
+                  
+                  // ユーザーに編集可能であることを通知
+                  toast({
+                    title: "テキスト編集モード",
+                    description: "ハイライトのテキストを編集できます",
+                    variant: "default",
+                  });
+                  
+                  e.preventDefault();
+                  e.stopPropagation();
+                  return;
+                } else {
+                  // シングルクリックの場合は、編集可能であることを通知
+                  toast({
+                    title: "テキスト編集",
+                    description: "Ctrl+クリックまたはダブルクリックでテキストを編集できます",
+                    variant: "default",
+                  });
                 }
-                setColor(stroke.color);
-                // テキストツールに切り替え（編集モード）
-                setTool('text');
-                e.preventDefault();
-                e.stopPropagation();
-                return;
               }
             }
           } else {
@@ -2804,6 +2823,17 @@ export default function Home() {
 
         // テキスト情報を取得（テキスト埋め込み用）
         const textItem = boundingBox.textItem;
+        
+        // テキストの位置を元のテキストの位置に正確に合わせる
+        // boundingBoxは既にviewport座標系なので、pageSizeで正規化する
+        const textNormalizedX = boundingBox.x / pageSize.width;
+        const textNormalizedY = boundingBox.y / pageSize.height;
+        
+        // フォントサイズを実際の描画スケールに合わせる
+        // textItem.fontSizeはviewport座標系（scale=1.0）でのサイズなので、
+        // 実際の描画スケール（scale）を考慮する必要はない（canvasのサイズが既にスケールされているため）
+        const actualFontSize = textItem?.fontSize || 12;
+        
         const stroke: Stroke = {
           id: `stroke-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           tool: 'highlight',
@@ -2818,9 +2848,9 @@ export default function Home() {
           // テキスト情報を保存（テキスト埋め込み用）
           text: textItem?.str || '',
           fontName: textItem?.fontName || 'Arial',
-          fontSize: textItem?.fontSize || 12,
-          textX: normalizedX1,
-          textY: normalizedY1,
+          fontSize: actualFontSize,
+          textX: textNormalizedX, // 元のテキストの位置を使用
+          textY: textNormalizedY, // 元のテキストの位置を使用
         };
 
         // ストロークを即座に確定
