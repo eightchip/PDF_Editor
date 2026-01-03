@@ -412,7 +412,8 @@ export default function Home() {
   const [redoStack, setRedoStack] = useState<UndoState[]>([]);
 
   // Canvas refs
-  const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
+  const pdfCanvasRef = useRef<HTMLCanvasElement>(null); // メイン画面用
+  const presentationCanvasRef = useRef<HTMLCanvasElement>(null); // プレゼンモード用
   const inkCanvasRef = useRef<HTMLCanvasElement>(null);
   const textCanvasRef = useRef<HTMLCanvasElement>(null);
   const shapeCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -1402,12 +1403,16 @@ export default function Home() {
 
   // ページレンダリング
   const renderCurrentPage = async () => {
+    // プレゼンモードの場合はプレゼンモード用のキャンバス、そうでない場合はメイン画面用のキャンバスを使用
+    const targetCanvasRef = isPresentationMode ? presentationCanvasRef : pdfCanvasRef;
+    
     console.log('renderCurrentPage: 開始', { 
       hasPdfDoc: !!pdfDoc, 
-      hasPdfCanvas: !!pdfCanvasRef.current, 
+      hasPdfCanvas: !!targetCanvasRef.current, 
       hasInkCanvas: !!inkCanvasRef.current,
       currentPage,
-      isPresentationMode 
+      isPresentationMode,
+      usingPresentationCanvas: isPresentationMode
     });
     
     // キャンバスが取得できない場合、少し待ってから再試行（モーダルが開いている場合など）
@@ -1416,44 +1421,26 @@ export default function Home() {
       return;
     }
     
-    // プレゼンモードでない場合は、メイン画面のキャンバスが存在することを確認
-    if (!isPresentationMode) {
-      // メイン画面のキャンバスがDOMに存在するか確認
-      const mainCanvas = document.querySelector('canvas[ref]') || 
-                         (containerRef.current?.querySelector('canvas') as HTMLCanvasElement);
-      if (!mainCanvas && !pdfCanvasRef.current) {
-        console.warn('renderCurrentPage: メイン画面のキャンバスがDOMに存在しません', { 
-          hasContainer: !!containerRef.current,
-          hasPdfCanvas: !!pdfCanvasRef.current
-        });
-        // 少し待ってから再試行
-        await new Promise(resolve => setTimeout(resolve, 200));
-        if (!pdfCanvasRef.current) {
-          console.warn('renderCurrentPage: 再試行後もメイン画面のキャンバスが取得できません');
-          return;
-        }
-      }
-    }
-    
-    if (!pdfCanvasRef.current || !inkCanvasRef.current) {
+    if (!targetCanvasRef.current || !inkCanvasRef.current) {
       console.warn('renderCurrentPage: キャンバスが取得できません、再試行します', { 
-        hasPdfCanvas: !!pdfCanvasRef.current, 
+        hasPdfCanvas: !!targetCanvasRef.current, 
         hasInkCanvas: !!inkCanvasRef.current,
         showThumbnailModal,
         showTableOfContentsDialog,
-        isPresentationMode
+        isPresentationMode,
+        usingPresentationCanvas: isPresentationMode
       });
       // モーダルが開いている場合は、モーダルが閉じるまで待つ
       // 最大10回まで再試行（合計1秒）
       for (let i = 0; i < 10; i++) {
         await new Promise(resolve => setTimeout(resolve, 100));
-        if (pdfCanvasRef.current && inkCanvasRef.current) {
+        if (targetCanvasRef.current && inkCanvasRef.current) {
           console.log('renderCurrentPage: 再試行でキャンバスを取得しました', { retryCount: i + 1 });
           break;
         }
         if (i === 9) {
           console.warn('renderCurrentPage: 再試行後もキャンバスが取得できません', { 
-            hasPdfCanvas: !!pdfCanvasRef.current, 
+            hasPdfCanvas: !!targetCanvasRef.current, 
             hasInkCanvas: !!inkCanvasRef.current 
           });
           return;
@@ -1478,7 +1465,7 @@ export default function Home() {
       const actualPageNum = getActualPageNum(currentPage);
       console.log('renderCurrentPage: レンダリング開始', { currentPage, actualPageNum, totalPages: pdfDoc.numPages, isPresentationMode });
       const page = await pdfDoc.getPage(actualPageNum);
-      const pdfCanvas = pdfCanvasRef.current;
+      const pdfCanvas = targetCanvasRef.current;
       const inkCanvas = inkCanvasRef.current;
       
       if (!pdfCanvas || !inkCanvas) {
@@ -5542,9 +5529,9 @@ export default function Home() {
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              {/* PDFキャンバス */}
+              {/* PDFキャンバス（プレゼンモード用） */}
               <canvas
-                ref={pdfCanvasRef}
+                ref={presentationCanvasRef}
                 style={{ 
                   display: 'block', 
                   maxWidth: '95%', // 少し小さくする（最後の手段）
