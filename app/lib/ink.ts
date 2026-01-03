@@ -30,7 +30,14 @@ export function drawStroke(
                      normalizedColor === 'rgba(0, 0, 0, 0.5)' ||
                      normalizedColor === 'rgba(0, 0, 0, 0.3)';
     
-    if (isRedact) {
+    // テキスト情報がある場合は墨消しモード（背景と同じ色で見えなくする）
+    if (stroke.text) {
+      // 墨消しモード：背景と同じ色で覆う
+      // PDFの背景色を取得するか、白をデフォルトとする
+      ctx.globalAlpha = 1.0; // 完全に不透明
+      ctx.globalCompositeOperation = 'source-over'; // 通常の描画モード
+      ctx.fillStyle = '#FFFFFF'; // 白で固定（背景色と同じ）
+    } else if (isRedact) {
       // 墨消しモード：黒で覆う（opacityを低く）
       ctx.globalAlpha = 0.5; // 墨消し用のopacity
       ctx.globalCompositeOperation = 'source-over'; // 通常の描画モード
@@ -66,8 +73,9 @@ export function drawStroke(
       
       ctx.fillRect(rectX, rectY, rectW, rectH);
       
-      // テキスト情報がある場合は、テキストを描画（元のテキストと同じフォント・サイズで）
-      if (stroke.text && stroke.fontName && stroke.fontSize && stroke.textX !== undefined && stroke.textY !== undefined) {
+      // テキスト情報がある場合は、ハイライト上には描画しない（墨消しのみ）
+      // テキストは別のテキスト注釈として配置される
+      if (false && stroke.text && stroke.fontName && stroke.fontSize && stroke.textX !== undefined && stroke.textY !== undefined) {
         ctx.save();
         // テキスト描画用の設定
         ctx.globalAlpha = 1.0; // テキストは不透明

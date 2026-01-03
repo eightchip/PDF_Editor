@@ -24,6 +24,7 @@ export type TextAnnotation = {
   color: string;
   width?: number; // テキストボックスの幅（オプション）
   height?: number; // テキストボックスの高さ（オプション）
+  fontName?: string; // フォント名（オプション）
 };
 
 export type ShapeAnnotation = {

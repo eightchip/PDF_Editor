@@ -94,8 +94,27 @@ export function drawTextAnnotation(
   const y = annotation.y * canvasHeight;
 
   ctx.save();
+  
   const scaledFontSize = annotation.fontSize * scale;
-  ctx.font = `${scaledFontSize}px sans-serif`;
+  
+  // フォント名を設定（指定されている場合）
+  if (annotation.fontName) {
+    let fontFamily = annotation.fontName;
+    // PDF.jsのフォント名から実際のフォント名を抽出
+    if (fontFamily.includes('+')) {
+      fontFamily = fontFamily.split('+')[1] || fontFamily;
+    }
+    if (fontFamily.includes('-')) {
+      fontFamily = fontFamily.split('-')[0] || fontFamily;
+    }
+    // 日本語フォントのフォールバック
+    if (!fontFamily || fontFamily === 'Arial') {
+      fontFamily = 'sans-serif';
+    }
+    ctx.font = `${scaledFontSize}px ${fontFamily}`;
+  } else {
+    ctx.font = `${scaledFontSize}px sans-serif`;
+  }
   ctx.fillStyle = annotation.color;
   ctx.textBaseline = 'top';
   

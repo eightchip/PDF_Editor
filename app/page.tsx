@@ -2867,10 +2867,11 @@ export default function Home() {
           actualFontSize
         });
         
+        // ハイライトストロークを作成（テキストを非表示にするため、背景色で塗りつぶす）
         const stroke: Stroke = {
           id: `stroke-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           tool: 'highlight',
-          color: color,
+          color: '#FFFFFF', // 背景色（白）で固定（墨消し用）
           width: boundingBox.height * 1.2, // テキストの高さに合わせて調整
           points: [
             { x: normalizedX1, y: normalizedY1 },
@@ -2878,12 +2879,10 @@ export default function Home() {
             { x: normalizedX2, y: normalizedY2 },
             { x: normalizedX1, y: normalizedY2 },
           ],
-          // テキスト情報を保存（テキスト埋め込み用）
+          // テキスト情報を保存（テキスト注釈作成用）
           text: textItem.str,
           fontName: textItem.fontName || 'Arial',
           fontSize: actualFontSize,
-          textX: textNormalizedX, // 元のテキストの位置を使用
-          textY: textNormalizedY, // 元のテキストの位置を使用
         };
 
         // ストロークを即座に確定
@@ -2892,6 +2891,36 @@ export default function Home() {
         if (docId) {
           const actualPageNum = getActualPageNum(currentPage);
           saveAnnotations(docId, actualPageNum, newStrokes);
+        }
+        
+        // フォント名を正規化
+        let fontFamily = textItem.fontName || 'Arial';
+        if (fontFamily.includes('+')) {
+          fontFamily = fontFamily.split('+')[1] || fontFamily;
+        }
+        if (fontFamily.includes('-')) {
+          fontFamily = fontFamily.split('-')[0] || fontFamily;
+        }
+        if (!fontFamily || fontFamily === 'Arial') {
+          fontFamily = 'sans-serif';
+        }
+        
+        // テキスト注釈を作成（元のテキストと同じフォント・色・サイズで、任意の場所に配置可能）
+        const textAnnotation: TextAnnotation = {
+          id: generateTextId(),
+          x: textNormalizedX, // 初期位置は元のテキストの位置（後で移動可能）
+          y: textNormalizedY,
+          text: textItem.str,
+          fontSize: actualFontSize,
+          color: '#000000', // デフォルトは黒（後で変更可能）
+          fontName: fontFamily, // フォント名を保存
+        };
+        
+        const newTextAnnotations = [...textAnnotations, textAnnotation];
+        setTextAnnotations(newTextAnnotations);
+        if (docId) {
+          const actualPageNum = getActualPageNum(currentPage);
+          saveTextAnnotations(docId, actualPageNum, newTextAnnotations).catch(console.error);
         }
         
         // 再描画
@@ -2903,6 +2932,31 @@ export default function Home() {
             redrawStrokes(ctx, newStrokes, pageSize.width, pageSize.height);
           }
         }
+        
+        // テキスト注釈も再描画
+        if (textCanvasRef.current && pageSize) {
+          const ctx = textCanvasRef.current.getContext('2d');
+          if (ctx) {
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+            ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
+            redrawTextAnnotations(ctx, newTextAnnotations, pageSize.width, pageSize.height);
+          }
+        }
+        
+        // 作成したテキスト注釈を自動選択して、移動可能にする
+        setSelectedAnnotationIds({
+          strokes: [],
+          shapes: [],
+          texts: [textAnnotation.id],
+        });
+        
+        // ユーザーに通知
+        toast({
+          title: "テキストを非表示にしました",
+          description: "テキスト注釈を作成しました。ドラッグで移動、クリックで編集できます。",
+          variant: "default",
+        });
 
         e.preventDefault();
         return;
