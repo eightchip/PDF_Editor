@@ -1459,7 +1459,9 @@ export default function Home() {
 
       // テキストレイヤーを生成（テキスト選択可能にする）
       if (textLayerRef.current) {
-        const viewport = page.getViewport({ scale, rotation: currentRotation });
+        // プレゼンモードでは回転0でテキストレイヤーを生成
+        const textRotation = isPresentationMode ? 0 : currentRotation;
+        const viewport = page.getViewport({ scale, rotation: textRotation });
         await renderTextLayer(page, textLayerRef.current, viewport);
       }
       
@@ -1542,9 +1544,16 @@ export default function Home() {
         setEditingTextId(null);
 
         // 注釈を再描画（表示サイズで描画）
+        // まずキャンバスをクリアしてから再描画（他のページの注釈が残らないように）
         const inkCtx = inkCanvas.getContext('2d');
         if (inkCtx) {
           // devicePixelRatioを考慮してスケールを設定
+          inkCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+          // キャンバスをクリアしてから再描画
+          inkCtx.save();
+          inkCtx.setTransform(1, 0, 0, 1, 0, 0);
+          inkCtx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
+          inkCtx.restore();
           inkCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
           redrawStrokes(inkCtx, savedStrokes, size.width, size.height);
         }
@@ -1553,6 +1562,11 @@ export default function Home() {
         if (textCanvasRef.current) {
           const textCtx = textCanvasRef.current.getContext('2d');
           if (textCtx) {
+            // キャンバスをクリアしてから再描画
+            textCtx.save();
+            textCtx.setTransform(1, 0, 0, 1, 0, 0);
+            textCtx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
+            textCtx.restore();
             textCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
             redrawTextAnnotations(textCtx, savedTexts, size.width, size.height);
           }
@@ -1562,6 +1576,11 @@ export default function Home() {
         if (shapeCanvasRef.current) {
           const shapeCtx = shapeCanvasRef.current.getContext('2d');
           if (shapeCtx) {
+            // キャンバスをクリアしてから再描画
+            shapeCtx.save();
+            shapeCtx.setTransform(1, 0, 0, 1, 0, 0);
+            shapeCtx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
+            shapeCtx.restore();
             shapeCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
             redrawShapeAnnotations(shapeCtx, savedShapes, size.width, size.height).catch(console.error);
           }
@@ -3617,26 +3636,34 @@ export default function Home() {
   };
 
   // 目次からページにジャンプ
-  const handleJumpToPage = (page: number) => {
+  const handleJumpToPage = async (page: number) => {
     console.log('目次ジャンプ デバッグ: ページ番号', page, 'pageOrder', pageOrder);
     // pageOrderが設定されている場合、実際のページ番号から表示順序のインデックスに変換
+    let newPage: number;
     if (pageOrder.length > 0) {
       const displayIndex = pageOrder.indexOf(page) + 1;
       console.log('目次ジャンプ デバッグ: displayIndex', displayIndex);
       if (displayIndex > 0) {
-        setCurrentPage(displayIndex);
+        newPage = displayIndex;
         console.log('目次ジャンプ デバッグ: currentPageを', displayIndex, 'に設定');
       } else {
         // pageOrderに含まれていない場合は、そのまま使用
-        setCurrentPage(page);
+        newPage = page;
         console.log('目次ジャンプ デバッグ: currentPageを', page, 'に設定（pageOrderに含まれていない）');
       }
     } else {
-      setCurrentPage(page);
+      newPage = page;
       console.log('目次ジャンプ デバッグ: currentPageを', page, 'に設定（pageOrderなし）');
     }
+    setCurrentPage(newPage);
     setShowTableOfContentsDialog(false);
     console.log('目次ジャンプ デバッグ: ダイアログを閉じました');
+    // 確実にページをレンダリング
+    if (pdfDoc) {
+      setTimeout(async () => {
+        await renderCurrentPage();
+      }, 0);
+    }
   };
 
   // 目次見出しの編集を開始
@@ -4049,15 +4076,34 @@ export default function Home() {
     isClearingRef.current = false;
     
     // 少し待ってからrenderCurrentPage()を呼ぶ（状態更新を待つ）
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, 100));
     
     try {
       await renderCurrentPage();
-      // renderCurrentPage()が完了した後、再度状態をクリア（念のため）
-      // データベースから空の配列が読み込まれているはずだが、確実にするため
-      setStrokes([]);
-      setTextAnnotations([]);
-      setShapeAnnotations([]);
+      // renderCurrentPage()が完了した後、データベースから空の配列が読み込まれているはず
+      // 念のため、再度確認して状態をクリア
+      const verifyStrokesAfter = await loadAnnotations(docId, actualPageNum);
+      const verifyTextsAfter = await loadTextAnnotations(docId, actualPageNum);
+      const verifyShapesAfter = await loadShapeAnnotations(docId, actualPageNum);
+      if (verifyStrokesAfter.length === 0 && verifyTextsAfter.length === 0 && verifyShapesAfter.length === 0) {
+        setStrokes([]);
+        setTextAnnotations([]);
+        setShapeAnnotations([]);
+        console.log('handleClear: データベースが空であることを確認し、状態をクリア');
+      } else {
+        console.warn('handleClear: データベースが空でない', { 
+          strokes: verifyStrokesAfter.length, 
+          texts: verifyTextsAfter.length, 
+          shapes: verifyShapesAfter.length 
+        });
+        // データベースが空でない場合は、再度削除を試みる
+        await deleteAnnotations(docId, actualPageNum);
+        await deleteTextAnnotations(docId, actualPageNum);
+        await deleteShapeAnnotations(docId, actualPageNum);
+        setStrokes([]);
+        setTextAnnotations([]);
+        setShapeAnnotations([]);
+      }
     } catch (error) {
       console.error('handleClear: ページ再レンダリングエラー', error);
       // エラーが発生しても状態はクリア済みなので、useEffectで再レンダリングされる
@@ -5642,35 +5688,51 @@ export default function Home() {
                     
                     {/* サムネイル画像 */}
                     <div
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
                         e.preventDefault();
                         // 1クリックでメイン画面のスライドを指定（サムネイルは閉じない）
+                        let newPage: number;
                         if (pageOrder.length > 0) {
                           const displayIndex = pageOrder.indexOf(pageNum);
                           if (displayIndex >= 0) {
-                            setCurrentPage(displayIndex + 1);
+                            newPage = displayIndex + 1;
                           } else {
-                            setCurrentPage(pageNum);
+                            newPage = pageNum;
                           }
                         } else {
-                          setCurrentPage(pageNum);
+                          newPage = pageNum;
+                        }
+                        setCurrentPage(newPage);
+                        // 確実にページをレンダリング
+                        if (pdfDoc) {
+                          setTimeout(async () => {
+                            await renderCurrentPage();
+                          }, 0);
                         }
                         // サムネイルモーダルは閉じない
                       }}
-                      onDoubleClick={(e) => {
+                      onDoubleClick={async (e) => {
                         e.stopPropagation();
                         e.preventDefault();
                         // ダブルクリックでメイン画面のスライドを指定してサムネイルを閉じる
+                        let newPage: number;
                         if (pageOrder.length > 0) {
                           const displayIndex = pageOrder.indexOf(pageNum);
                           if (displayIndex >= 0) {
-                            setCurrentPage(displayIndex + 1);
+                            newPage = displayIndex + 1;
                           } else {
-                            setCurrentPage(pageNum);
+                            newPage = pageNum;
                           }
                         } else {
-                          setCurrentPage(pageNum);
+                          newPage = pageNum;
+                        }
+                        setCurrentPage(newPage);
+                        // 確実にページをレンダリング
+                        if (pdfDoc) {
+                          setTimeout(async () => {
+                            await renderCurrentPage();
+                          }, 0);
                         }
                         setShowThumbnailModal(false);
                       }}
