@@ -2829,10 +2829,20 @@ export default function Home() {
         const textNormalizedX = boundingBox.x / pageSize.width;
         const textNormalizedY = boundingBox.y / pageSize.height;
         
-        // フォントサイズを実際の描画スケールに合わせる
-        // textItem.fontSizeはviewport座標系（scale=1.0）でのサイズなので、
-        // 実際の描画スケール（scale）を考慮する必要はない（canvasのサイズが既にスケールされているため）
-        const actualFontSize = textItem?.fontSize || 12;
+        // フォントサイズを実際のテキストの高さから逆算する（より正確）
+        // boundingBox.heightは実際のテキストの高さなので、それをフォントサイズとして使用
+        // ただし、テキストの高さは通常フォントサイズの約1.2倍なので、調整する
+        const actualFontSize = textItem?.fontSize || (boundingBox.height / 1.2);
+        
+        console.log('ハイライト: テキスト情報', {
+          text: textItem?.str,
+          boundingBoxHeight: boundingBox.height,
+          fontSize: textItem?.fontSize,
+          actualFontSize,
+          fontName: textItem?.fontName,
+          textX: textNormalizedX,
+          textY: textNormalizedY
+        });
         
         const stroke: Stroke = {
           id: `stroke-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
