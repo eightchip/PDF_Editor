@@ -65,6 +65,26 @@ export function drawStroke(
       const rectH = maxY - minY;
       
       ctx.fillRect(rectX, rectY, rectW, rectH);
+      
+      // テキスト情報がある場合は、テキストを描画（元のテキストと同じフォント・サイズで）
+      if (stroke.text && stroke.fontName && stroke.fontSize && stroke.textX !== undefined && stroke.textY !== undefined) {
+        ctx.save();
+        // テキスト描画用の設定
+        ctx.globalAlpha = 1.0; // テキストは不透明
+        ctx.globalCompositeOperation = 'source-over'; // 通常の描画モード
+        ctx.fillStyle = '#000000'; // テキストは黒色
+        ctx.font = `${stroke.fontSize}px ${stroke.fontName}`;
+        ctx.textBaseline = 'top'; // 上端基準
+        ctx.textAlign = 'left'; // 左揃え
+        
+        // テキストの位置を計算（正規化座標から実際の座標へ）
+        const textX = stroke.textX * canvasWidth;
+        const textY = stroke.textY * canvasHeight;
+        
+        // テキストを描画
+        ctx.fillText(stroke.text, textX, textY);
+        ctx.restore();
+      }
     } else {
       // 従来のストローク描画（後方互換性のため）
       ctx.strokeStyle = stroke.color;

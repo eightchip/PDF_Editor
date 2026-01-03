@@ -9,6 +9,8 @@ export interface TextItem {
   width: number;
   height: number;
   transform: number[];
+  fontName?: string; // フォント名
+  fontSize?: number; // フォントサイズ
 }
 
 /**
@@ -61,6 +63,10 @@ export async function extractTextItems(
       const adjustedHeight = height * 1.15; // ディセンダーを含めるため、heightを15%増やす
       const y = viewportY - adjustedHeight + (adjustedHeight * 0.05); // テキストの上端を計算（少し下に調整）
 
+      // フォント情報を取得
+      const fontSize = (item as any).fontSize || 12;
+      const fontName = (item as any).fontName || 'Arial'; // デフォルトフォント
+      
       textItems.push({
         str: item.str,
         x,
@@ -68,6 +74,8 @@ export async function extractTextItems(
         width,
         height: adjustedHeight, // 調整後のheightを使用
         transform,
+        fontName,
+        fontSize,
       });
     }
   }
@@ -119,7 +127,7 @@ export function findTextBoundingBox(
   x: number,
   y: number,
   threshold: number = 30
-): { x: number; y: number; width: number; height: number } | null {
+): { x: number; y: number; width: number; height: number; textItem?: TextItem } | null {
   // 最も近いテキストアイテムを見つける
   let nearestItem: TextItem | null = null;
   let minDistance = threshold;
@@ -147,12 +155,13 @@ export function findTextBoundingBox(
 
   if (!nearestItem) return null;
 
-  // クリックしたテキストアイテムのみのバウンディングボックスを返す
+  // クリックしたテキストアイテムのみのバウンディングボックスを返す（テキストアイテムも含める）
   return {
     x: nearestItem.x,
     y: nearestItem.y,
     width: nearestItem.width,
     height: nearestItem.height,
+    textItem: nearestItem,
   };
 }
 

@@ -6,7 +6,13 @@ export type Stroke = {
   tool: 'pen' | 'eraser' | 'highlight'; 
   color: string; 
   width: number; 
-  points: Point[] 
+  points: Point[];
+  // ハイライト用のテキスト情報（オプション）
+  text?: string; // 埋め込むテキスト
+  fontName?: string; // フォント名
+  fontSize?: number; // フォントサイズ
+  textX?: number; // テキストのX座標（0..1の比率）
+  textY?: number; // テキストのY座標（0..1の比率）
 };
 
 export type TextAnnotation = {

@@ -2759,6 +2759,8 @@ export default function Home() {
         const normalizedX2 = (boundingBox.x + boundingBox.width) / pageSize.width;
         const normalizedY2 = (boundingBox.y + boundingBox.height + heightAdjustment) / pageSize.height;
 
+        // テキスト情報を取得（テキスト埋め込み用）
+        const textItem = boundingBox.textItem;
         const stroke: Stroke = {
           id: `stroke-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           tool: 'highlight',
@@ -2770,6 +2772,12 @@ export default function Home() {
             { x: normalizedX2, y: normalizedY2 },
             { x: normalizedX1, y: normalizedY2 },
           ],
+          // テキスト情報を保存（テキスト埋め込み用）
+          text: textItem?.str || '',
+          fontName: textItem?.fontName || 'Arial',
+          fontSize: textItem?.fontSize || 12,
+          textX: normalizedX1,
+          textY: normalizedY1,
         };
 
         // ストロークを即座に確定
