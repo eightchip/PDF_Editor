@@ -204,6 +204,8 @@ export default function Home() {
   const [watermarkAngle, setWatermarkAngle] = useState(45); // 透かしの角度（度）
   const [watermarkOpacity, setWatermarkOpacity] = useState(0.5); // 透かしの濃度（0-1、デフォルト0.5）
   const [watermarkFontSize, setWatermarkFontSize] = useState(0.1); // 透かしのフォントサイズ（ページサイズに対する比率、デフォルト0.1=10%）
+  const [watermarkOffsetX, setWatermarkOffsetX] = useState(0); // 透かしのX方向オフセット（ピクセル、デフォルト0）
+  const [watermarkOffsetY, setWatermarkOffsetY] = useState(0); // 透かしのY方向オフセット（ピクセル、デフォルト0）
   const [showWatermarkPreview, setShowWatermarkPreview] = useState(false); // 透かしプレビューの表示状態
   const [watermarkPdfPreviewUrl, setWatermarkPdfPreviewUrl] = useState<string | null>(null); // 透かしPDFプレビューのURL
   const [showThumbnails, setShowThumbnails] = useState(false);
@@ -1267,6 +1269,8 @@ export default function Home() {
     const angle = watermarkAngle ?? 45; // 0度も有効な値として扱うため、??を使用
     const opacity = watermarkOpacity ?? 0.5; // 濃度（0-1）
     const fontSizeRatio = watermarkFontSize ?? 0.1; // フォントサイズ比率（デフォルト0.1=10%）
+    const offsetX = watermarkOffsetX || 0; // X方向オフセット（ピクセル）
+    const offsetY = watermarkOffsetY || 0; // Y方向オフセット（ピクセル）
     
     const fontSize = Math.min(canvasWidth, canvasHeight) * fontSizeRatio;
     ctx.font = `${fontSize}px Arial, sans-serif`;
@@ -1292,7 +1296,7 @@ export default function Home() {
     } else if (pattern === 'bottom-right') {
       // 右下1箇所（Canvas座標系では下から15% = 上から85%）
       ctx.save();
-      ctx.translate(canvasWidth * 0.85, canvasHeight * 0.85);
+      ctx.translate(canvasWidth * 0.85 + watermarkOffsetX, canvasHeight * 0.85 - watermarkOffsetY);
       if (angle !== 0) {
         ctx.rotate(angle * Math.PI / 180);
       }
@@ -1301,7 +1305,7 @@ export default function Home() {
     } else if (pattern === 'top-right') {
       // 右上1箇所（Canvas座標系では上から15% = 下から85%）
       ctx.save();
-      ctx.translate(canvasWidth * 0.85, canvasHeight * 0.15);
+      ctx.translate(canvasWidth * 0.85 + watermarkOffsetX, canvasHeight * 0.15 - watermarkOffsetY);
       if (angle !== 0) {
         ctx.rotate(angle * Math.PI / 180);
       }
@@ -1310,7 +1314,7 @@ export default function Home() {
     } else if (pattern === 'bottom-left') {
       // 左下1箇所（Canvas座標系では下から15% = 上から85%）
       ctx.save();
-      ctx.translate(canvasWidth * 0.15, canvasHeight * 0.85);
+      ctx.translate(canvasWidth * 0.15 + watermarkOffsetX, canvasHeight * 0.85 - watermarkOffsetY);
       if (angle !== 0) {
         ctx.rotate(angle * Math.PI / 180);
       }
@@ -1319,7 +1323,7 @@ export default function Home() {
     } else if (pattern === 'top-left') {
       // 左上1箇所（Canvas座標系では上から15% = 下から85%）
       ctx.save();
-      ctx.translate(canvasWidth * 0.15, canvasHeight * 0.15);
+      ctx.translate(canvasWidth * 0.15 + watermarkOffsetX, canvasHeight * 0.15 - watermarkOffsetY);
       if (angle !== 0) {
         ctx.rotate(angle * Math.PI / 180);
       }
@@ -1364,7 +1368,7 @@ export default function Home() {
     }
     
     ctx.restore();
-  }, [watermarkText, showWatermarkPreview, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, watermarkFontSize]);
+  }, [watermarkText, showWatermarkPreview, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, watermarkFontSize, watermarkOffsetX, watermarkOffsetY]);
 
   // スライドショーモードが変更されたときに再レンダリング
   useEffect(() => {
@@ -2023,7 +2027,7 @@ export default function Home() {
       };
       checkAndRender();
     }
-  }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, watermarkFontSize, drawWatermarkOnCanvas, snapToTextEnabled, textSelectionEnabled, isPresentationMode, showThumbnailModal, showTableOfContentsDialog]);
+  }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, watermarkFontSize, watermarkOffsetX, watermarkOffsetY, drawWatermarkOnCanvas, snapToTextEnabled, textSelectionEnabled, isPresentationMode, showThumbnailModal, showTableOfContentsDialog]);
   
   // モーダルが閉じたときに再レンダリング（メイン画面用、プレゼンモードは除外）
   useEffect(() => {
@@ -2094,7 +2098,136 @@ export default function Home() {
         }
       }
     }
-  }, [strokes, pageSize, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, watermarkFontSize, drawWatermarkOnCanvas]);
+  }, [strokes, pageSize, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, watermarkFontSize, watermarkOffsetX, watermarkOffsetY, drawWatermarkOnCanvas]);
+
+  // 透かしの設定変更時にリアルタイムでプレビューを更新
+  useEffect(() => {
+    if (!showWatermarkPreview || !watermarkPdfPreviewUrl || !pdfDoc || !watermarkText.trim() || !docId || !pageSize || !originalPdfBytes) {
+      return;
+    }
+
+    // デバウンス: 500ms後に実行
+    const timeoutId = setTimeout(async () => {
+      try {
+        // 現在のページの注釈を取得
+        const actualPageNum = getActualPageNum(currentPage);
+        const pageAnnotations = await loadAnnotations(docId, actualPageNum);
+        const pageTextAnnotations = await loadTextAnnotations(docId, actualPageNum);
+        const pageShapeAnnotations = await loadShapeAnnotations(docId, actualPageNum);
+        
+        // PDFをエクスポート（透かしを含む）
+        const pdfBytes = await exportAnnotatedPDFV2(
+          originalPdfBytes,
+          { [currentPage]: pageAnnotations },
+          { [currentPage]: pageSize },
+          { [currentPage]: pageTextAnnotations },
+          { [currentPage]: pageShapeAnnotations },
+          undefined,
+          undefined,
+          undefined,
+          watermarkText || undefined,
+          undefined,
+          watermarkPattern,
+          watermarkDensity,
+          watermarkAngle,
+          watermarkOpacity,
+          watermarkFontSize,
+          watermarkOffsetX,
+          watermarkOffsetY
+        );
+        
+        // PDFプレビュー用のURLを生成
+        const arrayBuffer = pdfBytes.buffer instanceof ArrayBuffer 
+          ? pdfBytes.buffer 
+          : new Uint8Array(pdfBytes).buffer;
+        const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        if (watermarkPdfPreviewUrl) {
+          URL.revokeObjectURL(watermarkPdfPreviewUrl);
+        }
+        setWatermarkPdfPreviewUrl(url);
+      } catch (error) {
+        console.error('透かしリアルタイムプレビュー更新エラー:', error);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, watermarkFontSize, watermarkOffsetX, watermarkOffsetY, showWatermarkPreview, pdfDoc, docId, pageSize, originalPdfBytes, currentPage]);
+
+  // 署名の位置・サイズ変更時にリアルタイムでプレビューを更新
+  useEffect(() => {
+    if (!showSignaturePreview || !pdfDoc || !signatureName.trim() || !docId || !pageSize || !originalPdfBytes) {
+      return;
+    }
+    
+    // 初回はプレビューを生成しない（ボタンで生成）
+    if (!signaturePdfPreviewUrl) {
+      return;
+    }
+
+    // デバウンス: 500ms後に実行
+    const timeoutId = setTimeout(async () => {
+      try {
+        const previewSignature: Signature = {
+          id: generateSignatureId(),
+          signerName: signatureName,
+          signerEmail: signatureEmail || undefined,
+          signDate: new Date(),
+          signatureImage: signatureImage || undefined,
+          signatureText: signatureText || undefined,
+          position: {
+            pageNumber: currentPage,
+            x: signatureX,
+            y: signatureY,
+            width: signatureWidth,
+            height: signatureHeight,
+          },
+          reason: signatureReason || undefined,
+          location: signatureLocation || undefined,
+          imageWidth: signatureImageScale,
+          imageHeight: signatureImageScale,
+          fontSize: signatureFontSize,
+        };
+        
+        // 現在のページの注釈を取得
+        const actualPageNum = getActualPageNum(currentPage);
+        const pageAnnotations = await loadAnnotations(docId, actualPageNum);
+        const pageTextAnnotations = await loadTextAnnotations(docId, actualPageNum);
+        const pageShapeAnnotations = await loadShapeAnnotations(docId, actualPageNum);
+        
+        // PDFをエクスポート（署名を含む）
+        const pdfBytes = await exportAnnotatedPDFV2(
+          originalPdfBytes,
+          { [currentPage]: pageAnnotations },
+          { [currentPage]: pageSize },
+          { [currentPage]: pageTextAnnotations },
+          { [currentPage]: pageShapeAnnotations },
+          undefined,
+          undefined,
+          [previewSignature]
+        );
+        
+        // PDFプレビュー用のURLを生成
+        const arrayBuffer = pdfBytes.buffer instanceof ArrayBuffer 
+          ? pdfBytes.buffer 
+          : new Uint8Array(pdfBytes).buffer;
+        const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        // 古いURLをクリーンアップ（非同期で実行）
+        setSignaturePdfPreviewUrl(prevUrl => {
+          if (prevUrl) {
+            // 次のレンダリングサイクルでクリーンアップ
+            setTimeout(() => URL.revokeObjectURL(prevUrl), 100);
+          }
+          return url;
+        });
+      } catch (error) {
+        console.error('リアルタイムプレビュー更新エラー:', error);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [signatureX, signatureY, signatureWidth, signatureHeight, signatureImageScale, signatureFontSize, showSignaturePreview, pdfDoc, signatureName, docId, pageSize, originalPdfBytes, currentPage, signatureEmail, signatureImage, signatureText, signatureReason, signatureLocation]);
 
   // サムネイル生成（注釈なし）
   const generateThumbnails = async () => {
@@ -5166,7 +5299,9 @@ export default function Home() {
         watermarkDensity,
         watermarkAngle,
         watermarkOpacity,
-        watermarkFontSize
+        watermarkFontSize,
+        watermarkOffsetX,
+        watermarkOffsetY
       );
 
       return pdfBytes;
@@ -9572,12 +9707,12 @@ export default function Home() {
         }}
       >
         <DialogContent 
-          topPosition="top-[15%]"
-          className="max-w-2xl max-h-[85vh] flex flex-col"
+          topPosition="top-[5%]"
+          className="max-w-2xl max-h-[90vh] flex flex-col"
           style={{
             zIndex: 10001,
             left: '50%',
-            top: '15%',
+            top: '5%',
             transform: 'translateX(-50%) translateY(0)',
             background: 'linear-gradient(135deg, #dbeafe 0%, #e0f2fe 50%, #bae6fd 100%)',
           }}
@@ -9809,9 +9944,9 @@ export default function Home() {
               </div>
               {showSignaturePreview && signaturePdfPreviewUrl && (
                 <div className="p-4 bg-white/60 rounded-lg border-2 border-slate-200">
-                  <label className="block text-sm font-semibold text-slate-800 mb-2">PDFプレビュー</label>
+                  <label className="block text-sm font-semibold text-slate-800 mb-2">PDFプレビュー（1ページ目）</label>
                   <iframe
-                    src={signaturePdfPreviewUrl}
+                    src={`${signaturePdfPreviewUrl}#page=1`}
                     className="w-full h-96 border-2 border-slate-300 rounded-lg"
                     title="署名PDFプレビュー"
                   />
@@ -9821,6 +9956,7 @@ export default function Home() {
                       if (signaturePdfPreviewUrl) {
                         URL.revokeObjectURL(signaturePdfPreviewUrl);
                         setSignaturePdfPreviewUrl(null);
+                        setShowSignaturePreview(false);
                       }
                     }}
                     variant="outline"
@@ -11697,6 +11833,70 @@ export default function Home() {
                 ))}
               </div>
             </div>
+            {(watermarkPattern === 'bottom-left' || watermarkPattern === 'bottom-right' || watermarkPattern === 'top-left' || watermarkPattern === 'top-right') && (
+              <div className="p-4 bg-white/60 rounded-lg border-2 border-slate-200">
+                <label className="block text-sm font-semibold text-slate-800 mb-3">
+                  X方向オフセット: {watermarkOffsetX}px (右方向が正)
+                </label>
+                <div className="flex items-center gap-4 mb-3">
+                  <input
+                    type="range"
+                    min="-200"
+                    max="200"
+                    step="1"
+                    value={watermarkOffsetX}
+                    onChange={(e) => setWatermarkOffsetX(parseInt(e.target.value))}
+                    className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-500"
+                  />
+                  <Input
+                    type="number"
+                    min="-200"
+                    max="200"
+                    value={watermarkOffsetX}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      setWatermarkOffsetX(Math.max(-200, Math.min(200, val)));
+                    }}
+                    className="w-24 px-3 py-2 text-base border-2 border-slate-300 rounded-lg bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-200"
+                  />
+                </div>
+                <label className="block text-sm font-semibold text-slate-800 mb-3 mt-4">
+                  Y方向オフセット: {watermarkOffsetY}px (上方向が正)
+                </label>
+                <div className="flex items-center gap-4 mb-3">
+                  <input
+                    type="range"
+                    min="-200"
+                    max="200"
+                    step="1"
+                    value={watermarkOffsetY}
+                    onChange={(e) => setWatermarkOffsetY(parseInt(e.target.value))}
+                    className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-500"
+                  />
+                  <Input
+                    type="number"
+                    min="-200"
+                    max="200"
+                    value={watermarkOffsetY}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      setWatermarkOffsetY(Math.max(-200, Math.min(200, val)));
+                    }}
+                    className="w-24 px-3 py-2 text-base border-2 border-slate-300 rounded-lg bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-200"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWatermarkOffsetX(0);
+                    setWatermarkOffsetY(0);
+                  }}
+                  className="px-3 py-1.5 text-xs font-semibold border-2 border-slate-300 rounded-lg bg-white hover:bg-teal-50 hover:border-teal-400 transition-all shadow-sm"
+                >
+                  リセット
+                </button>
+              </div>
+            )}
             <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg border-2 border-slate-200">
               <input
                 type="checkbox"
@@ -11711,9 +11911,9 @@ export default function Home() {
             </div>
             {watermarkPdfPreviewUrl && (
               <div className="p-4 bg-white/60 rounded-lg border-2 border-slate-200">
-                <label className="block text-sm font-semibold text-slate-800 mb-2">PDFプレビュー</label>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">PDFプレビュー（1ページ目）</label>
                 <iframe
-                  src={watermarkPdfPreviewUrl}
+                  src={`${watermarkPdfPreviewUrl}#page=1`}
                   className="w-full h-96 border-2 border-slate-300 rounded-lg"
                   title="透かしPDFプレビュー"
                 />
