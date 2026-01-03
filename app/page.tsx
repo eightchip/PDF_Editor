@@ -1492,6 +1492,12 @@ export default function Home() {
 
       // キャンバスを完全にリセット（前のレンダリングタスクがキャンバスを使用できなくする）
       // 新しいキャンバスコンテキストを取得するために、一度サイズを0にリセット
+      // プレゼンモードでない場合は、メイン画面のキャンバスを確実に表示
+      if (!isPresentationMode) {
+        pdfCanvas.style.display = 'block';
+        pdfCanvas.style.visibility = 'visible';
+        pdfCanvas.style.opacity = '1';
+      }
       const oldWidth = pdfCanvas.width;
       const oldHeight = pdfCanvas.height;
       pdfCanvas.width = 0;
@@ -1713,7 +1719,14 @@ export default function Home() {
     // pdfDocが有効な場合のみレンダリング
     if (pdfDoc && pdfDoc.numPages > 0 && currentPage > 0 && currentPage <= pdfDoc.numPages) {
       console.log('useEffect: currentPage変更を検知、renderCurrentPage()を呼び出し', { currentPage, isPresentationMode });
-      renderCurrentPage();
+      // 確実に実行されるように、少し待ってから呼び出す
+      const timer = setTimeout(() => {
+        console.log('useEffect: renderCurrentPage()を実行', { currentPage });
+        renderCurrentPage().catch(error => {
+          console.error('useEffect: renderCurrentPage()エラー', error);
+        });
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, drawWatermarkOnCanvas, snapToTextEnabled, textSelectionEnabled, isPresentationMode]);
 
