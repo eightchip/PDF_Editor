@@ -1386,8 +1386,10 @@ export default function Home() {
     try {
       // pageOrderが設定されている場合は、表示順序から実際のページ番号に変換
       const actualPageNum = getActualPageNum(currentPage);
-      console.log('renderCurrentPage:', { currentPage, actualPageNum, totalPages: pdfDoc.numPages });
-      const page = await pdfDoc.getPage(actualPageNum);
+      // PDF.jsは0ベースのインデックスを期待するので、-1して変換
+      const pageIndex = actualPageNum - 1;
+      console.log('renderCurrentPage:', { currentPage, actualPageNum, pageIndex, totalPages: pdfDoc.numPages });
+      const page = await pdfDoc.getPage(pageIndex);
       const pdfCanvas = pdfCanvasRef.current;
       const inkCanvas = inkCanvasRef.current;
 
@@ -2992,32 +2994,18 @@ export default function Home() {
   };
 
   // 前のページ
-  const goToPrevPage = async () => {
+  const goToPrevPage = () => {
     if (currentPage > 1) {
-      const newPage = currentPage - 1;
-      setCurrentPage(newPage);
-      // useEffectで自動的にrenderCurrentPage()が呼ばれるが、確実に反映させるため明示的に呼ぶ
-      if (pdfDoc) {
-        // 少し待ってからレンダリング（状態更新を待つ）
-        setTimeout(async () => {
-          await renderCurrentPage();
-        }, 0);
-      }
+      setCurrentPage(currentPage - 1);
+      // useEffectで自動的にrenderCurrentPage()が呼ばれる
     }
   };
 
   // 次のページ
-  const goToNextPage = async () => {
+  const goToNextPage = () => {
     if (pdfDoc && currentPage < totalPages) {
-      const newPage = currentPage + 1;
-      setCurrentPage(newPage);
-      // useEffectで自動的にrenderCurrentPage()が呼ばれるが、確実に反映させるため明示的に呼ぶ
-      if (pdfDoc) {
-        // 少し待ってからレンダリング（状態更新を待つ）
-        setTimeout(async () => {
-          await renderCurrentPage();
-        }, 0);
-      }
+      setCurrentPage(currentPage + 1);
+      // useEffectで自動的にrenderCurrentPage()が呼ばれる
     }
   };
 
@@ -3636,7 +3624,7 @@ export default function Home() {
   };
 
   // 目次からページにジャンプ
-  const handleJumpToPage = async (page: number) => {
+  const handleJumpToPage = (page: number) => {
     console.log('目次ジャンプ デバッグ: ページ番号', page, 'pageOrder', pageOrder);
     // pageOrderが設定されている場合、実際のページ番号から表示順序のインデックスに変換
     let newPage: number;
@@ -3658,12 +3646,7 @@ export default function Home() {
     setCurrentPage(newPage);
     setShowTableOfContentsDialog(false);
     console.log('目次ジャンプ デバッグ: ダイアログを閉じました');
-    // 確実にページをレンダリング
-    if (pdfDoc) {
-      setTimeout(async () => {
-        await renderCurrentPage();
-      }, 0);
-    }
+    // useEffectで自動的にrenderCurrentPage()が呼ばれる
   };
 
   // 目次見出しの編集を開始
@@ -4070,44 +4053,34 @@ export default function Home() {
     
     console.log('handleClear: 状態をクリア完了');
     
-    // ページを再レンダリングして、空の状態を反映
-    // フラグをfalseにリセットしてからrenderCurrentPage()を呼ぶ
-    // これにより、データベースから空の配列が読み込まれる（既に削除済み）
+    // フラグをリセット（次のページ遷移時に正常に動作するように）
     isClearingRef.current = false;
     
-    // 少し待ってからrenderCurrentPage()を呼ぶ（状態更新を待つ）
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // データベースが空であることを再確認
+    const finalVerifyStrokes = await loadAnnotations(docId, actualPageNum);
+    const finalVerifyTexts = await loadTextAnnotations(docId, actualPageNum);
+    const finalVerifyShapes = await loadShapeAnnotations(docId, actualPageNum);
     
-    try {
-      await renderCurrentPage();
-      // renderCurrentPage()が完了した後、データベースから空の配列が読み込まれているはず
-      // 念のため、再度確認して状態をクリア
-      const verifyStrokesAfter = await loadAnnotations(docId, actualPageNum);
-      const verifyTextsAfter = await loadTextAnnotations(docId, actualPageNum);
-      const verifyShapesAfter = await loadShapeAnnotations(docId, actualPageNum);
-      if (verifyStrokesAfter.length === 0 && verifyTextsAfter.length === 0 && verifyShapesAfter.length === 0) {
-        setStrokes([]);
-        setTextAnnotations([]);
-        setShapeAnnotations([]);
-        console.log('handleClear: データベースが空であることを確認し、状態をクリア');
-      } else {
-        console.warn('handleClear: データベースが空でない', { 
-          strokes: verifyStrokesAfter.length, 
-          texts: verifyTextsAfter.length, 
-          shapes: verifyShapesAfter.length 
-        });
-        // データベースが空でない場合は、再度削除を試みる
-        await deleteAnnotations(docId, actualPageNum);
-        await deleteTextAnnotations(docId, actualPageNum);
-        await deleteShapeAnnotations(docId, actualPageNum);
-        setStrokes([]);
-        setTextAnnotations([]);
-        setShapeAnnotations([]);
-      }
-    } catch (error) {
-      console.error('handleClear: ページ再レンダリングエラー', error);
-      // エラーが発生しても状態はクリア済みなので、useEffectで再レンダリングされる
-      isClearingRef.current = false;
+    if (finalVerifyStrokes.length > 0 || finalVerifyTexts.length > 0 || finalVerifyShapes.length > 0) {
+      console.warn('handleClear: データベースがまだ空でない、再度削除を試みる', { 
+        strokes: finalVerifyStrokes.length, 
+        texts: finalVerifyTexts.length, 
+        shapes: finalVerifyShapes.length 
+      });
+      // 再度削除を試みる
+      await deleteAnnotations(docId, actualPageNum);
+      await deleteTextAnnotations(docId, actualPageNum);
+      await deleteShapeAnnotations(docId, actualPageNum);
+      // 状態を確実にクリア
+      setStrokes([]);
+      setTextAnnotations([]);
+      setShapeAnnotations([]);
+    } else {
+      // データベースが空であることを確認
+      setStrokes([]);
+      setTextAnnotations([]);
+      setShapeAnnotations([]);
+      console.log('handleClear: データベースが空であることを確認し、状態をクリア');
     }
     
     console.log('handleClear: 完了');
@@ -5688,7 +5661,7 @@ export default function Home() {
                     
                     {/* サムネイル画像 */}
                     <div
-                      onClick={async (e) => {
+                      onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
                         // 1クリックでメイン画面のスライドを指定（サムネイルは閉じない）
@@ -5704,15 +5677,10 @@ export default function Home() {
                           newPage = pageNum;
                         }
                         setCurrentPage(newPage);
-                        // 確実にページをレンダリング
-                        if (pdfDoc) {
-                          setTimeout(async () => {
-                            await renderCurrentPage();
-                          }, 0);
-                        }
+                        // useEffectで自動的にrenderCurrentPage()が呼ばれる
                         // サムネイルモーダルは閉じない
                       }}
-                      onDoubleClick={async (e) => {
+                      onDoubleClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
                         // ダブルクリックでメイン画面のスライドを指定してサムネイルを閉じる
@@ -5728,12 +5696,7 @@ export default function Home() {
                           newPage = pageNum;
                         }
                         setCurrentPage(newPage);
-                        // 確実にページをレンダリング
-                        if (pdfDoc) {
-                          setTimeout(async () => {
-                            await renderCurrentPage();
-                          }, 0);
-                        }
+                        // useEffectで自動的にrenderCurrentPage()が呼ばれる
                         setShowThumbnailModal(false);
                       }}
                       className="relative cursor-pointer group"
