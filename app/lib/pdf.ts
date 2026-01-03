@@ -124,6 +124,7 @@ export async function renderPage(
   const renderContext = {
     canvasContext: context,
     viewport: viewport,
+    canvas: canvas,
   };
 
   // 新しいレンダリングタスクを開始
