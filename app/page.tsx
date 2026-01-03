@@ -1410,13 +1410,27 @@ export default function Home() {
       isPresentationMode 
     });
     
-    if (!pdfDoc || !pdfCanvasRef.current || !inkCanvasRef.current) {
-      console.warn('renderCurrentPage: 早期リターン', { 
-        hasPdfDoc: !!pdfDoc, 
+    // キャンバスが取得できない場合、少し待ってから再試行（モーダルが開いている場合など）
+    if (!pdfDoc) {
+      console.warn('renderCurrentPage: pdfDocがありません');
+      return;
+    }
+    
+    if (!pdfCanvasRef.current || !inkCanvasRef.current) {
+      console.warn('renderCurrentPage: キャンバスが取得できません、再試行します', { 
         hasPdfCanvas: !!pdfCanvasRef.current, 
         hasInkCanvas: !!inkCanvasRef.current 
       });
-      return;
+      // 少し待ってから再試行（モーダルが閉じるのを待つ）
+      await new Promise(resolve => setTimeout(resolve, 100));
+      if (!pdfCanvasRef.current || !inkCanvasRef.current) {
+        console.warn('renderCurrentPage: 再試行後もキャンバスが取得できません', { 
+          hasPdfCanvas: !!pdfCanvasRef.current, 
+          hasInkCanvas: !!inkCanvasRef.current 
+        });
+        return;
+      }
+      console.log('renderCurrentPage: 再試行でキャンバスを取得しました');
     }
 
     // プレゼンモード中でもレンダリングを実行（プレゼンモード用の表示のため）
