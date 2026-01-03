@@ -1394,8 +1394,8 @@ export default function Home() {
       // スライドショーモードの場合は、画面に収まるようにスケールを計算
       let renderScale = scale;
       if (isPresentationMode) {
-        // actualPageNumは1ベースの実際のページ番号なので、そのままpageRotationsを参照
-        const viewport = page.getViewport({ scale: 1.0, rotation: pageRotations[actualPageNum] || 0 });
+        // プレゼンモードでは回転0でビューポートを取得（回転を適用しない）
+        const viewport = page.getViewport({ scale: 1.0, rotation: 0 });
         const maxWidth = window.innerWidth * 0.95; // 表示領域を最大限活用
         const maxHeight = (window.innerHeight - 68) * 0.95; // コントロールバーの高さを考慮（さらにコンパクト化）
         const scaleX = maxWidth / viewport.width;
@@ -4047,8 +4047,17 @@ export default function Home() {
     // フラグをfalseにリセットしてからrenderCurrentPage()を呼ぶ
     // これにより、データベースから空の配列が読み込まれる（既に削除済み）
     isClearingRef.current = false;
+    
+    // 少し待ってからrenderCurrentPage()を呼ぶ（状態更新を待つ）
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
     try {
       await renderCurrentPage();
+      // renderCurrentPage()が完了した後、再度状態をクリア（念のため）
+      // データベースから空の配列が読み込まれているはずだが、確実にするため
+      setStrokes([]);
+      setTextAnnotations([]);
+      setShapeAnnotations([]);
     } catch (error) {
       console.error('handleClear: ページ再レンダリングエラー', error);
       // エラーが発生しても状態はクリア済みなので、useEffectで再レンダリングされる
