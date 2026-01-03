@@ -1335,18 +1335,24 @@ export default function Home() {
         laserPointerTimeoutRef.current = null;
       }
       // プレゼンモード終了時にメイン画面のPDFを再レンダリング
-      // currentPageを強制的に更新してuseEffectを確実にトリガーする
+      // 確実にメイン画面のPDFが表示されるように、少し待ってから強制的に再レンダリング
       (async () => {
-        await new Promise(resolve => setTimeout(resolve, 150));
+        await new Promise(resolve => setTimeout(resolve, 200));
         const currentPageValue = currentPage;
         if (currentPageValue > 0 && pdfDoc && currentPageValue <= pdfDoc.numPages) {
           // 一時的に別のページに設定してから元に戻すことで、useEffectを確実にトリガー
           // ただし、0に設定すると無効なページになるので、1に設定してから元に戻す
           const tempPage = currentPageValue === 1 ? 2 : 1;
           setCurrentPage(tempPage);
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise(resolve => setTimeout(resolve, 150));
           setCurrentPage(currentPageValue);
           console.log('プレゼンモード終了: currentPageを更新して再レンダリングをトリガー', { currentPageValue });
+          // さらに確実にするため、明示的にrenderCurrentPage()を呼ぶ
+          await new Promise(resolve => setTimeout(resolve, 200));
+          if (pdfDoc && pdfCanvasRef.current && inkCanvasRef.current && !isPresentationMode) {
+            console.log('プレゼンモード終了: 明示的にrenderCurrentPage()を呼び出し');
+            await renderCurrentPage();
+          }
         } else if (pdfDoc && pdfCanvasRef.current && inkCanvasRef.current) {
           // currentPageが無効な場合は、直接renderCurrentPage()を呼ぶ
           console.log('プレゼンモード終了: 直接renderCurrentPage()を呼び出し');
@@ -1396,12 +1402,33 @@ export default function Home() {
 
   // ページレンダリング
   const renderCurrentPage = async () => {
-    if (!pdfDoc || !pdfCanvasRef.current || !inkCanvasRef.current) return;
+    console.log('renderCurrentPage: 開始', { 
+      hasPdfDoc: !!pdfDoc, 
+      hasPdfCanvas: !!pdfCanvasRef.current, 
+      hasInkCanvas: !!inkCanvasRef.current,
+      currentPage,
+      isPresentationMode 
+    });
+    
+    if (!pdfDoc || !pdfCanvasRef.current || !inkCanvasRef.current) {
+      console.warn('renderCurrentPage: 早期リターン', { 
+        hasPdfDoc: !!pdfDoc, 
+        hasPdfCanvas: !!pdfCanvasRef.current, 
+        hasInkCanvas: !!inkCanvasRef.current 
+      });
+      return;
+    }
+
+    // プレゼンモードでない場合のみ、メイン画面のPDFをレンダリング
+    if (isPresentationMode) {
+      console.log('renderCurrentPage: プレゼンモード中なのでスキップ');
+      return;
+    }
 
     try {
       // pageOrderが設定されている場合は、表示順序から実際のページ番号に変換
       const actualPageNum = getActualPageNum(currentPage);
-      console.log('renderCurrentPage:', { currentPage, actualPageNum, totalPages: pdfDoc.numPages });
+      console.log('renderCurrentPage: レンダリング開始', { currentPage, actualPageNum, totalPages: pdfDoc.numPages });
       const page = await pdfDoc.getPage(actualPageNum);
       const pdfCanvas = pdfCanvasRef.current;
       const inkCanvas = inkCanvasRef.current;
