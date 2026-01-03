@@ -1335,10 +1335,14 @@ export default function Home() {
         laserPointerTimeoutRef.current = null;
       }
       // プレゼンモード終了時にメイン画面のPDFを再レンダリング
-      // 確実に再レンダリングするため、少し待ってから実行
+      // currentPageを強制的に更新してuseEffectをトリガーする
       (async () => {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        await renderCurrentPage();
+        await new Promise(resolve => setTimeout(resolve, 100));
+        // currentPageを一度更新してから元に戻すことで、useEffectを確実にトリガー
+        const currentPageValue = currentPage;
+        setCurrentPage(0); // 一時的に0に設定
+        await new Promise(resolve => setTimeout(resolve, 50));
+        setCurrentPage(currentPageValue); // 元の値に戻す（これでuseEffectが確実に実行される）
       })();
     }
   }, [isPresentationMode]);
@@ -3666,7 +3670,12 @@ export default function Home() {
     setCurrentPage(newPage);
     setShowTableOfContentsDialog(false);
     console.log('目次ジャンプ デバッグ: ダイアログを閉じました');
-    // useEffectで自動的にrenderCurrentPage()が呼ばれる
+    // useEffectで自動的にrenderCurrentPage()が呼ばれるが、確実に実行されるように少し待ってから明示的に呼ぶ
+    if (pdfDoc) {
+      setTimeout(async () => {
+        await renderCurrentPage();
+      }, 100);
+    }
   };
 
   // 目次見出しの編集を開始
