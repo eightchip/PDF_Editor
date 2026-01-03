@@ -4854,6 +4854,9 @@ export default function Home() {
       : 200;
     const normalizedWidth = textInputWidth / pageSize.width;
 
+    // 編集モードの場合は既存のテキスト注釈からfontNameを取得
+    const existingText = editingTextId ? textAnnotations.find(t => t.id === editingTextId) : null;
+    
     const newText: TextAnnotation = {
       id: editingTextId || generateTextId(),
       x: Math.max(0, Math.min(1, normalizedX)),
@@ -4862,6 +4865,7 @@ export default function Home() {
       fontSize,
       color,
       width: Math.max(0.1, Math.min(1, normalizedWidth)), // 最小10%、最大100%
+      fontName: existingText?.fontName, // 既存のフォント名を保持
     };
 
     let updatedTexts: TextAnnotation[];
@@ -7538,15 +7542,18 @@ export default function Home() {
                     <MdPalette className="text-lg text-purple-600" />
                     色:
                   </label>
-                  <div className="flex gap-1 items-center">
-                    {['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500'].map((presetColor) => (
+                  <div className="flex gap-2 items-center">
+                    {['#FFFFFF', '#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500'].map((presetColor) => (
                       <button
                         key={presetColor}
                         onClick={() => setColor(presetColor)}
-                        className={`w-8 h-8 rounded border-2 transition-all hover:scale-110 ${
-                          color === presetColor ? 'border-slate-800 ring-2 ring-offset-1 ring-slate-400' : 'border-slate-300'
+                        className={`w-10 h-10 rounded-lg border-2 transition-all hover:scale-110 shadow-sm ${
+                          color === presetColor ? 'border-slate-800 ring-2 ring-offset-1 ring-slate-400 scale-110' : 'border-slate-300 hover:border-slate-400'
                         }`}
-                        style={{ backgroundColor: presetColor }}
+                        style={{ 
+                          backgroundColor: presetColor,
+                          borderColor: presetColor === '#FFFFFF' ? '#cbd5e1' : undefined
+                        }}
                         title={presetColor}
                       />
                     ))}
@@ -7554,7 +7561,7 @@ export default function Home() {
                     type="color"
                     value={color}
                     onChange={(e) => setColor(e.target.value)}
-                      className="w-10 h-8 rounded border border-slate-300 cursor-pointer ml-1"
+                      className="w-12 h-10 rounded-lg border-2 border-slate-300 cursor-pointer ml-1 shadow-sm hover:border-slate-400"
                   />
                   </div>
                 </div>
@@ -7613,15 +7620,18 @@ export default function Home() {
                     <MdPalette className="text-lg text-purple-600" />
                     色:
                   </label>
-                  <div className="flex gap-1 items-center">
-                    {['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500'].map((presetColor) => (
+                  <div className="flex gap-2 items-center">
+                    {['#FFFFFF', '#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500'].map((presetColor) => (
                       <button
                         key={presetColor}
                         onClick={() => setColor(presetColor)}
-                        className={`w-8 h-8 rounded border-2 transition-all hover:scale-110 ${
-                          color === presetColor ? 'border-slate-800 ring-2 ring-offset-1 ring-slate-400' : 'border-slate-300'
+                        className={`w-10 h-10 rounded-lg border-2 transition-all hover:scale-110 shadow-sm ${
+                          color === presetColor ? 'border-slate-800 ring-2 ring-offset-1 ring-slate-400 scale-110' : 'border-slate-300 hover:border-slate-400'
                         }`}
-                        style={{ backgroundColor: presetColor }}
+                        style={{ 
+                          backgroundColor: presetColor,
+                          borderColor: presetColor === '#FFFFFF' ? '#cbd5e1' : undefined
+                        }}
                         title={presetColor}
                       />
                     ))}
@@ -7629,7 +7639,7 @@ export default function Home() {
                       type="color"
                       value={color}
                       onChange={(e) => setColor(e.target.value)}
-                      className="w-10 h-8 rounded border border-slate-300 cursor-pointer ml-1"
+                      className="w-12 h-10 rounded-lg border-2 border-slate-300 cursor-pointer ml-1 shadow-sm hover:border-slate-400"
                     />
                   </div>
                 </div>
@@ -7655,15 +7665,18 @@ export default function Home() {
                     <MdPalette className="text-lg text-purple-600" />
                     色:
                   </label>
-                  <div className="flex gap-1 items-center">
-                    {['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500'].map((presetColor) => (
+                  <div className="flex gap-2 items-center">
+                    {['#FFFFFF', '#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500'].map((presetColor) => (
                       <button
                         key={presetColor}
                         onClick={() => setColor(presetColor)}
-                        className={`w-8 h-8 rounded border-2 transition-all hover:scale-110 ${
-                          color === presetColor ? 'border-slate-800 ring-2 ring-offset-1 ring-slate-400' : 'border-slate-300'
+                        className={`w-10 h-10 rounded-lg border-2 transition-all hover:scale-110 shadow-sm ${
+                          color === presetColor ? 'border-slate-800 ring-2 ring-offset-1 ring-slate-400 scale-110' : 'border-slate-300 hover:border-slate-400'
                         }`}
-                        style={{ backgroundColor: presetColor }}
+                        style={{ 
+                          backgroundColor: presetColor,
+                          borderColor: presetColor === '#FFFFFF' ? '#cbd5e1' : undefined
+                        }}
                         title={presetColor}
                       />
                     ))}
@@ -7671,7 +7684,7 @@ export default function Home() {
                       type="color"
                       value={color}
                       onChange={(e) => setColor(e.target.value)}
-                      className="w-10 h-8 rounded border border-slate-300 cursor-pointer ml-1"
+                      className="w-12 h-10 rounded-lg border-2 border-slate-300 cursor-pointer ml-1 shadow-sm hover:border-slate-400"
                     />
                   </div>
                 </div>
