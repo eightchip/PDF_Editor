@@ -1419,11 +1419,7 @@ export default function Home() {
       return;
     }
 
-    // プレゼンモードでない場合のみ、メイン画面のPDFをレンダリング
-    if (isPresentationMode) {
-      console.log('renderCurrentPage: プレゼンモード中なのでスキップ');
-      return;
-    }
+    // プレゼンモード中でもレンダリングを実行（プレゼンモード用の表示のため）
 
     try {
       // pageOrderが設定されている場合は、表示順序から実際のページ番号に変換
