@@ -1542,7 +1542,7 @@ export default function Home() {
       const page = await pdfDoc.getPage(actualPageNum);
       const pdfCanvas = targetCanvasRef.current;
       const inkCanvas = inkCanvasRef.current;
-      
+
       if (!pdfCanvas || !inkCanvas) {
         console.error('renderCurrentPage: キャンバスが取得できません', { pdfCanvas: !!pdfCanvas, inkCanvas: !!inkCanvas });
         return;
@@ -1986,8 +1986,8 @@ export default function Home() {
           ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
         }
         redrawStrokes(ctx, strokes, pageSize.width, pageSize.height);
+        }
       }
-    }
   }, [strokes, pageSize]);
 
 
@@ -2223,8 +2223,8 @@ export default function Home() {
       // 入力フィールドにフォーカスがある場合は無視（スライドショーモード以外）
       if (
         !isPresentationMode && (
-          e.target instanceof HTMLInputElement ||
-          e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
           (e.target instanceof HTMLButtonElement && e.target.type !== 'button')
         )
       ) {
@@ -2303,11 +2303,11 @@ export default function Home() {
     }
 
     // 座標を取得（すべてのツールで使用）
-    const target = e.currentTarget;
-    const rect = target.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
+      const target = e.currentTarget;
+      const rect = target.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
     // テキスト選択モードが有効な場合、シングルクリックでテキスト範囲を検出してコピー
     if (textSelectionEnabled) {
       console.log('テキスト選択: 処理開始');
@@ -2467,12 +2467,12 @@ export default function Home() {
             }
           } else {
             // 通常のストロークは最初の点との距離で判定
-            const firstPoint = stroke.points[0];
-            const strokeX = firstPoint.x * pageSize.width;
-            const strokeY = firstPoint.y * pageSize.height;
-            const distance = Math.sqrt(Math.pow(x - strokeX, 2) + Math.pow(y - strokeY, 2));
-            if (distance < 20) {
-              clickedStrokes.push(stroke.id);
+          const firstPoint = stroke.points[0];
+          const strokeX = firstPoint.x * pageSize.width;
+          const strokeY = firstPoint.y * pageSize.height;
+          const distance = Math.sqrt(Math.pow(x - strokeX, 2) + Math.pow(y - strokeY, 2));
+          if (distance < 20) {
+            clickedStrokes.push(stroke.id);
             }
           }
         }
@@ -2527,9 +2527,9 @@ export default function Home() {
       const hasTextsOnly = clickedTexts.length > 0 && clickedStrokes.length === 0 && clickedShapes.length === 0;
       
       if (hasStrokesOrShapes || (hasTextsOnly && allowTextDrag)) {
-        // ドラッグ開始位置を記録
-        setDragStart({ x, y });
-        setIsDragging(false);
+      // ドラッグ開始位置を記録
+      setDragStart({ x, y });
+      setIsDragging(false);
       } else {
         // テキストのみでallowTextDragがfalseの場合はドラッグを無効化
         setDragStart(null);
@@ -2632,16 +2632,16 @@ export default function Home() {
       
       // 折れ線矢印の場合は複数点を記録
       if (tool === 'polyline-arrow') {
-        setCurrentShape({
-          id: generateShapeId(),
-          type: tool,
-          x1: normalizedX,
-          y1: normalizedY,
-          x2: normalizedX,
-          y2: normalizedY,
-          color,
-          width,
-          fill: fillShape,
+      setCurrentShape({
+        id: generateShapeId(),
+        type: tool,
+        x1: normalizedX,
+        y1: normalizedY,
+        x2: normalizedX,
+        y2: normalizedY,
+        color,
+        width,
+        fill: fillShape,
           points: [{ x: normalizedX, y: normalizedY }], // 最初の点
         });
       } else {
@@ -2743,7 +2743,7 @@ export default function Home() {
         toast({
           title: "ハイライト機能",
           description: "ハイライト機能は100%表示でのみ使用できます。ズームを100%に変更してください。",
-          variant: "destructive",
+          variant: "success",
         });
         e.preventDefault();
         return;
@@ -2753,58 +2753,58 @@ export default function Home() {
       if (highlightMode === 'auto') {
         if (textItems.length === 0) {
           console.warn('ハイライト: テキストアイテムがありません。テキスト抽出が失敗している可能性があります。');
-          return;
-        }
+            return;
+          }
         const boundingBox = findTextBoundingBox(textItems, x, y, 30);
         if (boundingBox) {
           console.log('ハイライト: バウンディングボックスを検出', boundingBox);
-          // テキスト全体のバウンディングボックスをハイライトとして描画
-          // 矩形の4つの角をpointsとして追加
-          // ハイライト範囲が少し上にはみ出さないように、y座標を少し下に調整
-          // ディセンダー（「り」などの下にはみ出す部分）を含めるため、heightを少し大きくする
-          const yOffset = boundingBox.height * 0.05; // heightの5%分下げる（上方向の調整）
-          const heightAdjustment = boundingBox.height * 0.15; // heightの15%分増やす（下方向の調整、ディセンダー対応）
+        // テキスト全体のバウンディングボックスをハイライトとして描画
+        // 矩形の4つの角をpointsとして追加
+        // ハイライト範囲が少し上にはみ出さないように、y座標を少し下に調整
+        // ディセンダー（「り」などの下にはみ出す部分）を含めるため、heightを少し大きくする
+        const yOffset = boundingBox.height * 0.05; // heightの5%分下げる（上方向の調整）
+        const heightAdjustment = boundingBox.height * 0.15; // heightの15%分増やす（下方向の調整、ディセンダー対応）
           
           // キャンバス座標系を正規化（0-1の比率に変換）
-          const normalizedX1 = boundingBox.x / pageSize.width;
-          const normalizedY1 = (boundingBox.y + yOffset) / pageSize.height;
-          const normalizedX2 = (boundingBox.x + boundingBox.width) / pageSize.width;
-          const normalizedY2 = (boundingBox.y + boundingBox.height + heightAdjustment) / pageSize.height;
+        const normalizedX1 = boundingBox.x / pageSize.width;
+        const normalizedY1 = (boundingBox.y + yOffset) / pageSize.height;
+        const normalizedX2 = (boundingBox.x + boundingBox.width) / pageSize.width;
+        const normalizedY2 = (boundingBox.y + boundingBox.height + heightAdjustment) / pageSize.height;
 
           // 通常のハイライトストロークを作成
-          const stroke: Stroke = {
-            id: `stroke-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            tool: 'highlight',
+        const stroke: Stroke = {
+          id: `stroke-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          tool: 'highlight',
             color: color, // 選択された色を使用
-            width: boundingBox.height * 1.2, // テキストの高さに合わせて調整
-            points: [
-              { x: normalizedX1, y: normalizedY1 },
-              { x: normalizedX2, y: normalizedY1 },
-              { x: normalizedX2, y: normalizedY2 },
-              { x: normalizedX1, y: normalizedY2 },
-            ],
-          };
+          width: boundingBox.height * 1.2, // テキストの高さに合わせて調整
+          points: [
+            { x: normalizedX1, y: normalizedY1 },
+            { x: normalizedX2, y: normalizedY1 },
+            { x: normalizedX2, y: normalizedY2 },
+            { x: normalizedX1, y: normalizedY2 },
+          ],
+        };
 
-          // ストロークを即座に確定
-          const newStrokes = [...strokes, stroke];
-          setStrokes(newStrokes);
-          if (docId) {
-            const actualPageNum = getActualPageNum(currentPage);
-            saveAnnotations(docId, actualPageNum, newStrokes);
+        // ストロークを即座に確定
+        const newStrokes = [...strokes, stroke];
+        setStrokes(newStrokes);
+        if (docId) {
+          const actualPageNum = getActualPageNum(currentPage);
+          saveAnnotations(docId, actualPageNum, newStrokes);
+        }
+        
+        // 再描画
+        if (inkCanvasRef.current && pageSize) {
+          const ctx = inkCanvasRef.current.getContext('2d');
+          if (ctx) {
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+            redrawStrokes(ctx, newStrokes, pageSize.width, pageSize.height);
           }
-          
-          // 再描画
-          if (inkCanvasRef.current && pageSize) {
-            const ctx = inkCanvasRef.current.getContext('2d');
-            if (ctx) {
-              const devicePixelRatio = window.devicePixelRatio || 1;
-              ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-              redrawStrokes(ctx, newStrokes, pageSize.width, pageSize.height);
-            }
-          }
+        }
 
-          e.preventDefault();
-          return;
+        e.preventDefault();
+        return;
         }
       }
       
@@ -3003,7 +3003,7 @@ export default function Home() {
           description: "テキスト注釈を作成しました。ドラッグで移動、クリックで編集できます。",
           variant: "default",
         });
-
+        
         e.preventDefault();
         return;
       }
@@ -3125,14 +3125,14 @@ export default function Home() {
         // テキストを移動（allowTextDragがtrueの場合のみ）
         const movedTexts = allowTextDrag && selectedAnnotationIds.texts.length > 0
           ? textAnnotations.map(text => {
-              if (selectedAnnotationIds.texts.includes(text.id)) {
-                return {
-                  ...text,
-                  x: Math.max(0, Math.min(1, text.x + deltaX)),
-                  y: Math.max(0, Math.min(1, text.y + deltaY)),
-                };
-              }
-              return text;
+          if (selectedAnnotationIds.texts.includes(text.id)) {
+            return {
+              ...text,
+              x: Math.max(0, Math.min(1, text.x + deltaX)),
+              y: Math.max(0, Math.min(1, text.y + deltaY)),
+            };
+          }
+          return text;
             })
           : textAnnotations; // allowTextDragがfalseの場合は移動しない
         
@@ -3251,10 +3251,10 @@ export default function Home() {
         };
       } else {
         updatedShape = {
-          ...currentShape,
-          x2: normalizedX,
-          y2: normalizedY,
-        };
+        ...currentShape,
+        x2: normalizedX,
+        y2: normalizedY,
+      };
       }
       setCurrentShape(updatedShape);
 
@@ -3470,14 +3470,14 @@ export default function Home() {
         // テキストを移動（allowTextDragがtrueの場合のみ）
         const movedTexts = allowTextDrag && selectedAnnotationIds.texts.length > 0
           ? textAnnotations.map(text => {
-              if (selectedAnnotationIds.texts.includes(text.id)) {
-                return {
-                  ...text,
-                  x: Math.max(0, Math.min(1, text.x + deltaX)),
-                  y: Math.max(0, Math.min(1, text.y + deltaY)),
-                };
-              }
-              return text;
+          if (selectedAnnotationIds.texts.includes(text.id)) {
+            return {
+              ...text,
+              x: Math.max(0, Math.min(1, text.x + deltaX)),
+              y: Math.max(0, Math.min(1, text.y + deltaY)),
+            };
+          }
+          return text;
             })
           : textAnnotations; // allowTextDragがfalseの場合は移動しない
         
@@ -3644,8 +3644,8 @@ export default function Home() {
         pdfCanvasRef.current.style.visibility = 'visible';
         pdfCanvasRef.current.style.opacity = '1';
       }
-      if (currentPage > 1) {
-        setCurrentPage(currentPage - 1);
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
         // useEffectで自動的にrenderCurrentPage()が呼ばれる
       }
     }
@@ -3667,8 +3667,8 @@ export default function Home() {
         pdfCanvasRef.current.style.visibility = 'visible';
         pdfCanvasRef.current.style.opacity = '1';
       }
-      if (pdfDoc && currentPage < totalPages) {
-        setCurrentPage(currentPage + 1);
+    if (pdfDoc && currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
         // useEffectで自動的にrenderCurrentPage()が呼ばれる
       }
     }
@@ -4268,7 +4268,7 @@ export default function Home() {
       const entries = await generateTableOfContents(pdfDoc);
       setTableOfContents(entries);
       if (docId) {
-        await saveTableOfContents(docId, entries);
+      await saveTableOfContents(docId, entries);
       }
       
       toast({
@@ -4354,7 +4354,7 @@ export default function Home() {
     // IndexedDBに保存
     try {
       if (docId) {
-        await saveTableOfContents(docId, updatedTOC);
+      await saveTableOfContents(docId, updatedTOC);
       }
     } catch (error) {
       console.error('目次の保存に失敗:', error);
@@ -5156,11 +5156,11 @@ export default function Home() {
     }
     
     // 状態をクリア（キャンバスをクリアした後に実行）
-    setStrokes([]);
-    setTextAnnotations([]);
-    setShapeAnnotations([]);
+      setStrokes([]);
+      setTextAnnotations([]);
+      setShapeAnnotations([]);
     
-    console.log('handleClear: 状態をクリア完了');
+      console.log('handleClear: 状態をクリア完了');
     
     // フラグをリセット（次のページ遷移時に正常に動作するように）
     isClearingRef.current = false;
@@ -5292,7 +5292,7 @@ export default function Home() {
 
     // 編集モードの場合は既存のテキスト注釈からfontNameを取得
     const existingText = editingTextId ? textAnnotations.find(t => t.id === editingTextId) : null;
-    
+
     const newText: TextAnnotation = {
       id: editingTextId || generateTextId(),
       x: Math.max(0, Math.min(1, normalizedX)),
@@ -6907,9 +6907,9 @@ export default function Home() {
                           
                           // 拡大表示用の画像を生成（大きなスケールでレンダリング）
                           if (pdfDoc) {
-      try {
-        const page = await pdfDoc.getPage(pageNum);
-        const canvas = document.createElement('canvas');
+                            try {
+                              const page = await pdfDoc.getPage(pageNum);
+                              const canvas = document.createElement('canvas');
                               const ctx = canvas.getContext('2d');
                               
                               if (ctx) {
@@ -7289,7 +7289,7 @@ export default function Home() {
               />
               <span className="text-sm font-semibold bg-gradient-to-r from-slate-600 to-slate-700 bg-clip-text text-transparent">
                 / {totalPages}
-              </span>
+            </span>
             </div>
             <button
               onClick={goToNextPage}
@@ -7835,7 +7835,7 @@ export default function Home() {
                     </span>
                   )}
                 </button>
-                <button
+                      <button
               type="button"
               onClick={(e) => {
                 e.preventDefault();
@@ -7875,25 +7875,25 @@ export default function Home() {
             >
               <MdSelectAll className="text-base" />
               {textSelectionEnabled ? 'テキスト選択ON' : 'テキスト選択OFF'}
-            </button>
+                      </button>
             
                 {tool === 'stamp' && (
                   <div className="absolute top-full left-0 mt-1 bg-white border border-purple-300 rounded-lg shadow-lg p-2 z-50">
                     <div className="flex flex-col gap-2">
                       <div className="text-xs font-semibold text-slate-700 mb-1">スタンプの色</div>
                       <div className="flex gap-2">
-                        <button
+                      <button
                           onClick={() => setStampColor('black')}
                           className={`px-3 py-1 text-sm rounded ${stampColor === 'black' ? 'bg-slate-200 text-slate-800' : 'bg-white hover:bg-gray-100'}`}
-                        >
+                      >
                           黒
-                        </button>
-                        <button
+                      </button>
+                      <button
                           onClick={() => setStampColor('red')}
                           className={`px-3 py-1 text-sm rounded ${stampColor === 'red' ? 'bg-red-200 text-red-800' : 'bg-white hover:bg-gray-100'}`}
-                        >
+                      >
                           赤
-                        </button>
+                      </button>
                       </div>
                       <div className="text-xs font-semibold text-slate-700 mb-1 mt-2">スタンプのサイズ: {stampSize}%</div>
                       <input
@@ -8372,28 +8372,28 @@ export default function Home() {
             {/* プレゼンモードボタン */}
             {pdfDoc && (
               <>
-                <button
+            <button
                   onClick={() => setIsPresentationMode(true)}
                   className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-green-500 shadow-md hover:scale-105 active:scale-95"
-                  style={{
+              style={{
                     background: 'linear-gradient(to right, #10b981, #059669)',
-                    color: 'white',
-                    pointerEvents: 'auto',
-                    cursor: 'pointer',
-                    zIndex: 10,
-                  }}
-                  onMouseEnter={(e) => {
+                color: 'white',
+                pointerEvents: 'auto',
+                cursor: 'pointer',
+                zIndex: 10,
+              }}
+              onMouseEnter={(e) => {
                     e.currentTarget.style.background = 'linear-gradient(to right, #059669, #047857)';
-                  }}
-                  onMouseLeave={(e) => {
+              }}
+              onMouseLeave={(e) => {
                     e.currentTarget.style.background = 'linear-gradient(to right, #10b981, #059669)';
-                  }}
+              }}
                   title="スライドショーモード (F11)"
-                >
+            >
                   <MdSlideshow className="text-base text-white" />
                   プレゼン
-                </button>
-                <span className="text-slate-300 mx-1">|</span>
+            </button>
+            <span className="text-slate-300 mx-1">|</span>
               </>
             )}
             <button
@@ -8751,13 +8751,13 @@ export default function Home() {
                       if (selectedText) {
                         // クリップボードにコピー
                         navigator.clipboard.writeText(selectedText).then(() => {
-              console.log('テキスト選択: クリップボードにコピー成功');
+                          console.log('テキスト選択: クリップボードにコピー成功');
               console.log('🔔 TOAST呼び出し開始 デバッグ');
-              toast({
+                          toast({
                 title: `テキストをコピーしました`,
                 description: `"${selectedText.replace(/^1\.\s*/, '').substring(0, 50)}${selectedText.length > 50 ? '...' : ''}"`,
                 variant: "success",
-              });
+                          });
               console.log('🔔 TOAST呼び出し完了 デバッグ');
                         }).catch(err => {
                           console.error('クリップボードへのコピーに失敗:', err);
@@ -9077,10 +9077,10 @@ export default function Home() {
                   }`}
                 >
                   <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                    <span className={`font-medium ${selectedAnnotationIds.strokes.includes(stroke.id || '') ? 'text-indigo-800' : 'text-slate-700'}`}>
-                      <MdBrush className="inline mr-1 text-indigo-600" />
-                      ストローク {index + 1}
-                    </span>
+                  <span className={`font-medium ${selectedAnnotationIds.strokes.includes(stroke.id || '') ? 'text-indigo-800' : 'text-slate-700'}`}>
+                    <MdBrush className="inline mr-1 text-indigo-600" />
+                    ストローク {index + 1}
+                  </span>
                     <div className="text-[10px] text-orange-600 font-mono flex items-center gap-1.5">
                       <span className="px-1.5 py-0.5 rounded bg-orange-50 border border-orange-200">
                         {stroke.tool === 'pen' ? 'ペン' : stroke.tool === 'highlight' ? 'ハイライト' : '消しゴム'}
@@ -10354,13 +10354,13 @@ export default function Home() {
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'start' }}>
                           <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                            {editingOcrPage === parseInt(pageNum) ? (
+                        {editingOcrPage === parseInt(pageNum) ? (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                <textarea
-                                  value={editingOcrText}
-                                  onChange={(e) => setEditingOcrText(e.target.value)}
+                            <textarea
+                              value={editingOcrText}
+                              onChange={(e) => setEditingOcrText(e.target.value)}
                                   className="w-full text-sm text-purple-900 bg-white p-2 rounded border border-purple-400 resize-none"
-                                  rows={16}
+                              rows={16}
                                   style={{ 
                                     minHeight: '300px', 
                                     maxHeight: 'calc(98vh - 550px)', 
@@ -10370,14 +10370,14 @@ export default function Home() {
                                   }}
                                 />
                                 <div className="flex gap-1 flex-shrink-0">
-                                  <button
-                                    onClick={async () => {
-                                      if (docId) {
-                                        const updatedResult = { ...result, text: editingOcrText };
-                                        await saveOCRResult(docId, parseInt(pageNum), updatedResult);
-                                        const newResults = { ...ocrResults };
-                                        newResults[parseInt(pageNum)] = updatedResult;
-                                        setOcrResults(newResults);
+                              <button
+                                onClick={async () => {
+                                  if (docId) {
+                                    const updatedResult = { ...result, text: editingOcrText };
+                                    await saveOCRResult(docId, parseInt(pageNum), updatedResult);
+                                    const newResults = { ...ocrResults };
+                                    newResults[parseInt(pageNum)] = updatedResult;
+                                    setOcrResults(newResults);
                                         
                                         // シナリオにも反映（同期）
                                         if (scenarios[parseInt(pageNum)]) {
@@ -10385,19 +10385,19 @@ export default function Home() {
                                           setScenarios(prev => ({ ...prev, [parseInt(pageNum)]: editingOcrText }));
                                         }
                                         
-                                        setEditingOcrPage(null);
-                                        setEditingOcrText('');
-                                        toast({
-                                          title: "成功",
-                                          description: `ページ ${pageNum} のOCR結果を更新しました`,
+                                    setEditingOcrPage(null);
+                                    setEditingOcrText('');
+                                    toast({
+                                      title: "成功",
+                                      description: `ページ ${pageNum} のOCR結果を更新しました`,
                                           variant: "success",
-                                        });
-                                      }
-                                    }}
-                                    className="px-2 py-1 text-xs font-medium bg-green-500 text-white rounded hover:bg-green-600"
-                                  >
-                                    保存
-                                  </button>
+                                    });
+                                  }
+                                }}
+                                className="px-2 py-1 text-xs font-medium bg-green-500 text-white rounded hover:bg-green-600"
+                              >
+                                保存
+                              </button>
                                   <button
                                     onClick={async () => {
                                       // OCR結果をシナリオに保存してからシナリオモーダルを開く
@@ -10428,18 +10428,18 @@ export default function Home() {
                                     <MdDescription className="text-xs" />
                                     シナリオに反映
                                   </button>
-                                  <button
-                                    onClick={() => {
-                                      setEditingOcrPage(null);
-                                      setEditingOcrText('');
-                                    }}
-                                    className="px-2 py-1 text-xs font-medium bg-gray-500 text-white rounded hover:bg-gray-600"
-                                  >
-                                    キャンセル
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
+                              <button
+                                onClick={() => {
+                                  setEditingOcrPage(null);
+                                  setEditingOcrText('');
+                                }}
+                                className="px-2 py-1 text-xs font-medium bg-gray-500 text-white rounded hover:bg-gray-600"
+                              >
+                                キャンセル
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
                               <div 
                                 className="text-sm text-purple-900 bg-white p-2 rounded border border-purple-200 overflow-y-auto overflow-x-hidden whitespace-pre-wrap leading-relaxed break-words" 
                                 style={{ 
@@ -10449,19 +10449,19 @@ export default function Home() {
                                   maxHeight: 'calc(98vh - 500px)'
                                 }}
                               >
-                                {ocrSearchQuery.trim() ? (
-                                  result.text.split(new RegExp(`(${ocrSearchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')).map((part, idx) => 
-                                    part.toLowerCase() === ocrSearchQuery.toLowerCase() ? (
-                                      <mark key={idx} className="bg-yellow-300 text-purple-900 font-semibold">{part}</mark>
-                                    ) : (
-                                      <span key={idx}>{part}</span>
-                                    )
-                                  )
+                            {ocrSearchQuery.trim() ? (
+                              result.text.split(new RegExp(`(${ocrSearchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')).map((part, idx) => 
+                                part.toLowerCase() === ocrSearchQuery.toLowerCase() ? (
+                                  <mark key={idx} className="bg-yellow-300 text-purple-900 font-semibold">{part}</mark>
                                 ) : (
-                                  result.text || '(テキストが見つかりませんでした)'
-                                )}
-                              </div>
+                                  <span key={idx}>{part}</span>
+                                )
+                              )
+                            ) : (
+                              result.text || '(テキストが見つかりませんでした)'
                             )}
+                          </div>
+                        )}
                           </div>
                           <div style={{ flexShrink: 0, position: 'sticky', top: '0.5rem' }}>
                             {thumbnails[parseInt(pageNum)] ? (
@@ -10515,9 +10515,9 @@ export default function Home() {
                         前へ
                       </button>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-purple-900 px-3 py-1.5 bg-purple-50 rounded border border-purple-200">
-                          ページ {currentOcrResultPage} / {totalFilteredPages}
-                        </span>
+                      <span className="text-xs font-semibold text-purple-900 px-3 py-1.5 bg-purple-50 rounded border border-purple-200">
+                        ページ {currentOcrResultPage} / {totalFilteredPages}
+                      </span>
                         <Input
                           type="number"
                           min={1}
@@ -11094,12 +11094,12 @@ export default function Home() {
               <>
                 <div className="flex justify-between items-center mb-4 flex-shrink-0 gap-3">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-indigo-800">
-                      {tableOfContents.length}個の見出しが見つかりました
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      （重複を除外した数）
-                    </p>
+                  <p className="text-sm font-semibold text-indigo-800">
+                    {tableOfContents.length}個の見出しが見つかりました
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    （重複を除外した数）
+                  </p>
                   </div>
                   <Button
                     onClick={handleGenerateTableOfContents}
@@ -11266,9 +11266,9 @@ export default function Home() {
 
       {/* 一括注釈配置ダイアログ */}
       <Dialog open={showBulkAnnotationDialog} onOpenChange={setShowBulkAnnotationDialog}>
-        <DialogContent 
+        <DialogContent
           className="sm:max-w-[500px]" 
-          style={{ 
+          style={{
             zIndex: 100014,
             background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 50%, #7dd3fc 100%)',
             border: '2px solid #0ea5e9',
@@ -11301,7 +11301,7 @@ export default function Home() {
               <div className="space-y-2">
                 <label className="text-sm font-medium">対象ページ:</label>
                 <input
-                  type="text"
+                type="text"
                   value={bulkAnnotationTargetPages}
                   onChange={(e) => setBulkAnnotationTargetPages(e.target.value)}
                   placeholder="例: 1, 3, 5-7"
@@ -11310,7 +11310,7 @@ export default function Home() {
                 <p className="text-xs text-gray-500">
                   ページ番号をカンマ区切りで指定（例: 1, 3, 5-7）
                 </p>
-              </div>
+            </div>
             )}
             <div className="space-y-2">
               <label className="text-sm font-medium">回転角度:</label>
@@ -11325,11 +11325,11 @@ export default function Home() {
                   className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                 />
                 <span className="text-sm font-medium w-16 text-right">{bulkAnnotationAngle}°</span>
-              </div>
+                </div>
               <p className="text-xs text-gray-500">
                 注釈を回転させて配置します（0-360度、ページ中央を基準に回転）
               </p>
-            </div>
+              </div>
             <div className="text-sm text-gray-600">
               選択中の注釈:
               <ul className="list-disc list-inside mt-1">
@@ -11400,7 +11400,7 @@ export default function Home() {
                   className="w-4 h-4"
                 />
                 <span>全ページ一括（すべてのページから削除）</span>
-              </label>
+                </label>
             </div>
             {!bulkDeleteIncludeAll && (
               <div className="space-y-2">
@@ -11415,11 +11415,11 @@ export default function Home() {
                 <p className="text-xs text-gray-500">
                   ページ番号をカンマ区切りで指定（例: 1, 3, 5-7）
                 </p>
-              </div>
+                </div>
             )}
             <div className="text-sm text-gray-600 bg-yellow-50 p-3 rounded-md border border-yellow-200">
               <strong className="text-red-600">警告:</strong> この操作は取り消せません。選択した注釈が対象ページから完全に削除されます。
-            </div>
+              </div>
             <div className="text-sm text-gray-600">
               選択中の注釈:
               <ul className="list-disc list-inside mt-1">
@@ -11485,7 +11485,7 @@ export default function Home() {
               <div className="space-y-4 flex-shrink-0">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">プレフィックス（任意）:</label>
-                  <input
+                <input
                     type="text"
                     value={pageNumberPrefix}
                     onChange={(e) => {
@@ -11511,12 +11511,12 @@ export default function Home() {
                 <label className="text-sm font-medium">X座標: {Math.round(pageNumberX * 100)}%</label>
                 <div className="flex items-center gap-2">
                   <input
-                    type="number"
-                    min="0"
+                  type="number"
+                  min="0"
                     max="100"
                     step="0.1"
                     value={Math.round(pageNumberX * 100)}
-                    onChange={(e) => {
+                  onChange={(e) => {
                       const newValue = Math.max(0, Math.min(100, Number(e.target.value))) / 100;
                       setPageNumberX(newValue);
                       // リアルタイムプレビューを更新
@@ -11532,8 +11532,8 @@ export default function Home() {
                     className="w-20 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
                   />
                   <div className="flex flex-col gap-1">
-                    <button
-                      type="button"
+                  <button
+                    type="button"
                       onClick={() => {
                         const newValue = Math.min(1, pageNumberX + 0.01);
                         setPageNumberX(newValue);
@@ -11549,7 +11549,7 @@ export default function Home() {
                       className="w-6 h-4 flex items-center justify-center border border-gray-300 rounded-t bg-white hover:bg-gray-50"
                     >
                       ▲
-                    </button>
+                  </button>
                     <button
                       type="button"
                       onClick={() => {
@@ -11568,19 +11568,19 @@ export default function Home() {
                     >
                       ▼
                     </button>
-                  </div>
-                </div>
+              </div>
+            </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Y座標: {Math.round(pageNumberY * 100)}%</label>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
                     step="0.1"
                     value={Math.round(pageNumberY * 100)}
-                    onChange={(e) => {
+                  onChange={(e) => {
                       const newValue = Math.max(0, Math.min(100, Number(e.target.value))) / 100;
                       setPageNumberY(newValue);
                       // リアルタイムプレビューを更新
@@ -11596,8 +11596,8 @@ export default function Home() {
                     className="w-20 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
                   />
                   <div className="flex flex-col gap-1">
-                    <button
-                      type="button"
+                  <button
+                    type="button"
                       onClick={() => {
                         const newValue = Math.min(1, pageNumberY + 0.01);
                         setPageNumberY(newValue);
@@ -11613,7 +11613,7 @@ export default function Home() {
                       className="w-6 h-4 flex items-center justify-center border border-gray-300 rounded-t bg-white hover:bg-gray-50"
                     >
                       ▲
-                    </button>
+                  </button>
                     <button
                       type="button"
                       onClick={() => {
@@ -11632,8 +11632,8 @@ export default function Home() {
                     >
                       ▼
                     </button>
-                  </div>
-                </div>
+              </div>
+            </div>
               </div>
               </div>
               <div className="flex flex-col gap-2 overflow-hidden" style={{ minHeight: 0, maxHeight: '350px', flexShrink: 0 }}>
@@ -11648,9 +11648,9 @@ export default function Home() {
                   ) : (
                     <div className="flex items-center justify-center h-full text-gray-500" style={{ minHeight: '250px' }}>
                       プレビューを生成してください
-                    </div>
+            </div>
                   )}
-                </div>
+          </div>
               </div>
             </div>
           </div>
