@@ -2738,6 +2738,17 @@ export default function Home() {
 
     // ハイライトツールの場合（通常のハイライト機能）
     if (tool === 'highlight') {
+      // 100%以外のズームレベルではハイライトを使用できない
+      if (Math.abs(scale - 1.0) > 0.01) {
+        toast({
+          title: "ハイライト機能",
+          description: "ハイライト機能は100%表示でのみ使用できます。ズームを100%に変更してください。",
+          variant: "destructive",
+        });
+        e.preventDefault();
+        return;
+      }
+
       // 自動モード：テキスト全体を検出してハイライト
       if (highlightMode === 'auto') {
         if (textItems.length === 0) {
@@ -2754,19 +2765,11 @@ export default function Home() {
           const yOffset = boundingBox.height * 0.05; // heightの5%分下げる（上方向の調整）
           const heightAdjustment = boundingBox.height * 0.15; // heightの15%分増やす（下方向の調整、ディセンダー対応）
           
-          // キャンバスの実際のサイズを取得（スケールを考慮）
-          // rectはhandlePointerDownの先頭で取得されている
-          const target = e.currentTarget;
-          const canvasRect = target.getBoundingClientRect();
-          const canvasWidth = canvasRect.width;
-          const canvasHeight = canvasRect.height;
-          
           // キャンバス座標系を正規化（0-1の比率に変換）
-          // pageSizeはscale=1.0の時のサイズなので、現在のスケールでのキャンバスサイズで正規化する
-          const normalizedX1 = boundingBox.x / canvasWidth;
-          const normalizedY1 = (boundingBox.y + yOffset) / canvasHeight;
-          const normalizedX2 = (boundingBox.x + boundingBox.width) / canvasWidth;
-          const normalizedY2 = (boundingBox.y + boundingBox.height + heightAdjustment) / canvasHeight;
+          const normalizedX1 = boundingBox.x / pageSize.width;
+          const normalizedY1 = (boundingBox.y + yOffset) / pageSize.height;
+          const normalizedX2 = (boundingBox.x + boundingBox.width) / pageSize.width;
+          const normalizedY2 = (boundingBox.y + boundingBox.height + heightAdjustment) / pageSize.height;
 
           // 通常のハイライトストロークを作成
           const stroke: Stroke = {
