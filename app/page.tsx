@@ -2302,14 +2302,15 @@ export default function Home() {
       return;
     }
 
+    // 座標を取得（すべてのツールで使用）
+    const target = e.currentTarget;
+    const rect = target.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
     // テキスト選択モードが有効な場合、シングルクリックでテキスト範囲を検出してコピー
     if (textSelectionEnabled) {
       console.log('テキスト選択: 処理開始');
-      const target = e.currentTarget;
-      const rect = target.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      
       console.log('テキスト選択: クリック検出', { x, y, textItemsCount: textItems.length, textSelectionEnabled });
       
       if (textItems.length > 0) {
@@ -2394,11 +2395,6 @@ export default function Home() {
         setTextInputValue('');
         setEditingTextId(null);
       }
-      
-      const target = e.currentTarget;
-      const rect = target.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
       
       if (!pageSize) return;
       
@@ -2553,10 +2549,6 @@ export default function Home() {
         e.stopPropagation();
         return;
       }
-      const target = e.currentTarget;
-      const rect = target.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
       setTextInputPosition({ x, y });
       setTextInputValue('');
       setEditingTextId(null);
@@ -2631,10 +2623,6 @@ export default function Home() {
         return;
       }
       
-      const target = e.currentTarget;
-      const rect = target.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
       const normalizedX = x / pageSize.width;
       const normalizedY = y / pageSize.height;
       
@@ -2681,9 +2669,6 @@ export default function Home() {
     if (!inkCanvasRef.current) return;
 
     const canvas = inkCanvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
 
     // テキスト選択モードが有効な場合、シングルクリックでテキスト範囲を検出してコピー
     if (textSelectionEnabled && !tool) {
@@ -2768,10 +2753,20 @@ export default function Home() {
           // ディセンダー（「り」などの下にはみ出す部分）を含めるため、heightを少し大きくする
           const yOffset = boundingBox.height * 0.05; // heightの5%分下げる（上方向の調整）
           const heightAdjustment = boundingBox.height * 0.15; // heightの15%分増やす（下方向の調整、ディセンダー対応）
-          const normalizedX1 = boundingBox.x / pageSize.width;
-          const normalizedY1 = (boundingBox.y + yOffset) / pageSize.height;
-          const normalizedX2 = (boundingBox.x + boundingBox.width) / pageSize.width;
-          const normalizedY2 = (boundingBox.y + boundingBox.height + heightAdjustment) / pageSize.height;
+          
+          // キャンバスの実際のサイズを取得（スケールを考慮）
+          // rectはhandlePointerDownの先頭で取得されている
+          const target = e.currentTarget;
+          const canvasRect = target.getBoundingClientRect();
+          const canvasWidth = canvasRect.width;
+          const canvasHeight = canvasRect.height;
+          
+          // キャンバス座標系を正規化（0-1の比率に変換）
+          // pageSizeはscale=1.0の時のサイズなので、現在のスケールでのキャンバスサイズで正規化する
+          const normalizedX1 = boundingBox.x / canvasWidth;
+          const normalizedY1 = (boundingBox.y + yOffset) / canvasHeight;
+          const normalizedX2 = (boundingBox.x + boundingBox.width) / canvasWidth;
+          const normalizedY2 = (boundingBox.y + boundingBox.height + heightAdjustment) / canvasHeight;
 
           // 通常のハイライトストロークを作成
           const stroke: Stroke = {
@@ -11482,97 +11477,181 @@ export default function Home() {
               PDFの全ページにページ番号を自動で追加します
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 flex flex-col gap-4 py-4 bg-white/80 rounded-lg p-4 overflow-hidden" style={{ minHeight: 0 }}>
-            <div className="space-y-4 flex-shrink-0">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">プレフィックス（任意）:</label>
-                <input
-                  type="text"
-                  value={pageNumberPrefix}
-                  onChange={(e) => {
-                    setPageNumberPrefix(e.target.value);
-                    // リアルタイムプレビューを更新（デバウンス）
-                    if (pageNumberPreviewTimeoutRef.current) {
-                      clearTimeout(pageNumberPreviewTimeoutRef.current);
-                    }
-                    pageNumberPreviewTimeoutRef.current = setTimeout(() => {
-                      if (pageNumberPreview && originalPdfBytes) {
-                        generatePageNumberPreview();
+          <div className="flex flex-col gap-4 py-4 bg-white/80 rounded-lg p-4" style={{ maxHeight: 'calc(90vh - 250px)', overflow: 'hidden' }}>
+            <div className="flex flex-col gap-4" style={{ minHeight: 0 }}>
+              <div className="space-y-4 flex-shrink-0">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">プレフィックス（任意）:</label>
+                  <input
+                    type="text"
+                    value={pageNumberPrefix}
+                    onChange={(e) => {
+                      setPageNumberPrefix(e.target.value);
+                      // リアルタイムプレビューを更新（デバウンス）
+                      if (pageNumberPreviewTimeoutRef.current) {
+                        clearTimeout(pageNumberPreviewTimeoutRef.current);
                       }
-                    }, 500);
-                  }}
-                  placeholder="例: 第"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-                <p className="text-xs text-gray-500">
-                  ページ番号の前に表示する文字列（例: "第" → "第1", "第2", ...）
-                </p>
-              </div>
+                      pageNumberPreviewTimeoutRef.current = setTimeout(() => {
+                        if (originalPdfBytes) {
+                          generatePageNumberPreview();
+                        }
+                      }, 500);
+                    }}
+                    placeholder="例: 第"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                  <p className="text-xs text-gray-500">
+                    ページ番号の前に表示する文字列（例: "第" → "第1", "第2", ...）
+                  </p>
+                </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">X座標: {Math.round(pageNumberX * 100)}%</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={pageNumberX}
-                  onChange={(e) => {
-                    setPageNumberX(Number(e.target.value));
-                    // リアルタイムプレビューを更新（デバウンス）
-                    if (pageNumberPreviewTimeoutRef.current) {
-                      clearTimeout(pageNumberPreviewTimeoutRef.current);
-                    }
-                    pageNumberPreviewTimeoutRef.current = setTimeout(() => {
-                      if (pageNumberPreview && originalPdfBytes) {
-                        generatePageNumberPreview();
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={Math.round(pageNumberX * 100)}
+                    onChange={(e) => {
+                      const newValue = Math.max(0, Math.min(100, Number(e.target.value))) / 100;
+                      setPageNumberX(newValue);
+                      // リアルタイムプレビューを更新
+                      if (pageNumberPreviewTimeoutRef.current) {
+                        clearTimeout(pageNumberPreviewTimeoutRef.current);
                       }
-                    }, 300);
-                  }}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                />
+                      pageNumberPreviewTimeoutRef.current = setTimeout(() => {
+                        if (originalPdfBytes) {
+                          generatePageNumberPreview();
+                        }
+                      }, 200);
+                    }}
+                    className="w-20 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                  <div className="flex flex-col gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newValue = Math.min(1, pageNumberX + 0.01);
+                        setPageNumberX(newValue);
+                        if (pageNumberPreviewTimeoutRef.current) {
+                          clearTimeout(pageNumberPreviewTimeoutRef.current);
+                        }
+                        pageNumberPreviewTimeoutRef.current = setTimeout(() => {
+                          if (originalPdfBytes) {
+                            generatePageNumberPreview();
+                          }
+                        }, 200);
+                      }}
+                      className="w-6 h-4 flex items-center justify-center border border-gray-300 rounded-t bg-white hover:bg-gray-50"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newValue = Math.max(0, pageNumberX - 0.01);
+                        setPageNumberX(newValue);
+                        if (pageNumberPreviewTimeoutRef.current) {
+                          clearTimeout(pageNumberPreviewTimeoutRef.current);
+                        }
+                        pageNumberPreviewTimeoutRef.current = setTimeout(() => {
+                          if (originalPdfBytes) {
+                            generatePageNumberPreview();
+                          }
+                        }, 200);
+                      }}
+                      className="w-6 h-4 flex items-center justify-center border border-gray-300 rounded-b bg-white hover:bg-gray-50"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Y座標: {Math.round(pageNumberY * 100)}%</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={pageNumberY}
-                  onChange={(e) => {
-                    setPageNumberY(Number(e.target.value));
-                    // リアルタイムプレビューを更新（デバウンス）
-                    if (pageNumberPreviewTimeoutRef.current) {
-                      clearTimeout(pageNumberPreviewTimeoutRef.current);
-                    }
-                    pageNumberPreviewTimeoutRef.current = setTimeout(() => {
-                      if (pageNumberPreview && originalPdfBytes) {
-                        generatePageNumberPreview();
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={Math.round(pageNumberY * 100)}
+                    onChange={(e) => {
+                      const newValue = Math.max(0, Math.min(100, Number(e.target.value))) / 100;
+                      setPageNumberY(newValue);
+                      // リアルタイムプレビューを更新
+                      if (pageNumberPreviewTimeoutRef.current) {
+                        clearTimeout(pageNumberPreviewTimeoutRef.current);
                       }
-                    }, 300);
-                  }}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                />
+                      pageNumberPreviewTimeoutRef.current = setTimeout(() => {
+                        if (originalPdfBytes) {
+                          generatePageNumberPreview();
+                        }
+                      }, 200);
+                    }}
+                    className="w-20 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                  <div className="flex flex-col gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newValue = Math.min(1, pageNumberY + 0.01);
+                        setPageNumberY(newValue);
+                        if (pageNumberPreviewTimeoutRef.current) {
+                          clearTimeout(pageNumberPreviewTimeoutRef.current);
+                        }
+                        pageNumberPreviewTimeoutRef.current = setTimeout(() => {
+                          if (originalPdfBytes) {
+                            generatePageNumberPreview();
+                          }
+                        }, 200);
+                      }}
+                      className="w-6 h-4 flex items-center justify-center border border-gray-300 rounded-t bg-white hover:bg-gray-50"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newValue = Math.max(0, pageNumberY - 0.01);
+                        setPageNumberY(newValue);
+                        if (pageNumberPreviewTimeoutRef.current) {
+                          clearTimeout(pageNumberPreviewTimeoutRef.current);
+                        }
+                        pageNumberPreviewTimeoutRef.current = setTimeout(() => {
+                          if (originalPdfBytes) {
+                            generatePageNumberPreview();
+                          }
+                        }, 200);
+                      }}
+                      className="w-6 h-4 flex items-center justify-center border border-gray-300 rounded-b bg-white hover:bg-gray-50"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
+              </div>
+              </div>
+              <div className="flex flex-col gap-2 overflow-hidden" style={{ minHeight: 0, maxHeight: '350px', flexShrink: 0 }}>
+                <label className="text-sm font-medium flex-shrink-0">プレビュー:</label>
+                <div className="border-2 border-orange-300 rounded-lg overflow-auto bg-white" style={{ minHeight: 0, maxHeight: '300px' }}>
+                  {pageNumberPreview ? (
+                    <iframe
+                      src={pageNumberPreview}
+                      className="w-full h-full"
+                      style={{ minHeight: '250px' }}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-500" style={{ minHeight: '250px' }}>
+                      プレビューを生成してください
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-          <div className="flex-1 flex flex-col gap-2 overflow-hidden" style={{ minHeight: 0 }}>
-            <label className="text-sm font-medium flex-shrink-0">プレビュー:</label>
-            <div className="flex-1 border-2 border-orange-300 rounded-lg overflow-auto bg-white" style={{ minHeight: 0 }}>
-              {pageNumberPreview ? (
-                <iframe
-                  src={pageNumberPreview}
-                  className="w-full h-full"
-                  style={{ minHeight: '400px' }}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-500">
-                  プレビューを生成してください
-                </div>
-              )}
-            </div>
-          </div>
-          <DialogFooter className="bg-white/90 rounded-b-lg p-4 -m-6 mt-4 flex-shrink-0">
+          <DialogFooter className="bg-white/90 rounded-b-lg p-4 -m-6 mt-4 flex-shrink-0" style={{ position: 'relative', zIndex: 10 }}>
             <Button
               variant="outline"
               onClick={generatePageNumberPreview}
@@ -11594,25 +11673,28 @@ export default function Home() {
                 }
                 try {
                   setIsExporting(true);
-                  const { PDFDocument } = await import('pdf-lib');
-                  const pdfDoc = await PDFDocument.load(originalPdfBytes);
-                  // ページ番号を削除するため、元のPDFをそのまま保存
-                  const pdfBytes = await pdfDoc.save();
-                  const blob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = originalFileName ? `${originalFileName.replace('.pdf', '')}_ページ番号削除.pdf` : 'ページ番号削除.pdf';
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
+                  // 元のPDFをそのまま使用（ページ番号を削除）
+                  const pdfFile = new File([originalPdfBytes], originalFileName || 'document.pdf', { type: 'application/pdf' });
+                  const arrayBuffer = await pdfFile.arrayBuffer();
+                  setOriginalPdfBytes(arrayBuffer);
+                  
+                  // PDFを再読み込み
+                  const doc = await loadPDF(pdfFile);
+                  setPdfDoc(doc);
+                  setTotalPages(doc.numPages);
+                  setCurrentPage(1);
                   
                   toast({
                     title: "成功",
-                    description: "ページ番号を削除したPDFをダウンロードしました",
+                    description: "ページ番号を削除しました",
                     variant: "success",
                   });
+                  
+                  setShowPageNumberModal(false);
+                  if (pageNumberPreview) {
+                    URL.revokeObjectURL(pageNumberPreview);
+                    setPageNumberPreview(null);
+                  }
                 } catch (error) {
                   console.error('ページ番号削除エラー:', error);
                   toast({
@@ -11681,15 +11763,18 @@ export default function Home() {
                   }
                   
                   const pdfBytes = await pdfDoc.save();
-                  const blob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = originalFileName ? `${originalFileName.replace('.pdf', '')}_ページ番号付き.pdf` : 'ページ番号付き.pdf';
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
+                  const arrayBuffer = new ArrayBuffer(pdfBytes.length);
+                  new Uint8Array(arrayBuffer).set(pdfBytes);
+                  
+                  // アプリ上に表示
+                  const pdfFile = new File([arrayBuffer], originalFileName || 'document.pdf', { type: 'application/pdf' });
+                  setOriginalPdfBytes(arrayBuffer);
+                  
+                  // PDFを再読み込み
+                  const doc = await loadPDF(pdfFile);
+                  setPdfDoc(doc);
+                  setTotalPages(doc.numPages);
+                  setCurrentPage(1);
                   
                   toast({
                     title: "成功",
