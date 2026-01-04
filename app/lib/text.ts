@@ -121,7 +121,35 @@ export function drawTextAnnotation(
   } else {
     ctx.font = `${scaledFontSize}px sans-serif`;
   }
-  ctx.fillStyle = annotation.color;
+  
+  // 色と濃さ（opacity）を設定
+  const opacity = annotation.opacity ?? 1.0;
+  if (opacity < 1.0) {
+    // 色をrgba形式に変換してopacityを適用
+    const colorMatch = annotation.color.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+    if (colorMatch) {
+      const r = parseInt(colorMatch[1], 16);
+      const g = parseInt(colorMatch[2], 16);
+      const b = parseInt(colorMatch[3], 16);
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    } else {
+      // 既にrgba形式の場合は、opacityを乗算
+      const rgbaMatch = annotation.color.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/);
+      if (rgbaMatch) {
+        const r = parseInt(rgbaMatch[1]);
+        const g = parseInt(rgbaMatch[2]);
+        const b = parseInt(rgbaMatch[3]);
+        const existingOpacity = rgbaMatch[4] ? parseFloat(rgbaMatch[4]) : 1.0;
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${existingOpacity * opacity})`;
+      } else {
+        ctx.fillStyle = annotation.color;
+        ctx.globalAlpha = opacity;
+      }
+    }
+  } else {
+    ctx.fillStyle = annotation.color;
+  }
+  
   ctx.textBaseline = 'top';
   
   // ユーザーが入力した改行（\n）で分割して、そのまま描画
@@ -133,6 +161,8 @@ export function drawTextAnnotation(
     ctx.fillText(line, x, y + index * scaledFontSize * 1.2);
   });
   
+  // globalAlphaをリセット（他の描画に影響しないように）
+  ctx.globalAlpha = 1.0;
   ctx.restore();
 }
 

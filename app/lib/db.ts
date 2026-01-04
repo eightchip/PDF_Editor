@@ -25,6 +25,7 @@ export type TextAnnotation = {
   width?: number; // テキストボックスの幅（オプション）
   height?: number; // テキストボックスの高さ（オプション）
   fontName?: string; // フォント名（オプション）
+  opacity?: number; // 文字の濃さ（0-1、デフォルト1.0）
 };
 
 export type ShapeAnnotation = {
@@ -57,18 +58,6 @@ interface AnnotationsDB extends DBSchema {
   shapeAnnotations: {
     key: string; // `${docId}_${pageNumber}`
     value: ShapeAnnotation[];
-  };
-  signatures: {
-    key: string; // `${docId}_${signatureId}`
-    value: import('./signature').Signature;
-  };
-  approvalWorkflows: {
-    key: string; // `${docId}_${workflowId}`
-    value: import('./signature').ApprovalWorkflow;
-  };
-  watermarkHistory: {
-    key: string; // `watermark_${text}`
-    value: { text: string; timestamp: number };
   };
   ocrResults: {
     key: string; // `${docId}_${pageNumber}`
@@ -106,15 +95,6 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
         }
         if (!db.objectStoreNames.contains('shapeAnnotations')) {
           db.createObjectStore('shapeAnnotations');
-        }
-        if (!db.objectStoreNames.contains('signatures')) {
-          db.createObjectStore('signatures');
-        }
-        if (!db.objectStoreNames.contains('approvalWorkflows')) {
-          db.createObjectStore('approvalWorkflows');
-        }
-        if (!db.objectStoreNames.contains('watermarkHistory')) {
-          db.createObjectStore('watermarkHistory');
         }
         if (!db.objectStoreNames.contains('ocrResults')) {
           db.createObjectStore('ocrResults');
@@ -156,9 +136,6 @@ async function getDB(): Promise<IDBPDatabase<AnnotationsDB>> {
             db.createObjectStore('annotations');
             db.createObjectStore('textAnnotations');
             db.createObjectStore('shapeAnnotations');
-            db.createObjectStore('signatures');
-            db.createObjectStore('approvalWorkflows');
-            db.createObjectStore('watermarkHistory');
             db.createObjectStore('ocrResults');
             db.createObjectStore('tableOfContents');
             db.createObjectStore('scenarios');
@@ -353,88 +330,6 @@ export async function getAllShapeAnnotations(
   return shapes;
 }
 
-// 署名関連の関数
-export async function saveSignature(docId: string, signature: import('./signature').Signature): Promise<void> {
-  const db = await getDB();
-  const key = `${docId}_${signature.id}`;
-  await db.put('signatures', signature, key);
-}
-
-export async function getAllSignatures(docId: string): Promise<import('./signature').Signature[]> {
-  const db = await getDB();
-  const tx = db.transaction('signatures', 'readonly');
-  const store = tx.objectStore('signatures');
-  const allKeys = await store.getAllKeys();
-  
-  // docIdでフィルタリング
-  const matchingKeys = allKeys.filter(key => String(key).startsWith(`${docId}_`));
-  const signatures: import('./signature').Signature[] = [];
-  
-  for (const key of matchingKeys) {
-    const sig = await store.get(key);
-    if (sig) {
-      signatures.push(sig);
-    }
-  }
-  
-  return signatures;
-}
-
-export async function deleteSignature(docId: string, signatureId: string): Promise<void> {
-  const db = await getDB();
-  const key = `${docId}_${signatureId}`;
-  await db.delete('signatures', key);
-}
-
-// 承認ワークフロー関連の関数
-export async function saveApprovalWorkflow(docId: string, workflow: import('./signature').ApprovalWorkflow): Promise<void> {
-  const db = await getDB();
-  const key = `${docId}_${workflow.id}`;
-  await db.put('approvalWorkflows', workflow, key);
-}
-
-export async function getAllApprovalWorkflows(docId: string): Promise<import('./signature').ApprovalWorkflow[]> {
-  const db = await getDB();
-  const tx = db.transaction('approvalWorkflows', 'readonly');
-  const store = tx.objectStore('approvalWorkflows');
-  const allKeys = await store.getAllKeys();
-  
-  // docIdでフィルタリング
-  const matchingKeys = allKeys.filter(key => String(key).startsWith(`${docId}_`));
-  const workflows: import('./signature').ApprovalWorkflow[] = [];
-  
-  for (const key of matchingKeys) {
-    const wf = await store.get(key);
-    if (wf) {
-      workflows.push(wf);
-    }
-  }
-  
-  return workflows;
-}
-
-// 透かし履歴関連の関数
-export async function saveWatermarkHistory(text: string): Promise<void> {
-  if (!text || text.trim() === '') return;
-  const db = await getDB();
-  const key = `watermark_${text.trim()}`;
-  await db.put('watermarkHistory', { text: text.trim(), timestamp: Date.now() }, key);
-}
-
-export async function getAllWatermarkHistory(): Promise<string[]> {
-  const db = await getDB();
-  const tx = db.transaction('watermarkHistory', 'readonly');
-  const store = tx.objectStore('watermarkHistory');
-  const allValues = await store.getAll();
-  
-  // タイムスタンプでソート（新しい順）
-  const sorted = allValues
-    .sort((a, b) => b.timestamp - a.timestamp)
-    .map(item => item.text);
-  
-  // 重複を除去
-  return Array.from(new Set(sorted));
-}
 
 // OCR結果関連の関数
 export async function saveOCRResult(

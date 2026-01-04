@@ -13,8 +13,7 @@ import { drawShapeAnnotation, redrawShapeAnnotations, generateShapeId } from './
 import { extractTextItems, findNearestTextLine, findTextBoundingBox, smoothStroke, type TextItem } from './lib/text-detection';
 import { convertImageToPDF } from './lib/image-to-pdf';
 import { extractFormFields, setFormFieldValues, calculateFormFields, setupCommonCalculations, type FormField } from './lib/forms';
-import { generateSignatureId, type Signature } from './lib/signature';
-import { saveSignature, getAllSignatures, deleteSignature, saveWatermarkHistory, getAllWatermarkHistory, saveOCRResult, loadOCRResult, getAllOCRResults, deleteOCRResult, saveTableOfContents, loadTableOfContents, saveScenario, loadScenario, getAllScenarios, deleteScenario } from './lib/db';
+import { saveOCRResult, loadOCRResult, getAllOCRResults, deleteOCRResult, saveTableOfContents, loadTableOfContents, saveScenario, loadScenario, getAllScenarios, deleteScenario } from './lib/db';
 import { generateTableOfContents, type TableOfContentsEntry } from './lib/table-of-contents';
 import { splitPDF, splitPDFByRanges, splitPDFByPageGroups } from './lib/pdf-split';
 import { performOCROnPDFPage, type OCRResult } from './lib/ocr';
@@ -150,7 +149,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button"; // Dialog内でのみ使用
-import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections, MdDragHandle, MdLock, MdSecurity, MdCheckCircle, MdInfo, MdLocalOffer, MdAssignment, MdContentCut, MdMenuBook, MdFileCopy, MdSlideshow, MdFullscreen, MdFullscreenExit, MdVisibility, MdVisibilityOff, MdPrint, MdDescription, MdNotes, MdTimer, MdTimerOff, MdPlayArrow, MdPause, MdStop, MdBlock, MdCallSplit, MdRemoveCircle } from 'react-icons/md';
+import { MdClose, MdSave, MdFileDownload, MdUndo, MdRedo, MdDelete, MdEdit, MdHighlight, MdTextFields, MdShapeLine, MdRectangle, MdCircle, MdArrowForward, MdSelectAll, MdList, MdZoomIn, MdZoomOut, MdRotateRight, MdNavigateBefore, MdNavigateNext, MdImage, MdInsertDriveFile, MdCreate, MdFormatColorFill, MdBrush, MdClear, MdRemove, MdPalette, MdUpload, MdQrCode, MdCameraAlt, MdCamera, MdMic, MdMicOff, MdArrowUpward, MdArrowDownward, MdCollections, MdDragHandle, MdLock, MdSecurity, MdCheckCircle, MdInfo, MdLocalOffer, MdAssignment, MdContentCut, MdMenuBook, MdFileCopy, MdContentCopy, MdSlideshow, MdFullscreen, MdFullscreenExit, MdVisibility, MdVisibilityOff, MdPrint, MdDescription, MdNotes, MdTimer, MdTimerOff, MdPlayArrow, MdPause, MdStop, MdBlock, MdCallSplit, MdRemoveCircle } from 'react-icons/md';
 import { QRCodeSVG } from 'qrcode.react';
 // PDF.jsの型は動的インポートで取得
 
@@ -196,18 +195,6 @@ export default function Home() {
   const [originalFileName, setOriginalFileName] = useState<string | null>(null); // 元のファイル名を保持
   const [pageRotations, setPageRotations] = useState<Record<number, number>>({}); // ページごとの回転角度（0, 90, 180, 270）
   const [rotationMode, setRotationMode] = useState<'all' | 'current'>('all'); // 全ページ回転か現在のページのみか
-  const [showWatermarkDialog, setShowWatermarkDialog] = useState(false);
-  const [watermarkText, setWatermarkText] = useState('');
-  const [watermarkHistory, setWatermarkHistory] = useState<string[]>([]);
-  const [watermarkPattern, setWatermarkPattern] = useState<'center' | 'grid' | 'tile' | 'bottom-right' | 'top-right' | 'bottom-left' | 'top-left'>('center'); // 透かしの配置パターン
-  const [watermarkDensity, setWatermarkDensity] = useState(3); // 透かしの密度（グリッド/タイルの場合の列数・行数）
-  const [watermarkAngle, setWatermarkAngle] = useState(45); // 透かしの角度（度）
-  const [watermarkOpacity, setWatermarkOpacity] = useState(0.5); // 透かしの濃度（0-1、デフォルト0.5）
-  const [watermarkFontSize, setWatermarkFontSize] = useState(0.1); // 透かしのフォントサイズ（ページサイズに対する比率、デフォルト0.1=10%）
-  const [watermarkOffsetX, setWatermarkOffsetX] = useState(0); // 透かしのX方向オフセット（ピクセル、デフォルト0）
-  const [watermarkOffsetY, setWatermarkOffsetY] = useState(0); // 透かしのY方向オフセット（ピクセル、デフォルト0）
-  const [showWatermarkPreview, setShowWatermarkPreview] = useState(false); // 透かしプレビューの表示状態
-  const [watermarkPdfPreviewUrl, setWatermarkPdfPreviewUrl] = useState<string | null>(null); // 透かしPDFプレビューのURL
   const [showThumbnails, setShowThumbnails] = useState(false);
   const [showThumbnailModal, setShowThumbnailModal] = useState(false); // 全画面サムネイルモーダルの表示状態
   const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
@@ -303,6 +290,7 @@ export default function Home() {
   }>({ strokes: [], shapes: [], texts: [] });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [allowTextDrag, setAllowTextDrag] = useState(false); // テキストのドラッグ可否
   const [color, setColor] = useState('#000000');
   const [width, setWidth] = useState(3);
   const [fontSize, setFontSize] = useState(16);
@@ -321,6 +309,7 @@ export default function Home() {
   const editingTextIdRef = useRef<string | null>(null);
   const [textInputValue, setTextInputValue] = useState('');
   const [textInputPosition, setTextInputPosition] = useState<{ x: number; y: number } | null>(null);
+  const [textInputOpacity, setTextInputOpacity] = useState(1.0); // 文字の濃さ（0-1、デフォルト1.0）
 
   // 図形注釈関連
   const [shapeAnnotations, setShapeAnnotations] = useState<ShapeAnnotation[]>([]);
@@ -338,25 +327,55 @@ export default function Home() {
   const [showFormFields, setShowFormFields] = useState(false); // フォームフィールドパネルの表示状態
   const [editingFormField, setEditingFormField] = useState<string | null>(null); // 編集中のフォームフィールドID
 
-  // 電子署名・承認関連
-  const [signatures, setSignatures] = useState<Signature[]>([]);
-  const [showSignatureDialog, setShowSignatureDialog] = useState(false);
-  const [signatureName, setSignatureName] = useState('');
-  const [signatureEmail, setSignatureEmail] = useState('');
-  const [signatureReason, setSignatureReason] = useState('');
-  const [signatureLocation, setSignatureLocation] = useState('');
-  const [signatureImage, setSignatureImage] = useState<string | null>(null); // Base64画像
-  const [signatureText, setSignatureText] = useState(''); // テキスト署名
-  const [signaturePosition, setSignaturePosition] = useState<'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'>('bottom-left'); // 署名位置
-  const [signatureImageScale, setSignatureImageScale] = useState(100); // 署名画像のサイズ比率（%、縦横一括）
-  const [signatureFontSize, setSignatureFontSize] = useState(10); // 署名フォントサイズ
-  const [signatureX, setSignatureX] = useState(0.1); // 署名のX位置（0-1の比率）
-  const [signatureY, setSignatureY] = useState(0.1); // 署名のY位置（0-1の比率）
-  const [signatureWidth, setSignatureWidth] = useState(0.3); // 署名の幅（0-1の比率）
-  const [signatureHeight, setSignatureHeight] = useState(0.15); // 署名の高さ（0-1の比率）
-  const [showSignaturePreview, setShowSignaturePreview] = useState(false); // 署名プレビューの表示状態
-  const [signaturePdfPreviewUrl, setSignaturePdfPreviewUrl] = useState<string | null>(null); // PDFプレビューのURL
   const [showSplitDialog, setShowSplitDialog] = useState(false); // PDF分割ダイアログ
+  
+  // ページ番号自動付与関連
+  const [showPageNumberModal, setShowPageNumberModal] = useState(false);
+  const [pageNumberPrefix, setPageNumberPrefix] = useState('');
+  const [pageNumberX, setPageNumberX] = useState(0.5); // 0-1の比率
+  const [pageNumberY, setPageNumberY] = useState(0.05); // 0-1の比率
+  const [pageNumberPreview, setPageNumberPreview] = useState<string | null>(null); // プレビュー用のPDFデータURL
+  const pageNumberPreviewTimeoutRef = useRef<NodeJS.Timeout | null>(null); // リアルタイムプレビュー用のタイマー
+  
+  // ページ番号プレビュー生成関数
+  const generatePageNumberPreview = useCallback(async () => {
+    if (!originalPdfBytes) return;
+    try {
+      const { PDFDocument, rgb } = await import('pdf-lib');
+      const pdfDoc = await PDFDocument.load(originalPdfBytes);
+      const helveticaFont = await pdfDoc.embedFont('Helvetica');
+      
+      const pages = pdfDoc.getPages();
+      for (let i = 0; i < Math.min(3, pages.length); i++) {
+        const page = pages[i];
+        const { width, height } = page.getSize();
+        const pageNum = i + 1;
+        const pageText = `${pageNumberPrefix}${pageNum}`;
+        const fontSize = 12;
+        const x = width * pageNumberX;
+        const y = height * (1 - pageNumberY); // PDF座標系は下から上
+        
+        page.drawText(pageText, {
+          x,
+          y,
+          size: fontSize,
+          font: helveticaFont,
+          color: rgb(0, 0, 0),
+        });
+      }
+      
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
+      if (pageNumberPreview) {
+        URL.revokeObjectURL(pageNumberPreview);
+      }
+      const url = URL.createObjectURL(blob);
+      setPageNumberPreview(url);
+    } catch (error) {
+      console.error('プレビュー生成エラー:', error);
+    }
+  }, [originalPdfBytes, pageNumberPrefix, pageNumberX, pageNumberY, pageNumberPreview]);
+  
   const [showOCRDialog, setShowOCRDialog] = useState(false); // OCRダイアログ
   const [showTableOfContentsDialog, setShowTableOfContentsDialog] = useState(false); // 目次ダイアログ
   const [tableOfContents, setTableOfContents] = useState<TableOfContentsEntry[]>([]); // 目次データ
@@ -408,14 +427,14 @@ export default function Home() {
   
   // ダイアログが開いているときにbodyのpointer-eventsを有効化
   useEffect(() => {
-    if (showSignatureDialog || showSplitDialog || showOCRDialog) {
+    if (showSplitDialog || showOCRDialog) {
       // ダイアログが開いているときはbodyのpointer-eventsをautoに設定
       document.body.style.pointerEvents = 'auto';
     } else {
       // ダイアログが閉じているときは元に戻す（必要に応じて）
       // document.body.style.pointerEvents = '';
     }
-  }, [showSignatureDialog, showSplitDialog, showOCRDialog]);
+  }, [showSplitDialog, showOCRDialog]);
 
   // Undo/Redo（strokes、shapes、textAnnotationsの全てを含む）
   type UndoState = {
@@ -461,10 +480,6 @@ export default function Home() {
   }, [tool, strokes, pageSize]);
 
   // ダイアログ状態の監視（デバッグ用）
-  useEffect(() => {
-    console.log('showSignatureDialog changed:', showSignatureDialog);
-  }, [showSignatureDialog]);
-
   useEffect(() => {
     console.log('showSplitDialog changed:', showSplitDialog);
   }, [showSplitDialog]);
@@ -1214,13 +1229,9 @@ export default function Home() {
             setFormFieldValues({});
           }
           
-          // 署名を読み込む
+          // OCR結果を読み込む
           if (id) {
             try {
-              const loadedSignatures = await getAllSignatures(id);
-              setSignatures(loadedSignatures);
-              
-              // OCR結果を読み込む
               const loadedOcrResults = await getAllOCRResults(id, doc.numPages);
               // 既存のOCR結果にも不要なスペース削除を適用
               const cleanedOcrResults: Record<number, OCRResult> = {};
@@ -1232,7 +1243,7 @@ export default function Home() {
               }
               setOcrResults(cleanedOcrResults);
             } catch (error) {
-              console.warn('署名・ワークフロー・OCR結果の読み込みに失敗:', error);
+              console.warn('OCR結果の読み込みに失敗:', error);
             }
           }
         } catch (error) {
@@ -1260,115 +1271,6 @@ export default function Home() {
     }
   };
 
-  // 透かしをCanvasに描画する関数
-  const drawWatermarkOnCanvas = useCallback((ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) => {
-    if (!watermarkText || !watermarkText.trim() || !showWatermarkPreview) return;
-    
-    const pattern = watermarkPattern || 'center';
-    const density = watermarkDensity || 3;
-    const angle = watermarkAngle ?? 45; // 0度も有効な値として扱うため、??を使用
-    const opacity = watermarkOpacity ?? 0.5; // 濃度（0-1）
-    const fontSizeRatio = watermarkFontSize ?? 0.1; // フォントサイズ比率（デフォルト0.1=10%）
-    const offsetX = watermarkOffsetX || 0; // X方向オフセット（ピクセル）
-    const offsetY = watermarkOffsetY || 0; // Y方向オフセット（ピクセル）
-    
-    const fontSize = Math.min(canvasWidth, canvasHeight) * fontSizeRatio;
-    ctx.font = `${fontSize}px Arial, sans-serif`;
-    const textMetrics = ctx.measureText(watermarkText);
-    const textWidth = textMetrics.width;
-    const textHeight = fontSize * 1.2;
-    
-    ctx.save();
-    ctx.globalAlpha = opacity; // 濃度を適用
-    ctx.fillStyle = `rgba(128, 128, 128, ${opacity})`; // 濃度を適用
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
-    if (pattern === 'center') {
-      // 中央1箇所
-      ctx.save();
-      ctx.translate(canvasWidth / 2, canvasHeight / 2);
-      if (angle !== 0) {
-        ctx.rotate(angle * Math.PI / 180);
-      }
-      ctx.fillText(watermarkText, 0, 0);
-      ctx.restore();
-    } else if (pattern === 'bottom-right') {
-      // 右下1箇所（Canvas座標系では下から15% = 上から85%）
-      ctx.save();
-      ctx.translate(canvasWidth * 0.85 + watermarkOffsetX, canvasHeight * 0.85 - watermarkOffsetY);
-      if (angle !== 0) {
-        ctx.rotate(angle * Math.PI / 180);
-      }
-      ctx.fillText(watermarkText, 0, 0);
-      ctx.restore();
-    } else if (pattern === 'top-right') {
-      // 右上1箇所（Canvas座標系では上から15% = 下から85%）
-      ctx.save();
-      ctx.translate(canvasWidth * 0.85 + watermarkOffsetX, canvasHeight * 0.15 - watermarkOffsetY);
-      if (angle !== 0) {
-        ctx.rotate(angle * Math.PI / 180);
-      }
-      ctx.fillText(watermarkText, 0, 0);
-      ctx.restore();
-    } else if (pattern === 'bottom-left') {
-      // 左下1箇所（Canvas座標系では下から15% = 上から85%）
-      ctx.save();
-      ctx.translate(canvasWidth * 0.15 + watermarkOffsetX, canvasHeight * 0.85 - watermarkOffsetY);
-      if (angle !== 0) {
-        ctx.rotate(angle * Math.PI / 180);
-      }
-      ctx.fillText(watermarkText, 0, 0);
-      ctx.restore();
-    } else if (pattern === 'top-left') {
-      // 左上1箇所（Canvas座標系では上から15% = 下から85%）
-      ctx.save();
-      ctx.translate(canvasWidth * 0.15 + watermarkOffsetX, canvasHeight * 0.15 - watermarkOffsetY);
-      if (angle !== 0) {
-        ctx.rotate(angle * Math.PI / 180);
-      }
-      ctx.fillText(watermarkText, 0, 0);
-      ctx.restore();
-    } else if (pattern === 'grid') {
-      // グリッド状
-      const cols = density;
-      const rows = density;
-      const spacingX = canvasWidth / (cols + 1);
-      const spacingY = canvasHeight / (rows + 1);
-      
-      for (let row = 1; row <= rows; row++) {
-        for (let col = 1; col <= cols; col++) {
-          const x = col * spacingX;
-          const y = row * spacingY;
-          ctx.save();
-          ctx.translate(x, y);
-          if (angle !== 0) {
-            ctx.rotate(angle * Math.PI / 180);
-          }
-          ctx.fillText(watermarkText, 0, 0);
-          ctx.restore();
-        }
-      }
-    } else if (pattern === 'tile') {
-      // タイル状
-      const spacingX = canvasWidth / density;
-      const spacingY = canvasHeight / density;
-      
-      for (let y = spacingY / 2; y < canvasHeight; y += spacingY) {
-        for (let x = spacingX / 2; x < canvasWidth; x += spacingX) {
-          ctx.save();
-          ctx.translate(x, y);
-          if (angle !== 0) {
-            ctx.rotate(angle * Math.PI / 180);
-          }
-          ctx.fillText(watermarkText, 0, 0);
-          ctx.restore();
-        }
-      }
-    }
-    
-    ctx.restore();
-  }, [watermarkText, showWatermarkPreview, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, watermarkFontSize, watermarkOffsetX, watermarkOffsetY]);
 
   // スライドショーモードが変更されたときに再レンダリング
   useEffect(() => {
@@ -1902,14 +1804,6 @@ export default function Home() {
           }
         }
 
-        // 透かしプレビューを描画
-        if (showWatermarkPreview && watermarkText && watermarkText.trim()) {
-          const inkCtx = inkCanvas.getContext('2d');
-          if (inkCtx) {
-            inkCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-            drawWatermarkOnCanvas(inkCtx, size.width, size.height);
-          }
-        }
       } else {
         // 新規PDF読み込み時もinkCanvasを初期化
         const inkCtx = inkCanvas.getContext('2d');
@@ -2027,7 +1921,7 @@ export default function Home() {
       };
       checkAndRender();
     }
-  }, [pdfDoc, currentPage, scale, docId, pageRotations, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, watermarkFontSize, watermarkOffsetX, watermarkOffsetY, drawWatermarkOnCanvas, snapToTextEnabled, textSelectionEnabled, isPresentationMode, showThumbnailModal, showTableOfContentsDialog]);
+  }, [pdfDoc, currentPage, scale, docId, pageRotations, snapToTextEnabled, textSelectionEnabled, isPresentationMode, showThumbnailModal, showTableOfContentsDialog]);
   
   // モーダルが閉じたときに再レンダリング（メイン画面用、プレゼンモードは除外）
   useEffect(() => {
@@ -2092,142 +1986,10 @@ export default function Home() {
           ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
         }
         redrawStrokes(ctx, strokes, pageSize.width, pageSize.height);
-        // 透かしプレビューを描画
-        if (showWatermarkPreview && watermarkText && watermarkText.trim()) {
-          drawWatermarkOnCanvas(ctx, pageSize.width, pageSize.height);
-        }
       }
     }
-  }, [strokes, pageSize, showWatermarkPreview, watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, watermarkFontSize, watermarkOffsetX, watermarkOffsetY, drawWatermarkOnCanvas]);
+  }, [strokes, pageSize]);
 
-  // 透かしの設定変更時にリアルタイムでプレビューを更新
-  useEffect(() => {
-    if (!showWatermarkPreview || !watermarkPdfPreviewUrl || !pdfDoc || !watermarkText.trim() || !docId || !pageSize || !originalPdfBytes) {
-      return;
-    }
-
-    // デバウンス: 500ms後に実行
-    const timeoutId = setTimeout(async () => {
-      try {
-        // 現在のページの注釈を取得
-        const actualPageNum = getActualPageNum(currentPage);
-        const pageAnnotations = await loadAnnotations(docId, actualPageNum);
-        const pageTextAnnotations = await loadTextAnnotations(docId, actualPageNum);
-        const pageShapeAnnotations = await loadShapeAnnotations(docId, actualPageNum);
-        
-        // PDFをエクスポート（透かしを含む）
-        const pdfBytes = await exportAnnotatedPDFV2(
-          originalPdfBytes,
-          { [currentPage]: pageAnnotations },
-          { [currentPage]: pageSize },
-          { [currentPage]: pageTextAnnotations },
-          { [currentPage]: pageShapeAnnotations },
-          undefined,
-          undefined,
-          undefined,
-          watermarkText || undefined,
-          undefined,
-          watermarkPattern,
-          watermarkDensity,
-          watermarkAngle,
-          watermarkOpacity,
-          watermarkFontSize,
-          watermarkOffsetX,
-          watermarkOffsetY
-        );
-        
-        // PDFプレビュー用のURLを生成
-        const arrayBuffer = pdfBytes.buffer instanceof ArrayBuffer 
-          ? pdfBytes.buffer 
-          : new Uint8Array(pdfBytes).buffer;
-        const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        if (watermarkPdfPreviewUrl) {
-          URL.revokeObjectURL(watermarkPdfPreviewUrl);
-        }
-        setWatermarkPdfPreviewUrl(url);
-      } catch (error) {
-        console.error('透かしリアルタイムプレビュー更新エラー:', error);
-      }
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [watermarkText, watermarkPattern, watermarkDensity, watermarkAngle, watermarkOpacity, watermarkFontSize, watermarkOffsetX, watermarkOffsetY, showWatermarkPreview, pdfDoc, docId, pageSize, originalPdfBytes, currentPage]);
-
-  // 署名の位置・サイズ変更時にリアルタイムでプレビューを更新
-  useEffect(() => {
-    if (!showSignaturePreview || !pdfDoc || !signatureName.trim() || !docId || !pageSize || !originalPdfBytes) {
-      return;
-    }
-    
-    // 初回はプレビューを生成しない（ボタンで生成）
-    if (!signaturePdfPreviewUrl) {
-      return;
-    }
-
-    // デバウンス: 500ms後に実行
-    const timeoutId = setTimeout(async () => {
-      try {
-        const previewSignature: Signature = {
-          id: generateSignatureId(),
-          signerName: signatureName,
-          signerEmail: signatureEmail || undefined,
-          signDate: new Date(),
-          signatureImage: signatureImage || undefined,
-          signatureText: signatureText || undefined,
-          position: {
-            pageNumber: currentPage,
-            x: signatureX,
-            y: signatureY,
-            width: signatureWidth,
-            height: signatureHeight,
-          },
-          reason: signatureReason || undefined,
-          location: signatureLocation || undefined,
-          imageWidth: signatureImageScale,
-          imageHeight: signatureImageScale,
-          fontSize: signatureFontSize,
-        };
-        
-        // 現在のページの注釈を取得
-        const actualPageNum = getActualPageNum(currentPage);
-        const pageAnnotations = await loadAnnotations(docId, actualPageNum);
-        const pageTextAnnotations = await loadTextAnnotations(docId, actualPageNum);
-        const pageShapeAnnotations = await loadShapeAnnotations(docId, actualPageNum);
-        
-        // PDFをエクスポート（署名を含む）
-        const pdfBytes = await exportAnnotatedPDFV2(
-          originalPdfBytes,
-          { [currentPage]: pageAnnotations },
-          { [currentPage]: pageSize },
-          { [currentPage]: pageTextAnnotations },
-          { [currentPage]: pageShapeAnnotations },
-          undefined,
-          undefined,
-          [previewSignature]
-        );
-        
-        // PDFプレビュー用のURLを生成
-        const arrayBuffer = pdfBytes.buffer instanceof ArrayBuffer 
-          ? pdfBytes.buffer 
-          : new Uint8Array(pdfBytes).buffer;
-        const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        // 古いURLをクリーンアップ（非同期で実行）
-        setSignaturePdfPreviewUrl(prevUrl => {
-          if (prevUrl) {
-            // 次のレンダリングサイクルでクリーンアップ
-            setTimeout(() => URL.revokeObjectURL(prevUrl), 100);
-          }
-          return url;
-        });
-      } catch (error) {
-        console.error('リアルタイムプレビュー更新エラー:', error);
-      }
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [signatureX, signatureY, signatureWidth, signatureHeight, signatureImageScale, signatureFontSize, showSignaturePreview, pdfDoc, signatureName, docId, pageSize, originalPdfBytes, currentPage, signatureEmail, signatureImage, signatureText, signatureReason, signatureLocation]);
 
   // サムネイル生成（注釈なし）
   const generateThumbnails = async () => {
@@ -2348,18 +2110,6 @@ export default function Home() {
     setThumbnailsWithAnnotations(newThumbnails);
   };
 
-  // 透かし履歴を読み込む
-  useEffect(() => {
-    const loadWatermarkHistory = async () => {
-      try {
-        const history = await getAllWatermarkHistory();
-        setWatermarkHistory(history);
-      } catch (error) {
-        console.error('透かし履歴の読み込みに失敗:', error);
-      }
-    };
-    loadWatermarkHistory();
-  }, []);
 
   // PDF読み込み時にサムネイルを生成
   useEffect(() => {
@@ -2775,9 +2525,20 @@ export default function Home() {
         });
       }
       
-      // ドラッグ開始位置を記録
-      setDragStart({ x, y });
-      setIsDragging(false);
+      // テキスト注釈のみが選択された場合は、allowTextDragがtrueの場合のみドラッグを有効化
+      // ストロークや図形が選択されている場合、またはテキストのみでallowTextDragがtrueの場合はドラッグを有効化
+      const hasStrokesOrShapes = clickedStrokes.length > 0 || clickedShapes.length > 0;
+      const hasTextsOnly = clickedTexts.length > 0 && clickedStrokes.length === 0 && clickedShapes.length === 0;
+      
+      if (hasStrokesOrShapes || (hasTextsOnly && allowTextDrag)) {
+        // ドラッグ開始位置を記録
+        setDragStart({ x, y });
+        setIsDragging(false);
+      } else {
+        // テキストのみでallowTextDragがfalseの場合はドラッグを無効化
+        setDragStart(null);
+        setIsDragging(false);
+      }
       
       e.preventDefault();
       e.stopPropagation(); // イベントの伝播を停止
@@ -3108,6 +2869,7 @@ export default function Home() {
           setTextInputPosition({ x: clickedText.x * pageSize.width, y: clickedText.y * pageSize.height });
           setFontSize(clickedText.fontSize);
           setColor(clickedText.color);
+          setTextInputOpacity(clickedText.opacity ?? 1.0); // 既存の濃さを読み込む
           setTool('text'); // テキストツールに切り替え
           e.preventDefault();
           return;
@@ -3300,7 +3062,17 @@ export default function Home() {
       }
       
       // 選択ツールでドラッグ中の場合は移動処理
+      // テキスト注釈のみが選択されている場合は、allowTextDragがfalseの場合はドラッグを無効化
       if (dragStart && selectedAnnotationIds.strokes.length + selectedAnnotationIds.shapes.length + selectedAnnotationIds.texts.length > 0) {
+        // テキスト注釈のみが選択されている場合は、allowTextDragがfalseの場合はドラッグを無効化
+        if (selectedAnnotationIds.texts.length > 0 && selectedAnnotationIds.strokes.length === 0 && selectedAnnotationIds.shapes.length === 0 && !allowTextDrag) {
+          setDragStart(null);
+          setIsDragging(false);
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        
         const target = e.currentTarget;
         const rect = target.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -3352,17 +3124,19 @@ export default function Home() {
           return shape;
         });
         
-        // テキストを移動
-        const movedTexts = textAnnotations.map(text => {
-          if (selectedAnnotationIds.texts.includes(text.id)) {
-            return {
-              ...text,
-              x: Math.max(0, Math.min(1, text.x + deltaX)),
-              y: Math.max(0, Math.min(1, text.y + deltaY)),
-            };
-          }
-          return text;
-        });
+        // テキストを移動（allowTextDragがtrueの場合のみ）
+        const movedTexts = allowTextDrag && selectedAnnotationIds.texts.length > 0
+          ? textAnnotations.map(text => {
+              if (selectedAnnotationIds.texts.includes(text.id)) {
+                return {
+                  ...text,
+                  x: Math.max(0, Math.min(1, text.x + deltaX)),
+                  y: Math.max(0, Math.min(1, text.y + deltaY)),
+                };
+              }
+              return text;
+            })
+          : textAnnotations; // allowTextDragがfalseの場合は移動しない
         
         setStrokes(movedStrokes);
         setShapeAnnotations(movedShapes);
@@ -3695,17 +3469,19 @@ export default function Home() {
           return shape;
         });
         
-        // テキストを移動
-        const movedTexts = textAnnotations.map(text => {
-          if (selectedAnnotationIds.texts.includes(text.id)) {
-            return {
-              ...text,
-              x: Math.max(0, Math.min(1, text.x + deltaX)),
-              y: Math.max(0, Math.min(1, text.y + deltaY)),
-            };
-          }
-          return text;
-        });
+        // テキストを移動（allowTextDragがtrueの場合のみ）
+        const movedTexts = allowTextDrag && selectedAnnotationIds.texts.length > 0
+          ? textAnnotations.map(text => {
+              if (selectedAnnotationIds.texts.includes(text.id)) {
+                return {
+                  ...text,
+                  x: Math.max(0, Math.min(1, text.x + deltaX)),
+                  y: Math.max(0, Math.min(1, text.y + deltaY)),
+                };
+              }
+              return text;
+            })
+          : textAnnotations; // allowTextDragがfalseの場合は移動しない
         
         setStrokes(movedStrokes);
         setShapeAnnotations(movedShapes);
@@ -4829,6 +4605,431 @@ export default function Home() {
     });
   };
 
+  // 一括注釈配置用のstate
+  const [showBulkAnnotationDialog, setShowBulkAnnotationDialog] = useState(false);
+  const [bulkAnnotationTargetPages, setBulkAnnotationTargetPages] = useState<string>('');
+  const [bulkAnnotationIncludeAll, setBulkAnnotationIncludeAll] = useState(false);
+  const [bulkAnnotationAngle, setBulkAnnotationAngle] = useState(0); // 角度（度、0-360）
+  
+  // 一括削除用のstate
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [bulkDeleteTargetPages, setBulkDeleteTargetPages] = useState<string>('');
+  const [bulkDeleteIncludeAll, setBulkDeleteIncludeAll] = useState(false);
+
+  // 座標を回転させる関数（中心点0.5, 0.5を基準に回転）
+  const rotatePoint = (x: number, y: number, angleDeg: number): { x: number; y: number } => {
+    if (angleDeg === 0) return { x, y };
+    
+    const angleRad = (angleDeg * Math.PI) / 180;
+    const centerX = 0.5;
+    const centerY = 0.5;
+    
+    // 中心点を原点に移動
+    const dx = x - centerX;
+    const dy = y - centerY;
+    
+    // 回転
+    const cos = Math.cos(angleRad);
+    const sin = Math.sin(angleRad);
+    const rotatedX = dx * cos - dy * sin;
+    const rotatedY = dx * sin + dy * cos;
+    
+    // 中心点を元に戻す
+    return {
+      x: Math.max(0, Math.min(1, rotatedX + centerX)),
+      y: Math.max(0, Math.min(1, rotatedY + centerY)),
+    };
+  };
+
+  // 選択した注釈を指定ページにコピー
+  const handleBulkPlaceAnnotations = async () => {
+    if (!docId || !pageSize) {
+      toast({
+        title: "エラー",
+        description: "PDFが読み込まれていません",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // 選択された注釈を取得
+    const selectedStrokes = strokes.filter(stroke => stroke.id && selectedAnnotationIds.strokes.includes(stroke.id));
+    const selectedShapes = shapeAnnotations.filter(shape => selectedAnnotationIds.shapes.includes(shape.id));
+    const selectedTexts = textAnnotations.filter(text => selectedAnnotationIds.texts.includes(text.id));
+
+    if (selectedStrokes.length === 0 && selectedShapes.length === 0 && selectedTexts.length === 0) {
+      toast({
+        title: "通知",
+        description: "コピーする注釈を選択してください",
+      });
+      return;
+    }
+
+    // 対象ページを決定
+    let targetPages: number[] = [];
+    
+    if (bulkAnnotationIncludeAll) {
+      // 全ページ一括: すべてのページ
+      for (let i = 1; i <= totalPages; i++) {
+        targetPages.push(i);
+      }
+    } else {
+      // 指定ページ
+      try {
+        const pageRanges = parsePageRanges(bulkAnnotationTargetPages, totalPages);
+        targetPages = [];
+        for (const range of pageRanges) {
+          for (let i = range.start; i <= range.end; i++) {
+            if (!targetPages.includes(i)) {
+              targetPages.push(i);
+            }
+          }
+        }
+      } catch (error) {
+        toast({
+          title: "エラー",
+          description: "ページ範囲の形式が正しくありません",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    if (targetPages.length === 0) {
+      toast({
+        title: "通知",
+        description: "対象ページがありません",
+      });
+      return;
+    }
+
+    // 角度が0でない場合は、注釈を回転させる
+    const angle = bulkAnnotationAngle;
+    const needsRotation = angle !== 0;
+
+    // 各対象ページに注釈をコピー
+    for (const targetPageNum of targetPages) {
+      // 既存の注釈を読み込む
+      const existingStrokes = await loadAnnotations(docId, targetPageNum);
+      const existingShapes = await loadShapeAnnotations(docId, targetPageNum);
+      const existingTexts = await loadTextAnnotations(docId, targetPageNum);
+
+      // 新しいIDを生成してコピー（角度を適用）
+      const copiedStrokes = selectedStrokes.map(stroke => {
+        const newStroke = {
+          ...stroke,
+          id: `stroke-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        };
+        
+        if (needsRotation && newStroke.points) {
+          // ストロークの各点を回転
+          newStroke.points = newStroke.points.map(p => {
+            const rotated = rotatePoint(p.x, p.y, angle);
+            return { ...p, x: rotated.x, y: rotated.y };
+          });
+        }
+        
+        return newStroke;
+      });
+      
+      const copiedShapes = selectedShapes.map(shape => {
+        const newShape = {
+          ...shape,
+          id: `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        };
+        
+        if (needsRotation) {
+          // 図形の座標を回転
+          const rotated1 = rotatePoint(newShape.x1, newShape.y1, angle);
+          const rotated2 = rotatePoint(newShape.x2, newShape.y2, angle);
+          newShape.x1 = rotated1.x;
+          newShape.y1 = rotated1.y;
+          newShape.x2 = rotated2.x;
+          newShape.y2 = rotated2.y;
+          
+          // 折れ線矢印の点も回転
+          if (newShape.points) {
+            newShape.points = newShape.points.map(p => rotatePoint(p.x, p.y, angle));
+          }
+        }
+        
+        return newShape;
+      });
+      
+      const copiedTexts = selectedTexts.map(text => {
+        const newText = {
+          ...text,
+          id: `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        };
+        
+        if (needsRotation) {
+          // テキストの座標を回転
+          const rotated = rotatePoint(newText.x, newText.y, angle);
+          newText.x = rotated.x;
+          newText.y = rotated.y;
+        }
+        
+        return newText;
+      });
+
+      // 既存の注釈に追加
+      const newStrokes = [...existingStrokes, ...copiedStrokes];
+      const newShapes = [...existingShapes, ...copiedShapes];
+      const newTexts = [...existingTexts, ...copiedTexts];
+
+      // 保存
+      await saveAnnotations(docId, targetPageNum, newStrokes);
+      await saveShapeAnnotations(docId, targetPageNum, newShapes);
+      await saveTextAnnotations(docId, targetPageNum, newTexts);
+    }
+
+    toast({
+      title: "成功",
+      description: `${targetPages.length}ページに注釈をコピーしました${angle !== 0 ? `（角度: ${angle}度）` : ''}`,
+      variant: "success",
+    });
+
+    setShowBulkAnnotationDialog(false);
+    setBulkAnnotationTargetPages('');
+    setBulkAnnotationIncludeAll(false);
+    setBulkAnnotationAngle(0);
+  };
+
+  // 選択した注釈を全ページまたは指定ページから一括削除（座標ベース）
+  const handleBulkDeleteAnnotations = async () => {
+    if (!docId || !pageSize) {
+      toast({
+        title: "エラー",
+        description: "PDFが読み込まれていません",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // 選択された注釈の座標を取得（現在のページから）
+    const selectedStrokes = strokes.filter(stroke => stroke.id && selectedAnnotationIds.strokes.includes(stroke.id));
+    const selectedShapes = shapeAnnotations.filter(shape => selectedAnnotationIds.shapes.includes(shape.id));
+    const selectedTexts = textAnnotations.filter(text => selectedAnnotationIds.texts.includes(text.id));
+
+    if (selectedStrokes.length === 0 && selectedShapes.length === 0 && selectedTexts.length === 0) {
+      toast({
+        title: "通知",
+        description: "削除する注釈を選択してください",
+      });
+      return;
+    }
+
+    // 座標の許容誤差（0.01 = 1%）
+    const tolerance = 0.01;
+
+    // ストロークの座標パターンを記録（すべての点を記録）
+    const strokePatterns = selectedStrokes.map(stroke => {
+      if (stroke.points && stroke.points.length > 0) {
+        return {
+          points: stroke.points.map(p => ({ x: p.x, y: p.y })),
+          tool: stroke.tool,
+          color: stroke.color,
+          width: stroke.width,
+        };
+      }
+      return null;
+    }).filter(p => p !== null);
+
+    // 図形の座標パターンを記録
+    const shapePatterns = selectedShapes.map(shape => ({
+      x1: shape.x1,
+      y1: shape.y1,
+      x2: shape.x2,
+      y2: shape.y2,
+      type: shape.type,
+      color: shape.color,
+    }));
+
+    // テキストの座標パターンを記録
+    const textPatterns = selectedTexts.map(text => ({
+      x: text.x,
+      y: text.y,
+      text: text.text,
+      fontSize: text.fontSize,
+      color: text.color,
+    }));
+
+    console.log('一括削除: 座標パターン', {
+      strokes: strokePatterns.length,
+      shapes: shapePatterns.length,
+      texts: textPatterns.length,
+    });
+
+    // 対象ページを決定
+    let targetPages: number[] = [];
+    
+    if (bulkDeleteIncludeAll) {
+      // 全ページ一括: すべてのページ
+      for (let i = 1; i <= totalPages; i++) {
+        targetPages.push(i);
+      }
+    } else {
+      // 指定ページ
+      try {
+        const pageRanges = parsePageRanges(bulkDeleteTargetPages, totalPages);
+        targetPages = [];
+        for (const range of pageRanges) {
+          for (let i = range.start; i <= range.end; i++) {
+            if (!targetPages.includes(i)) {
+              targetPages.push(i);
+            }
+          }
+        }
+      } catch (error) {
+        toast({
+          title: "エラー",
+          description: "ページ範囲の形式が正しくありません",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    if (targetPages.length === 0) {
+      toast({
+        title: "通知",
+        description: "対象ページがありません",
+      });
+      return;
+    }
+
+    // 各対象ページから注釈を削除（座標ベース）
+    let deletedCount = 0;
+    for (const targetPageNum of targetPages) {
+      // 既存の注釈を読み込む
+      const existingStrokes = await loadAnnotations(docId, targetPageNum);
+      const existingShapes = await loadShapeAnnotations(docId, targetPageNum);
+      const existingTexts = await loadTextAnnotations(docId, targetPageNum);
+
+      // 座標パターンに一致するストロークを除外
+      const newStrokes = existingStrokes.filter(stroke => {
+        if (!stroke.points || stroke.points.length === 0) return true;
+        
+        // パターンに一致するかチェック
+        return !strokePatterns.some(pattern => {
+          if (pattern === null) return false;
+          
+          // 点の数が一致しない場合は不一致
+          if (stroke.points.length !== pattern.points.length) return false;
+          
+          // ツール、色、幅が一致しない場合は不一致
+          if (stroke.tool !== pattern.tool || stroke.color !== pattern.color || stroke.width !== pattern.width) {
+            return false;
+          }
+          
+          // すべての点の座標が許容誤差内で一致するかチェック
+          for (let i = 0; i < stroke.points.length; i++) {
+            const strokePoint = stroke.points[i];
+            const patternPoint = pattern.points[i];
+            const xMatch = Math.abs(strokePoint.x - patternPoint.x) < tolerance;
+            const yMatch = Math.abs(strokePoint.y - patternPoint.y) < tolerance;
+            if (!xMatch || !yMatch) {
+              return false;
+            }
+          }
+          
+          return true;
+        });
+      });
+
+      // 座標パターンに一致する図形を除外
+      const newShapes = existingShapes.filter(shape => {
+        return !shapePatterns.some(pattern => {
+          const x1Match = Math.abs(shape.x1 - pattern.x1) < tolerance &&
+                         Math.abs(shape.y1 - pattern.y1) < tolerance;
+          const x2Match = Math.abs(shape.x2 - pattern.x2) < tolerance &&
+                         Math.abs(shape.y2 - pattern.y2) < tolerance;
+          const typeMatch = shape.type === pattern.type;
+          const colorMatch = shape.color === pattern.color;
+          
+          return x1Match && x2Match && typeMatch && colorMatch;
+        });
+      });
+
+      // 座標パターンに一致するテキストを除外
+      const newTexts = existingTexts.filter(text => {
+        return !textPatterns.some(pattern => {
+          const posMatch = Math.abs(text.x - pattern.x) < tolerance &&
+                          Math.abs(text.y - pattern.y) < tolerance;
+          const textMatch = text.text === pattern.text;
+          const fontSizeMatch = text.fontSize === pattern.fontSize;
+          const colorMatch = text.color === pattern.color;
+          
+          return posMatch && textMatch && fontSizeMatch && colorMatch;
+        });
+      });
+
+      // 削除された数をカウント
+      const deletedStrokes = existingStrokes.length - newStrokes.length;
+      const deletedShapes = existingShapes.length - newShapes.length;
+      const deletedTexts = existingTexts.length - newTexts.length;
+      deletedCount += deletedStrokes + deletedShapes + deletedTexts;
+
+      // 保存
+      await saveAnnotations(docId, targetPageNum, newStrokes);
+      await saveShapeAnnotations(docId, targetPageNum, newShapes);
+      await saveTextAnnotations(docId, targetPageNum, newTexts);
+    }
+
+    // 現在のページの注釈も更新（表示を更新するため）
+    const actualPageNum = getActualPageNum(currentPage);
+    if (targetPages.includes(actualPageNum)) {
+      const currentStrokes = await loadAnnotations(docId, actualPageNum);
+      const currentShapes = await loadShapeAnnotations(docId, actualPageNum);
+      const currentTexts = await loadTextAnnotations(docId, actualPageNum);
+      setStrokes(currentStrokes);
+      setShapeAnnotations(currentShapes);
+      setTextAnnotations(currentTexts);
+      
+      // 再描画
+      setTimeout(() => {
+        if (inkCanvasRef.current && pageSize) {
+          const ctx = inkCanvasRef.current.getContext('2d');
+          if (ctx) {
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+            ctx.clearRect(0, 0, inkCanvasRef.current.width, inkCanvasRef.current.height);
+            redrawStrokes(ctx, currentStrokes, pageSize.width, pageSize.height);
+          }
+        }
+        if (shapeCanvasRef.current && pageSize) {
+          const ctx = shapeCanvasRef.current.getContext('2d');
+          if (ctx) {
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+            ctx.clearRect(0, 0, shapeCanvasRef.current.width, shapeCanvasRef.current.height);
+            redrawShapeAnnotations(ctx, currentShapes, pageSize.width, pageSize.height).catch(console.error);
+          }
+        }
+        if (textCanvasRef.current && pageSize) {
+          const ctx = textCanvasRef.current.getContext('2d');
+          if (ctx) {
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+            ctx.clearRect(0, 0, textCanvasRef.current.width, textCanvasRef.current.height);
+            redrawTextAnnotations(ctx, currentTexts, pageSize.width, pageSize.height);
+          }
+        }
+      }, 0);
+    }
+
+    toast({
+      title: "成功",
+      description: `${targetPages.length}ページから${deletedCount}個の注釈を削除しました`,
+      variant: "success",
+    });
+
+    setShowBulkDeleteDialog(false);
+    setBulkDeleteTargetPages('');
+    setBulkDeleteIncludeAll(false);
+    setSelectedAnnotationIds({ strokes: [], shapes: [], texts: [] });
+  };
+
   // 選択した注釈を削除
   const handleDeleteSelected = async () => {
     if (!docId || !pageSize) return;
@@ -5103,6 +5304,7 @@ export default function Home() {
       color,
       width: Math.max(0.1, Math.min(1, normalizedWidth)), // 最小10%、最大100%
       fontName: existingText?.fontName, // 既存のフォント名を保持
+      opacity: textInputOpacity, // 文字の濃さ
     };
 
     let updatedTexts: TextAnnotation[];
@@ -5196,34 +5398,13 @@ export default function Home() {
         setTextInputPosition({ x: clickedText.x * pageSize.width, y: clickedText.y * pageSize.height });
         setFontSize(clickedText.fontSize);
         setColor(clickedText.color);
+        setTextInputOpacity(clickedText.opacity ?? 1.0); // 既存の濃さを読み込む
       }
     }
     
-    // 選択ツールの場合もテキスト注釈をクリックして編集可能
-    if (tool === 'select') {
-      const clickedText = textAnnotations.find(text => {
-        const textX = text.x * pageSize.width;
-        const textY = text.y * pageSize.height;
-        const textWidth = text.text.length * text.fontSize * 0.6; // 概算幅
-        const textHeight = text.fontSize * 1.2;
-
-        return (
-          x >= textX - 10 &&
-          x <= textX + textWidth + 10 &&
-          y >= textY - 10 &&
-          y <= textY + textHeight + 10
-        );
-      });
-
-      if (clickedText) {
-        setEditingTextId(clickedText.id);
-        setTextInputValue(clickedText.text);
-        setTextInputPosition({ x: clickedText.x * pageSize.width, y: clickedText.y * pageSize.height });
-        setFontSize(clickedText.fontSize);
-        setColor(clickedText.color);
-        setTool('text'); // テキストツールに切り替え
-      }
-    }
+    // 選択ツールの場合もテキスト注釈をクリックして選択可能（編集モードには切り替えない）
+    // 編集はダブルクリックまたはCtrl+クリックで行う
+    // ここでは選択のみを行う（ドラッグを防ぐため）
   };
 
   // テキスト注釈を削除
@@ -5280,10 +5461,7 @@ export default function Home() {
         }
       }
 
-      // 署名を読み込む
-      const allSignatures = docId ? await getAllSignatures(docId) : [];
-      
-      // 注釈をPDFに焼き込む（フォームフィールドの値と署名、透かし、ページ回転も含む）
+      // 注釈をPDFに焼き込む（フォームフィールドの値とページ回転も含む）
       const pdfBytes = await exportAnnotatedPDFV2(
         originalPdfBytes,
         annotations,
@@ -5292,16 +5470,9 @@ export default function Home() {
         shapeAnnotations,
         formFields,
         formFieldValues,
-        allSignatures,
-        watermarkText || undefined,
-        pageRotations,
-        watermarkPattern,
-        watermarkDensity,
-        watermarkAngle,
-        watermarkOpacity,
-        watermarkFontSize,
-        watermarkOffsetX,
-        watermarkOffsetY
+        undefined, // signatures
+        undefined, // watermarkText
+        pageRotations
       );
 
       return pdfBytes;
@@ -5869,15 +6040,6 @@ export default function Home() {
                         setFormFieldValues({});
                       }
                       
-                      // 署名を読み込む
-                      if (id) {
-                        try {
-                          const loadedSignatures = await getAllSignatures(id);
-                          setSignatures(loadedSignatures);
-                        } catch (error) {
-                          console.warn('署名・ワークフローの読み込みに失敗:', error);
-                        }
-                      }
                     } catch (error) {
                       console.error('ファイル読み込みエラー:', error);
                       toast({
@@ -7786,6 +7948,15 @@ export default function Home() {
                 <MdSelectAll className={`text-base ${tool === 'select' ? 'text-white' : 'text-slate-600'}`} />
                 選択
               </button>
+              <label className="flex items-center gap-1 px-2 py-2 text-sm font-medium text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={allowTextDrag}
+                  onChange={(e) => setAllowTextDrag(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span>テキスト移動</span>
+              </label>
               <button
                 onClick={() => setShowAnnotationList(!showAnnotationList)}
                 title="注釈一覧を表示/非表示"
@@ -7812,6 +7983,46 @@ export default function Home() {
                 <MdList className={`text-base ${showAnnotationList ? 'text-white' : 'text-green-500'}`} />
                 注釈一覧
               </button>
+              {(selectedAnnotationIds.strokes.length > 0 || selectedAnnotationIds.shapes.length > 0 || selectedAnnotationIds.texts.length > 0) && (
+                <>
+                  <button
+                    onClick={() => setShowBulkAnnotationDialog(true)}
+                    title="選択した注釈を指定ページにコピー"
+                    className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-blue-500"
+                    style={{
+                      background: 'linear-gradient(to right, #3b82f6, #2563eb)',
+                      color: 'white',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #2563eb, #1d4ed8)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #3b82f6, #2563eb)';
+                    }}
+                  >
+                    <MdContentCopy className="text-base text-white" />
+                    一括配置
+                  </button>
+                  <button
+                    onClick={() => setShowBulkDeleteDialog(true)}
+                    title="選択した注釈を指定ページから一括削除"
+                    className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-red-500"
+                    style={{
+                      background: 'linear-gradient(to right, #ef4444, #dc2626)',
+                      color: 'white',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #dc2626, #b91c1c)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #ef4444, #dc2626)';
+                    }}
+                  >
+                    <MdDelete className="text-base text-white" />
+                    一括削除
+                  </button>
+                </>
+              )}
               {formFields.length > 0 && (
                 <button
                   onClick={() => setShowFormFields(!showFormFields)}
@@ -7963,6 +8174,19 @@ export default function Home() {
                   />
                   <span style={{ marginLeft: '5px' }}>{fontSize}px</span>
                 </label>
+                <label>
+                  文字の濃さ:
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="1.0"
+                    step="0.1"
+                    value={textInputOpacity}
+                    onChange={(e) => setTextInputOpacity(Number(e.target.value))}
+                    style={{ marginLeft: '5px' }}
+                  />
+                  <span style={{ marginLeft: '5px' }}>{Math.round(textInputOpacity * 100)}%</span>
+                </label>
               </>
             )}
 
@@ -8038,36 +8262,7 @@ export default function Home() {
 
           {/* 操作ボタン */}
           <div className="mb-4 flex gap-3 md:gap-4 items-center flex-wrap transition-all duration-300 relative z-50" style={{ pointerEvents: 'auto' }}>
-            {/* アクションツール（電子署名、承認ワークフロー、PDF分割） */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('電子署名ボタンがクリックされました');
-                console.log('showSignatureDialogをtrueに設定します');
-                setShowSignatureDialog(true);
-                console.log('setShowSignatureDialog(true)を実行しました');
-              }}
-              title="電子署名を追加"
-              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-blue-500 shadow-md hover:scale-105 active:scale-95"
-              style={{
-                background: 'linear-gradient(to right, #3b82f6, #06b6d4)',
-                color: 'white',
-                pointerEvents: 'auto',
-                cursor: 'pointer',
-                zIndex: 10,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(to right, #2563eb, #0891b2)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(to right, #3b82f6, #06b6d4)';
-              }}
-            >
-              <MdAssignment className="text-base text-white" />
-              電子署名
-            </button>
+            {/* アクションツール（PDF分割） */}
             <button
               type="button"
               onClick={(e) => {
@@ -8102,26 +8297,26 @@ export default function Home() {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                setShowWatermarkDialog(true);
+                setShowPageNumberModal(true);
               }}
-              title="透かしを追加"
-              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-teal-500 shadow-md hover:scale-105 active:scale-95"
+              title="ページ番号を自動付与"
+              className="px-4 py-2 border rounded-lg text-sm font-medium transition-all flex items-center gap-1 shadow-sm border-orange-500 shadow-md hover:scale-105 active:scale-95"
               style={{
-                background: 'linear-gradient(to right, #14b8a6, #06b6d4)',
+                background: 'linear-gradient(to right, #fb923c, #f97316)',
                 color: 'white',
                 pointerEvents: 'auto',
                 cursor: 'pointer',
                 zIndex: 10,
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(to right, #0d9488, #0891b2)';
+                e.currentTarget.style.background = 'linear-gradient(to right, #f97316, #ea580c)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(to right, #14b8a6, #06b6d4)';
+                e.currentTarget.style.background = 'linear-gradient(to right, #fb923c, #f97316)';
               }}
             >
-              <MdSecurity className="text-base text-white" />
-              透かし
+              <MdDescription className="text-base text-white" />
+              ページ番号
             </button>
             <button
               type="button"
@@ -9694,547 +9889,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* 電子署名ダイアログ */}
-      <Dialog 
-        open={showSignatureDialog}
-        onOpenChange={(open) => {
-          console.log('電子署名ダイアログ onOpenChange called with:', open);
-          // openがtrueの場合のみ状態を更新
-          if (open) {
-            setShowSignatureDialog(true);
-          }
-          // openがfalseの場合は無視（手動で閉じるボタンのみで閉じる）
-        }}
-      >
-        <DialogContent 
-          topPosition="top-[5%]"
-          className="max-w-2xl max-h-[90vh] flex flex-col"
-          style={{
-            zIndex: 10001,
-            left: '50%',
-            top: '5%',
-            transform: 'translateX(-50%) translateY(0)',
-            background: 'linear-gradient(135deg, #dbeafe 0%, #e0f2fe 50%, #bae6fd 100%)',
-          }}
-          onClose={() => {
-            if (signaturePdfPreviewUrl) {
-              URL.revokeObjectURL(signaturePdfPreviewUrl);
-            }
-            setShowSignatureDialog(false);
-            setSignatureName('');
-            setSignatureEmail('');
-            setSignatureReason('');
-            setSignatureLocation('');
-            setSignatureImage(null);
-            setSignatureText('');
-            setSignaturePdfPreviewUrl(null);
-            setShowSignaturePreview(false);
-          }}
-        >
-            <DialogHeader className="pb-4 border-b border-blue-200 mb-4 flex-shrink-0">
-              <DialogTitle className="text-2xl font-bold text-slate-900 mb-2">電子署名を追加</DialogTitle>
-              <DialogDescription className="text-base text-slate-600">PDFに電子署名を追加します</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-5 overflow-y-auto flex-1 min-h-0">
-              <div>
-                <label className="block text-base font-semibold text-slate-800 mb-2">
-                  署名者名 <span className="text-red-500 font-bold">*</span>
-                </label>
-                <Input
-                  value={signatureName}
-                  onChange={(e) => setSignatureName(e.target.value)}
-                  placeholder="山田 太郎"
-                  className="w-full h-11 text-base border-2 border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg px-4 transition-all"
-                />
-      </div>
-              <div>
-                <label className="block text-base font-semibold text-slate-800 mb-2">
-                  メールアドレス
-                </label>
-                <Input
-                  type="email"
-                  value={signatureEmail}
-                  onChange={(e) => setSignatureEmail(e.target.value)}
-                  placeholder="example@company.com"
-                  className="w-full h-11 text-base border-2 border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg px-4 transition-all"
-                />
-    </div>
-              <div>
-                <label className="block text-base font-semibold text-slate-800 mb-2">
-                  署名理由
-                </label>
-                <Input
-                  value={signatureReason}
-                  onChange={(e) => setSignatureReason(e.target.value)}
-                  placeholder="承認"
-                  className="w-full h-11 text-base border-2 border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg px-4 transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-base font-semibold text-slate-800 mb-2">
-                  署名場所
-                </label>
-                <Input
-                  value={signatureLocation}
-                  onChange={(e) => setSignatureLocation(e.target.value)}
-                  placeholder="東京"
-                  className="w-full h-11 text-base border-2 border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg px-4 transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-base font-semibold text-slate-800 mb-2">
-                  署名画像（オプション）
-                </label>
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/jpg"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onload = (event) => {
-                        const result = event.target?.result as string;
-                        // 画像をリサイズしてから設定
-                        const img = new Image();
-                        img.onload = () => {
-                          const canvas = document.createElement('canvas');
-                          const maxWidth = 400;
-                          const maxHeight = 200;
-                          let width = img.width;
-                          let height = img.height;
-                          
-                          if (width > maxWidth || height > maxHeight) {
-                            const ratio = Math.min(maxWidth / width, maxHeight / height);
-                            width = width * ratio;
-                            height = height * ratio;
-                          }
-                          
-                          canvas.width = width;
-                          canvas.height = height;
-                          const ctx = canvas.getContext('2d');
-                          if (ctx) {
-                            ctx.drawImage(img, 0, 0, width, height);
-                            setSignatureImage(canvas.toDataURL('image/png'));
-                          }
-                        };
-                        img.src = result;
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  }}
-                  className="w-full h-11 text-base border-2 border-slate-300 rounded-lg px-4 py-2 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer transition-all"
-                />
-                {signatureImage && (
-                  <div className="mt-3 p-3 bg-slate-50 rounded-lg border-2 border-slate-200">
-                    <img 
-                      src={signatureImage} 
-                      alt="署名画像" 
-                      className="max-w-full max-h-48 border-2 border-slate-300 rounded-lg object-contain shadow-sm" 
-                      style={{ maxWidth: '400px', maxHeight: '200px' }}
-                    />
-                    <div className="mt-3">
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                          画像サイズ: {signatureImageScale}%
-                        </label>
-                        <input
-                          type="range"
-                          min="20"
-                          max="200"
-                          value={signatureImageScale}
-                          onChange={(e) => setSignatureImageScale(parseInt(e.target.value))}
-                          className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                        />
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setSignatureImage(null)}
-                      className="mt-2 px-3 py-1.5 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors shadow-sm"
-                    >
-                      画像を削除
-                    </button>
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="block text-base font-semibold text-slate-800 mb-2">
-                  署名テキスト（画像がない場合）
-                </label>
-                <Input
-                  value={signatureText}
-                  onChange={(e) => setSignatureText(e.target.value)}
-                  placeholder="署名"
-                  className="w-full h-11 text-base border-2 border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg px-4 transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-base font-semibold text-slate-800 mb-2">
-                  フォントサイズ: {signatureFontSize}px
-                </label>
-                <input
-                  type="range"
-                  min="6"
-                  max="24"
-                  value={signatureFontSize}
-                  onChange={(e) => setSignatureFontSize(parseInt(e.target.value))}
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                />
-              </div>
-              <div className="p-4 bg-white/60 rounded-lg border-2 border-slate-200">
-                <label className="block text-sm font-semibold text-slate-800 mb-3">
-                  X位置: {Math.round(signatureX * 100)}% (左から)
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={signatureX * 100}
-                  onChange={(e) => setSignatureX(parseInt(e.target.value) / 100)}
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                />
-                <label className="block text-sm font-semibold text-slate-800 mb-3 mt-4">
-                  Y位置: {Math.round(signatureY * 100)}% (下から)
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={signatureY * 100}
-                  onChange={(e) => setSignatureY(parseInt(e.target.value) / 100)}
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                />
-                <label className="block text-sm font-semibold text-slate-800 mb-3 mt-4">
-                  幅: {Math.round(signatureWidth * 100)}% (ページ幅に対する比率)
-                </label>
-                <input
-                  type="range"
-                  min="5"
-                  max="50"
-                  step="1"
-                  value={signatureWidth * 100}
-                  onChange={(e) => setSignatureWidth(parseInt(e.target.value) / 100)}
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                />
-                <label className="block text-sm font-semibold text-slate-800 mb-3 mt-4">
-                  高さ: {Math.round(signatureHeight * 100)}% (ページ高さに対する比率)
-                </label>
-                <input
-                  type="range"
-                  min="5"
-                  max="30"
-                  step="1"
-                  value={signatureHeight * 100}
-                  onChange={(e) => setSignatureHeight(parseInt(e.target.value) / 100)}
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                />
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg border-2 border-slate-200">
-                <input
-                  type="checkbox"
-                  id="showSignaturePreview"
-                  checked={showSignaturePreview}
-                  onChange={(e) => setShowSignaturePreview(e.target.checked)}
-                  className="w-5 h-5 text-blue-600 border-2 border-slate-300 rounded focus:ring-2 focus:ring-blue-200"
-                />
-                <label htmlFor="showSignaturePreview" className="text-sm font-semibold text-slate-800 cursor-pointer">
-                  プレビューを表示
-                </label>
-              </div>
-              {showSignaturePreview && signaturePdfPreviewUrl && (
-                <div className="p-4 bg-white/60 rounded-lg border-2 border-slate-200">
-                  <label className="block text-sm font-semibold text-slate-800 mb-2">PDFプレビュー（1ページ目）</label>
-                  <iframe
-                    src={`${signaturePdfPreviewUrl}#page=1`}
-                    className="w-full h-96 border-2 border-slate-300 rounded-lg"
-                    title="署名PDFプレビュー"
-                  />
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      if (signaturePdfPreviewUrl) {
-                        URL.revokeObjectURL(signaturePdfPreviewUrl);
-                        setSignaturePdfPreviewUrl(null);
-                        setShowSignaturePreview(false);
-                      }
-                    }}
-                    variant="outline"
-                    className="mt-2 h-9 px-4 text-sm font-semibold border-2 border-slate-300 hover:bg-slate-50"
-                  >
-                    プレビューを閉じる
-                  </Button>
-                </div>
-              )}
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  onClick={async () => {
-                    if (!pdfDoc || !signatureName.trim() || !docId || !pageSize || !originalPdfBytes) {
-                      toast({
-                        title: "エラー",
-                        description: "PDFが読み込まれていないか、署名者名が入力されていません。",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-                    try {
-                      const previewSignature: Signature = {
-                        id: generateSignatureId(),
-                        signerName: signatureName,
-                        signerEmail: signatureEmail || undefined,
-                        signDate: new Date(),
-                        signatureImage: signatureImage || undefined,
-                        signatureText: signatureText || undefined,
-                        position: {
-                          pageNumber: currentPage,
-                          x: signatureX,
-                          y: signatureY,
-                          width: signatureWidth,
-                          height: signatureHeight,
-                        },
-                        reason: signatureReason || undefined,
-                        location: signatureLocation || undefined,
-                        imageWidth: signatureImageScale,
-                        imageHeight: signatureImageScale,
-                        fontSize: signatureFontSize,
-                      };
-                      
-                      // 現在のページの注釈を取得
-                      const actualPageNum = getActualPageNum(currentPage);
-                      const pageAnnotations = await loadAnnotations(docId, actualPageNum);
-                      const pageTextAnnotations = await loadTextAnnotations(docId, actualPageNum);
-                      const pageShapeAnnotations = await loadShapeAnnotations(docId, actualPageNum);
-                      
-                      // PDFをエクスポート（署名を含む）
-                      const pdfBytes = await exportAnnotatedPDFV2(
-                        originalPdfBytes,
-                        { [currentPage]: pageAnnotations },
-                        { [currentPage]: pageSize },
-                        { [currentPage]: pageTextAnnotations },
-                        { [currentPage]: pageShapeAnnotations },
-                        undefined,
-                        undefined,
-                        [previewSignature]
-                      );
-                      
-                      // PDFプレビュー用のURLを生成
-                      const arrayBuffer = pdfBytes.buffer instanceof ArrayBuffer 
-                        ? pdfBytes.buffer 
-                        : new Uint8Array(pdfBytes).buffer;
-                      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
-                      const url = URL.createObjectURL(blob);
-                      if (signaturePdfPreviewUrl) {
-                        URL.revokeObjectURL(signaturePdfPreviewUrl);
-                      }
-                      setSignaturePdfPreviewUrl(url);
-                      setShowSignaturePreview(true);
-                      
-                      toast({
-                        title: "成功",
-                        description: "PDFプレビューを生成しました。",
-                        variant: "success",
-                      });
-                    } catch (error) {
-                      console.error('PDFプレビュー生成エラー:', error);
-                      toast({
-                        title: "エラー",
-                        description: "PDFプレビューの生成に失敗しました。",
-                        variant: "destructive",
-                      });
-                    }
-                  }}
-                  variant="outline"
-                  className="h-9 px-4 text-sm font-semibold border-2 border-blue-400 hover:bg-blue-50"
-                >
-                  PDFでプレビュー
-                </Button>
-              </div>
-              <div>
-                <label className="block text-base font-semibold text-slate-800 mb-3">
-                  署名位置（クイック選択）
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="flex items-center gap-3 p-3 border-2 border-slate-300 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-all shadow-sm">
-                    <input
-                      type="radio"
-                      name="signaturePosition"
-                      value="bottom-left"
-                      checked={signaturePosition === 'bottom-left'}
-                      onChange={(e) => {
-                        setSignaturePosition(e.target.value as 'bottom-left');
-                        setSignatureX(0.1);
-                        setSignatureY(0.1);
-                      }}
-                      className="w-5 h-5 text-blue-600"
-                    />
-                    <span className="text-base font-medium text-slate-700">左下</span>
-                  </label>
-                  <label className="flex items-center gap-3 p-3 border-2 border-slate-300 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-all shadow-sm">
-                    <input
-                      type="radio"
-                      name="signaturePosition"
-                      value="bottom-right"
-                      checked={signaturePosition === 'bottom-right'}
-                      onChange={(e) => {
-                        setSignaturePosition(e.target.value as 'bottom-right');
-                        setSignatureX(0.6);
-                        setSignatureY(0.1);
-                      }}
-                      className="w-5 h-5 text-blue-600"
-                    />
-                    <span className="text-base font-medium text-slate-700">右下</span>
-                  </label>
-                  <label className="flex items-center gap-3 p-3 border-2 border-slate-300 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-all shadow-sm">
-                    <input
-                      type="radio"
-                      name="signaturePosition"
-                      value="top-left"
-                      checked={signaturePosition === 'top-left'}
-                      onChange={(e) => {
-                        setSignaturePosition(e.target.value as 'top-left');
-                        setSignatureX(0.1);
-                        setSignatureY(0.75);
-                      }}
-                      className="w-5 h-5 text-blue-600"
-                    />
-                    <span className="text-base font-medium text-slate-700">左上</span>
-                  </label>
-                  <label className="flex items-center gap-3 p-3 border-2 border-slate-300 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-all shadow-sm">
-                    <input
-                      type="radio"
-                      name="signaturePosition"
-                      value="top-right"
-                      checked={signaturePosition === 'top-right'}
-                      onChange={(e) => {
-                        setSignaturePosition(e.target.value as 'top-right');
-                        setSignatureX(0.6);
-                        setSignatureY(0.75);
-                      }}
-                      className="w-5 h-5 text-blue-600"
-                    />
-                    <span className="text-base font-medium text-slate-700">右上</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-            <DialogFooter className="pt-4 border-t border-blue-200 mt-4 flex-shrink-0">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowSignatureDialog(false);
-                  setSignatureName('');
-                  setSignatureEmail('');
-                  setSignatureReason('');
-                  setSignatureLocation('');
-                  setSignatureImage(null);
-                  setSignatureText('');
-                  setSignaturePosition('bottom-left');
-                }}
-                className="h-11 px-6 text-base font-semibold border-2 border-slate-300 hover:bg-slate-50"
-              >
-                キャンセル
-              </Button>
-              <Button
-                onClick={async () => {
-                  if (!signatureName || !docId || !pageSize) {
-                    toast({
-                      title: "エラー",
-                      description: "署名者名を入力してください",
-                      variant: "destructive",
-                    });
-                    return;
-                  }
-                  
-                  // 署名位置を計算（位置選択ボタンが変更された場合は更新）
-                  let x = signatureX, y = signatureY;
-                  if (signaturePosition === 'bottom-right') {
-                    x = 0.6; // 右側
-                    y = 0.1; // 下側
-                    setSignatureX(0.6);
-                    setSignatureY(0.1);
-                  } else if (signaturePosition === 'top-left') {
-                    x = 0.1; // 左側
-                    y = 0.75; // 上側（PDF座標系は下から上）
-                    setSignatureX(0.1);
-                    setSignatureY(0.75);
-                  } else if (signaturePosition === 'top-right') {
-                    x = 0.6; // 右側
-                    y = 0.75; // 上側
-                    setSignatureX(0.6);
-                    setSignatureY(0.75);
-                  } else {
-                    // bottom-left (デフォルト)
-                    x = 0.1;
-                    y = 0.1;
-                    setSignatureX(0.1);
-                    setSignatureY(0.1);
-                  }
-                  
-                  const signature: Signature = {
-                    id: generateSignatureId(),
-                    signerName: signatureName,
-                    signerEmail: signatureEmail || undefined,
-                    signDate: new Date(),
-                    signatureImage: signatureImage || undefined,
-                    signatureText: signatureText || undefined,
-                    position: {
-                      pageNumber: currentPage,
-                      x,
-                      y,
-                      width: signatureWidth,
-                      height: signatureHeight,
-                    },
-                    reason: signatureReason || undefined,
-                    location: signatureLocation || undefined,
-                    imageWidth: signatureImageScale,
-                    imageHeight: signatureImageScale,
-                    fontSize: signatureFontSize,
-                  };
-                  
-                  await saveSignature(docId, signature);
-                  // 重複チェック: 同じIDの署名が既に存在する場合は追加しない
-                  setSignatures(prev => {
-                    const exists = prev.some(sig => sig.id === signature.id);
-                    if (exists) {
-                      return prev;
-                    }
-                    return [...prev, signature];
-                  });
-                  
-                  toast({
-                    title: "成功",
-                    description: "電子署名を追加しました",
-                    variant: "success",
-                  });
-                  
-                  if (signaturePdfPreviewUrl) {
-                    URL.revokeObjectURL(signaturePdfPreviewUrl);
-                  }
-                  setShowSignatureDialog(false);
-                  setSignatureName('');
-                  setSignatureEmail('');
-                  setSignatureReason('');
-                  setSignatureLocation('');
-                  setSignatureImage(null);
-                  setSignatureText('');
-                  setSignaturePosition('bottom-left');
-                  setSignatureX(0.1);
-                  setSignatureY(0.1);
-                  setSignatureWidth(0.3);
-                  setSignatureHeight(0.15);
-                  setSignaturePdfPreviewUrl(null);
-                  setShowSignaturePreview(false);
-                }}
-                disabled={!signatureName}
-              >
-                署名を追加
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-
       {/* PDF分割ダイアログ（ページ管理モーダルから） */}
       <Dialog 
         open={showSplitDialogFromThumbnail}
@@ -11612,428 +11266,462 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      {/* 透かしダイアログ */}
-      <Dialog open={showWatermarkDialog} onOpenChange={(open) => {
-        if (open) {
-          setShowWatermarkDialog(true);
-        } else {
-          setShowWatermarkDialog(false);
-        }
-      }}>
-        <DialogContent
-          topPosition="top-[15%]"
-          className="max-w-md"
-          style={{
-            zIndex: 10001,
-            left: '50%',
-            top: '15%',
-            transform: 'translateX(-50%) translateY(0)',
-            background: 'linear-gradient(135deg, #ccfbf1 0%, #99f6e4 50%, #5eead4 100%)',
-          }}
-          onClose={() => {
-            setShowWatermarkDialog(false);
-            setWatermarkText('');
-            if (watermarkPdfPreviewUrl) {
-              URL.revokeObjectURL(watermarkPdfPreviewUrl);
-              setWatermarkPdfPreviewUrl(null);
-            }
+      {/* 一括注釈配置ダイアログ */}
+      <Dialog open={showBulkAnnotationDialog} onOpenChange={setShowBulkAnnotationDialog}>
+        <DialogContent 
+          className="sm:max-w-[500px]" 
+          style={{ 
+            zIndex: 100014,
+            background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 50%, #7dd3fc 100%)',
+            border: '2px solid #0ea5e9',
           }}
         >
-          <DialogHeader className="pb-4 border-b border-teal-200 mb-4">
-            <DialogTitle className="text-2xl font-bold text-slate-900 mb-2">透かしを追加</DialogTitle>
-            <DialogDescription className="text-base text-slate-600">PDFに透かし文字を追加します</DialogDescription>
+          <DialogHeader className="bg-white/90 rounded-t-lg p-4 -m-6 mb-4">
+            <DialogTitle className="text-xl font-bold text-sky-900">一括注釈配置</DialogTitle>
+            <DialogDescription className="text-sky-700">
+              選択した注釈を指定したページにコピーします。
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">透かし文字</label>
-              <Input
-                type="text"
-                value={watermarkText}
-                onChange={(e) => setWatermarkText(e.target.value)}
-                placeholder="例: 機密、承認済み、下書き"
-                className="w-full"
-              />
-            </div>
-            {watermarkHistory.length > 0 && (
-              <div>
-                <label className="block text-sm font-semibold text-slate-800 mb-2">履歴から選択</label>
-                <div className="flex flex-wrap gap-2">
-                  {watermarkHistory.slice(0, 10).map((text, index) => (
-                    <button
-                      key={index}
-                      type="button"
-                      onClick={() => setWatermarkText(text)}
-                      className="px-3 py-1.5 text-sm bg-white border-2 border-slate-300 rounded-lg hover:bg-teal-50 hover:border-teal-400 transition-all shadow-sm"
-                    >
-                      {text}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div>
-              <label className="block text-sm font-semibold text-slate-800 mb-2">配置パターン</label>
-              <select
-                value={watermarkPattern}
-                onChange={(e) => setWatermarkPattern(e.target.value as 'center' | 'grid' | 'tile' | 'bottom-right' | 'top-right' | 'bottom-left' | 'top-left')}
-                className="w-full px-4 py-2.5 text-base border-2 border-slate-300 rounded-lg bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-200"
-              >
-                <option value="center">中央1箇所</option>
-                <option value="bottom-right">右下1箇所</option>
-                <option value="top-right">右上1箇所</option>
-                <option value="bottom-left">左下1箇所</option>
-                <option value="top-left">左上1箇所</option>
-                <option value="grid">グリッド状（均等配置）</option>
-                <option value="tile">タイル状（繰り返し配置）</option>
-              </select>
-            </div>
-            {(watermarkPattern === 'grid' || watermarkPattern === 'tile') && (
-              <div className="p-4 bg-white/60 rounded-lg border-2 border-slate-200">
-                <label className="block text-sm font-semibold text-slate-800 mb-3">
-                  密度（{watermarkPattern === 'grid' ? '列数・行数' : '間隔'}）: {watermarkDensity}
-                </label>
+          <div className="space-y-4 py-4 bg-white/80 rounded-lg p-4">
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm font-medium">
                 <input
-                  type="range"
-                  min="2"
-                  max="10"
-                  value={watermarkDensity}
-                  onChange={(e) => setWatermarkDensity(parseInt(e.target.value))}
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-500"
+                  type="checkbox"
+                  checked={bulkAnnotationIncludeAll}
+                  onChange={(e) => {
+                    setBulkAnnotationIncludeAll(e.target.checked);
+                    if (e.target.checked) {
+                      setBulkAnnotationTargetPages('');
+                    }
+                  }}
+                  className="w-4 h-4"
                 />
-                <div className="flex justify-between text-xs text-slate-600 mt-2 font-medium">
-                  <span>低密度</span>
-                  <span>高密度</span>
-                </div>
+                <span>全ページ一括（すべてのページにコピー）</span>
+              </label>
+            </div>
+            {!bulkAnnotationIncludeAll && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">対象ページ:</label>
+                <input
+                  type="text"
+                  value={bulkAnnotationTargetPages}
+                  onChange={(e) => setBulkAnnotationTargetPages(e.target.value)}
+                  placeholder="例: 1, 3, 5-7"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500">
+                  ページ番号をカンマ区切りで指定（例: 1, 3, 5-7）
+                </p>
               </div>
             )}
-            <div className="p-4 bg-white/60 rounded-lg border-2 border-slate-200">
-              <label className="block text-sm font-semibold text-slate-800 mb-3">配置角度: {watermarkAngle}°</label>
-              <div className="flex items-center gap-4 mb-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">回転角度:</label>
+              <div className="flex items-center gap-3">
                 <input
                   type="range"
                   min="0"
                   max="360"
-                  step="15"
-                  value={watermarkAngle}
-                  onChange={(e) => setWatermarkAngle(parseInt(e.target.value))}
-                  className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-500"
-                />
-                <Input
-                  type="number"
-                  min="0"
-                  max="360"
-                  value={watermarkAngle}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value) || 0;
-                    setWatermarkAngle(Math.max(0, Math.min(360, val)));
-                  }}
-                  className="w-20 px-3 py-2 text-base border-2 border-slate-300 rounded-lg bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-200"
-                />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => (
-                  <button
-                    key={angle}
-                    type="button"
-                    onClick={() => setWatermarkAngle(angle)}
-                    className={`px-4 py-2 text-sm font-semibold border-2 rounded-lg transition-all shadow-sm ${
-                      watermarkAngle === angle
-                        ? 'bg-teal-500 text-white border-teal-500 shadow-md'
-                        : 'bg-white border-slate-300 hover:bg-teal-50 hover:border-teal-400'
-                    }`}
-                  >
-                    {angle}°
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="p-4 bg-white/60 rounded-lg border-2 border-slate-200">
-              <label className="block text-sm font-semibold text-slate-800 mb-3">
-                濃度: {Math.round(watermarkOpacity * 100)}%
-              </label>
-              <div className="flex items-center gap-4 mb-3">
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="5"
-                  value={watermarkOpacity * 100}
-                  onChange={(e) => setWatermarkOpacity(parseInt(e.target.value) / 100)}
-                  className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-500"
-                />
-                <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={Math.round(watermarkOpacity * 100)}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value) || 0;
-                    setWatermarkOpacity(Math.max(0, Math.min(100, val)) / 100);
-                  }}
-                  className="w-20 px-3 py-2 text-base border-2 border-slate-300 rounded-lg bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-200"
-                />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((percent) => (
-                  <button
-                    key={percent}
-                    type="button"
-                    onClick={() => setWatermarkOpacity(percent / 100)}
-                    className={`px-3 py-1.5 text-xs font-semibold border-2 rounded-lg transition-all shadow-sm ${
-                      Math.round(watermarkOpacity * 100) === percent
-                        ? 'bg-teal-500 text-white border-teal-500 shadow-md'
-                        : 'bg-white border-slate-300 hover:bg-teal-50 hover:border-teal-400'
-                    }`}
-                  >
-                    {percent}%
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="p-4 bg-white/60 rounded-lg border-2 border-slate-200">
-              <label className="block text-sm font-semibold text-slate-800 mb-3">
-                表示サイズ: {Math.round(watermarkFontSize * 100)}% (ページサイズに対する比率)
-              </label>
-              <div className="flex items-center gap-4 mb-3">
-                <input
-                  type="range"
-                  min="5"
-                  max="30"
                   step="1"
-                  value={watermarkFontSize * 100}
-                  onChange={(e) => setWatermarkFontSize(parseInt(e.target.value) / 100)}
-                  className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-500"
+                  value={bulkAnnotationAngle}
+                  onChange={(e) => setBulkAnnotationAngle(Number(e.target.value))}
+                  className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                 />
-                <Input
-                  type="number"
-                  min="5"
-                  max="30"
-                  value={Math.round(watermarkFontSize * 100)}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value) || 10;
-                    setWatermarkFontSize(Math.max(5, Math.min(30, val)) / 100);
-                  }}
-                  className="w-20 px-3 py-2 text-base border-2 border-slate-300 rounded-lg bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-200"
-                />
+                <span className="text-sm font-medium w-16 text-right">{bulkAnnotationAngle}°</span>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {[5, 10, 15, 20, 25, 30].map((percent) => (
-                  <button
-                    key={percent}
-                    type="button"
-                    onClick={() => setWatermarkFontSize(percent / 100)}
-                    className={`px-3 py-1.5 text-xs font-semibold border-2 rounded-lg transition-all shadow-sm ${
-                      Math.round(watermarkFontSize * 100) === percent
-                        ? 'bg-teal-500 text-white border-teal-500 shadow-md'
-                        : 'bg-white border-slate-300 hover:bg-teal-50 hover:border-teal-400'
-                    }`}
-                  >
-                    {percent}%
-                  </button>
-                ))}
-              </div>
+              <p className="text-xs text-gray-500">
+                注釈を回転させて配置します（0-360度、ページ中央を基準に回転）
+              </p>
             </div>
-            {(watermarkPattern === 'bottom-left' || watermarkPattern === 'bottom-right' || watermarkPattern === 'top-left' || watermarkPattern === 'top-right') && (
-              <div className="p-4 bg-white/60 rounded-lg border-2 border-slate-200">
-                <label className="block text-sm font-semibold text-slate-800 mb-3">
-                  X方向オフセット: {watermarkOffsetX}px (右方向が正)
-                </label>
-                <div className="flex items-center gap-4 mb-3">
-                  <input
-                    type="range"
-                    min="-200"
-                    max="200"
-                    step="1"
-                    value={watermarkOffsetX}
-                    onChange={(e) => setWatermarkOffsetX(parseInt(e.target.value))}
-                    className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-500"
-                  />
-                  <Input
-                    type="number"
-                    min="-200"
-                    max="200"
-                    value={watermarkOffsetX}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || 0;
-                      setWatermarkOffsetX(Math.max(-200, Math.min(200, val)));
-                    }}
-                    className="w-24 px-3 py-2 text-base border-2 border-slate-300 rounded-lg bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-200"
-                  />
-                </div>
-                <label className="block text-sm font-semibold text-slate-800 mb-3 mt-4">
-                  Y方向オフセット: {watermarkOffsetY}px (上方向が正)
-                </label>
-                <div className="flex items-center gap-4 mb-3">
-                  <input
-                    type="range"
-                    min="-200"
-                    max="200"
-                    step="1"
-                    value={watermarkOffsetY}
-                    onChange={(e) => setWatermarkOffsetY(parseInt(e.target.value))}
-                    className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-500"
-                  />
-                  <Input
-                    type="number"
-                    min="-200"
-                    max="200"
-                    value={watermarkOffsetY}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || 0;
-                      setWatermarkOffsetY(Math.max(-200, Math.min(200, val)));
-                    }}
-                    className="w-24 px-3 py-2 text-base border-2 border-slate-300 rounded-lg bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-200"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setWatermarkOffsetX(0);
-                    setWatermarkOffsetY(0);
-                  }}
-                  className="px-3 py-1.5 text-xs font-semibold border-2 border-slate-300 rounded-lg bg-white hover:bg-teal-50 hover:border-teal-400 transition-all shadow-sm"
-                >
-                  リセット
-                </button>
-              </div>
-            )}
-            <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg border-2 border-slate-200">
-              <input
-                type="checkbox"
-                id="watermark-preview"
-                checked={showWatermarkPreview}
-                onChange={(e) => setShowWatermarkPreview(e.target.checked)}
-                className="w-5 h-5 text-teal-600 border-2 border-slate-300 rounded focus:ring-2 focus:ring-teal-200"
-              />
-              <label htmlFor="watermark-preview" className="text-sm font-semibold text-slate-800 cursor-pointer">
-                プレビューを表示
-              </label>
-            </div>
-            {watermarkPdfPreviewUrl && (
-              <div className="p-4 bg-white/60 rounded-lg border-2 border-slate-200">
-                <label className="block text-sm font-semibold text-slate-800 mb-2">PDFプレビュー（1ページ目）</label>
-                <iframe
-                  src={`${watermarkPdfPreviewUrl}#page=1`}
-                  className="w-full h-96 border-2 border-slate-300 rounded-lg"
-                  title="透かしPDFプレビュー"
-                />
-                <Button
-                  type="button"
-                  onClick={() => {
-                    if (watermarkPdfPreviewUrl) {
-                      URL.revokeObjectURL(watermarkPdfPreviewUrl);
-                      setWatermarkPdfPreviewUrl(null);
-                    }
-                  }}
-                  variant="outline"
-                  className="mt-2 h-9 px-4 text-sm font-semibold border-2 border-slate-300 hover:bg-slate-50"
-                >
-                  プレビューを閉じる
-                </Button>
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                onClick={async () => {
-                  if (!pdfDoc || !watermarkText.trim() || !originalPdfBytes || !pageSize || !docId) {
-                    toast({
-                      title: "エラー",
-                      description: "PDFが読み込まれていないか、透かし文字が入力されていません。",
-                      variant: "destructive",
-                    });
-                    return;
-                  }
-                  try {
-                    // 現在のページの注釈を取得
-                    const actualPageNum = getActualPageNum(currentPage);
-                    const pageAnnotations = await loadAnnotations(docId, actualPageNum);
-                    const pageTextAnnotations = await loadTextAnnotations(docId, actualPageNum);
-                    const pageShapeAnnotations = await loadShapeAnnotations(docId, actualPageNum);
-                    
-                    // PDFをエクスポート（透かしを含む）
-                    const pdfBytes = await exportAnnotatedPDFV2(
-                      originalPdfBytes,
-                      { [currentPage]: pageAnnotations },
-                      { [currentPage]: pageSize },
-                      { [currentPage]: pageTextAnnotations },
-                      { [currentPage]: pageShapeAnnotations },
-                      undefined,
-                      undefined,
-                      undefined,
-                      watermarkText || undefined,
-                      undefined,
-                      watermarkPattern,
-                      watermarkDensity,
-                      watermarkAngle,
-                      watermarkOpacity,
-                      watermarkFontSize
-                    );
-                    
-                    // PDFプレビュー用のURLを生成
-                    const arrayBuffer = pdfBytes.buffer instanceof ArrayBuffer 
-                      ? pdfBytes.buffer 
-                      : new Uint8Array(pdfBytes).buffer;
-                    const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
-                    const url = URL.createObjectURL(blob);
-                    if (watermarkPdfPreviewUrl) {
-                      URL.revokeObjectURL(watermarkPdfPreviewUrl);
-                    }
-                    setWatermarkPdfPreviewUrl(url);
-                    
-                    toast({
-                      title: "成功",
-                      description: "PDFプレビューを生成しました。",
-                      variant: "success",
-                    });
-                  } catch (error) {
-                    console.error('PDFプレビュー生成エラー:', error);
-                    toast({
-                      title: "エラー",
-                      description: "PDFプレビューの生成に失敗しました。",
-                      variant: "destructive",
-                    });
-                  }
-                }}
-                variant="outline"
-                className="h-9 px-4 text-sm font-semibold border-2 border-teal-400 hover:bg-teal-50"
-              >
-                PDFでプレビュー
-              </Button>
+            <div className="text-sm text-gray-600">
+              選択中の注釈:
+              <ul className="list-disc list-inside mt-1">
+                {selectedAnnotationIds.strokes.length > 0 && (
+                  <li>ペン/ハイライト: {selectedAnnotationIds.strokes.length}個</li>
+                )}
+                {selectedAnnotationIds.shapes.length > 0 && (
+                  <li>図形: {selectedAnnotationIds.shapes.length}個</li>
+                )}
+                {selectedAnnotationIds.texts.length > 0 && (
+                  <li>テキスト: {selectedAnnotationIds.texts.length}個</li>
+                )}
+              </ul>
             </div>
           </div>
-          <DialogFooter className="pt-4 border-t border-teal-200 mt-4">
+          <DialogFooter className="bg-white/90 rounded-b-lg p-4 -m-6 mt-4">
             <Button
-              onClick={() => {
-                setShowWatermarkDialog(false);
-                setWatermarkText('');
-              }}
               variant="outline"
-              className="h-11 px-6 text-base font-semibold border-2 border-slate-300 hover:bg-slate-50"
+              onClick={() => {
+                setShowBulkAnnotationDialog(false);
+                setBulkAnnotationTargetPages('');
+                setBulkAnnotationIncludeAll(false);
+                setBulkAnnotationAngle(0);
+              }}
+              className="border-2 border-slate-300"
+            >
+              キャンセル
+            </Button>
+            <Button
+              onClick={handleBulkPlaceAnnotations}
+              disabled={!bulkAnnotationIncludeAll && !bulkAnnotationTargetPages.trim()}
+              className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white"
+            >
+              コピー実行
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 一括削除ダイアログ */}
+      <Dialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <DialogContent 
+          className="sm:max-w-[500px]" 
+          style={{ 
+            zIndex: 100015,
+            background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 50%, #fca5a5 100%)',
+            border: '2px solid #ef4444',
+          }}
+        >
+          <DialogHeader className="bg-white/90 rounded-t-lg p-4 -m-6 mb-4">
+            <DialogTitle className="text-xl font-bold text-red-900">一括注釈削除</DialogTitle>
+            <DialogDescription className="text-red-700">
+              選択した注釈を指定したページから削除します。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4 bg-white/80 rounded-lg p-4">
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={bulkDeleteIncludeAll}
+                  onChange={(e) => {
+                    setBulkDeleteIncludeAll(e.target.checked);
+                    if (e.target.checked) {
+                      setBulkDeleteTargetPages('');
+                    }
+                  }}
+                  className="w-4 h-4"
+                />
+                <span>全ページ一括（すべてのページから削除）</span>
+              </label>
+            </div>
+            {!bulkDeleteIncludeAll && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">対象ページ:</label>
+                <input
+                  type="text"
+                  value={bulkDeleteTargetPages}
+                  onChange={(e) => setBulkDeleteTargetPages(e.target.value)}
+                  placeholder="例: 1, 3, 5-7"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+                <p className="text-xs text-gray-500">
+                  ページ番号をカンマ区切りで指定（例: 1, 3, 5-7）
+                </p>
+              </div>
+            )}
+            <div className="text-sm text-gray-600 bg-yellow-50 p-3 rounded-md border border-yellow-200">
+              <strong className="text-red-600">警告:</strong> この操作は取り消せません。選択した注釈が対象ページから完全に削除されます。
+            </div>
+            <div className="text-sm text-gray-600">
+              選択中の注釈:
+              <ul className="list-disc list-inside mt-1">
+                {selectedAnnotationIds.strokes.length > 0 && (
+                  <li>ペン/ハイライト: {selectedAnnotationIds.strokes.length}個</li>
+                )}
+                {selectedAnnotationIds.shapes.length > 0 && (
+                  <li>図形: {selectedAnnotationIds.shapes.length}個</li>
+                )}
+                {selectedAnnotationIds.texts.length > 0 && (
+                  <li>テキスト: {selectedAnnotationIds.texts.length}個</li>
+                )}
+              </ul>
+            </div>
+          </div>
+          <DialogFooter className="bg-white/90 rounded-b-lg p-4 -m-6 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowBulkDeleteDialog(false);
+                setBulkDeleteTargetPages('');
+                setBulkDeleteIncludeAll(false);
+              }}
+              className="border-2 border-slate-300"
+            >
+              キャンセル
+            </Button>
+            <Button
+              onClick={handleBulkDeleteAnnotations}
+              disabled={!bulkDeleteIncludeAll && !bulkDeleteTargetPages.trim()}
+              className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white"
+            >
+              削除実行
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ページ番号自動付与モーダル */}
+      <Dialog open={showPageNumberModal} onOpenChange={setShowPageNumberModal}>
+        <DialogContent 
+          className="sm:max-w-[900px] max-h-[90vh] flex flex-col"
+          style={{ 
+            zIndex: 100020,
+            background: 'linear-gradient(135deg, #fed7aa 0%, #fdba74 50%, #fb923c 100%)',
+            border: '2px solid #f97316',
+            position: 'fixed',
+            top: '5%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            maxHeight: '90vh',
+            overflow: 'hidden',
+          }}
+        >
+          <DialogHeader className="bg-white/90 rounded-t-lg p-4 -m-6 mb-4 flex-shrink-0">
+            <DialogTitle className="text-xl font-bold text-orange-900">ページ番号自動付与</DialogTitle>
+            <DialogDescription className="text-orange-700">
+              PDFの全ページにページ番号を自動で追加します
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 flex flex-col gap-4 py-4 bg-white/80 rounded-lg p-4 overflow-hidden" style={{ minHeight: 0 }}>
+            <div className="space-y-4 flex-shrink-0">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">プレフィックス（任意）:</label>
+                <input
+                  type="text"
+                  value={pageNumberPrefix}
+                  onChange={(e) => {
+                    setPageNumberPrefix(e.target.value);
+                    // リアルタイムプレビューを更新（デバウンス）
+                    if (pageNumberPreviewTimeoutRef.current) {
+                      clearTimeout(pageNumberPreviewTimeoutRef.current);
+                    }
+                    pageNumberPreviewTimeoutRef.current = setTimeout(() => {
+                      if (pageNumberPreview && originalPdfBytes) {
+                        generatePageNumberPreview();
+                      }
+                    }, 500);
+                  }}
+                  placeholder="例: 第"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+                <p className="text-xs text-gray-500">
+                  ページ番号の前に表示する文字列（例: "第" → "第1", "第2", ...）
+                </p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">X座標: {Math.round(pageNumberX * 100)}%</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={pageNumberX}
+                  onChange={(e) => {
+                    setPageNumberX(Number(e.target.value));
+                    // リアルタイムプレビューを更新（デバウンス）
+                    if (pageNumberPreviewTimeoutRef.current) {
+                      clearTimeout(pageNumberPreviewTimeoutRef.current);
+                    }
+                    pageNumberPreviewTimeoutRef.current = setTimeout(() => {
+                      if (pageNumberPreview && originalPdfBytes) {
+                        generatePageNumberPreview();
+                      }
+                    }, 300);
+                  }}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Y座標: {Math.round(pageNumberY * 100)}%</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={pageNumberY}
+                  onChange={(e) => {
+                    setPageNumberY(Number(e.target.value));
+                    // リアルタイムプレビューを更新（デバウンス）
+                    if (pageNumberPreviewTimeoutRef.current) {
+                      clearTimeout(pageNumberPreviewTimeoutRef.current);
+                    }
+                    pageNumberPreviewTimeoutRef.current = setTimeout(() => {
+                      if (pageNumberPreview && originalPdfBytes) {
+                        generatePageNumberPreview();
+                      }
+                    }, 300);
+                  }}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="flex-1 flex flex-col gap-2 overflow-hidden" style={{ minHeight: 0 }}>
+            <label className="text-sm font-medium flex-shrink-0">プレビュー:</label>
+            <div className="flex-1 border-2 border-orange-300 rounded-lg overflow-auto bg-white" style={{ minHeight: 0 }}>
+              {pageNumberPreview ? (
+                <iframe
+                  src={pageNumberPreview}
+                  className="w-full h-full"
+                  style={{ minHeight: '400px' }}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  プレビューを生成してください
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="bg-white/90 rounded-b-lg p-4 -m-6 mt-4 flex-shrink-0">
+            <Button
+              variant="outline"
+              onClick={generatePageNumberPreview}
+              className="border-2 border-orange-300"
+            >
+              プレビュー生成
+            </Button>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                // ページ番号を削除（元のPDFを再読み込み）
+                if (!originalPdfBytes) {
+                  toast({
+                    title: "エラー",
+                    description: "PDFが読み込まれていません",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                try {
+                  setIsExporting(true);
+                  const { PDFDocument } = await import('pdf-lib');
+                  const pdfDoc = await PDFDocument.load(originalPdfBytes);
+                  // ページ番号を削除するため、元のPDFをそのまま保存
+                  const pdfBytes = await pdfDoc.save();
+                  const blob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = originalFileName ? `${originalFileName.replace('.pdf', '')}_ページ番号削除.pdf` : 'ページ番号削除.pdf';
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                  
+                  toast({
+                    title: "成功",
+                    description: "ページ番号を削除したPDFをダウンロードしました",
+                    variant: "success",
+                  });
+                } catch (error) {
+                  console.error('ページ番号削除エラー:', error);
+                  toast({
+                    title: "エラー",
+                    description: "ページ番号の削除に失敗しました",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setIsExporting(false);
+                }
+              }}
+              disabled={isExporting}
+              className="border-2 border-red-300 text-red-700 hover:bg-red-50"
+            >
+              {isExporting ? '処理中...' : 'ページ番号削除'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowPageNumberModal(false);
+                setPageNumberPrefix('');
+                setPageNumberX(0.5);
+                setPageNumberY(0.05);
+                if (pageNumberPreview) {
+                  URL.revokeObjectURL(pageNumberPreview);
+                  setPageNumberPreview(null);
+                }
+              }}
+              className="border-2 border-slate-300"
             >
               キャンセル
             </Button>
             <Button
               onClick={async () => {
-                if (watermarkText.trim()) {
-                  await saveWatermarkHistory(watermarkText.trim());
-                  const history = await getAllWatermarkHistory();
-                  setWatermarkHistory(history);
+                if (!originalPdfBytes) {
+                  toast({
+                    title: "エラー",
+                    description: "PDFが読み込まれていません",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                try {
+                  setIsExporting(true);
+                  const { PDFDocument, rgb } = await import('pdf-lib');
+                  const pdfDoc = await PDFDocument.load(originalPdfBytes);
+                  const helveticaFont = await pdfDoc.embedFont('Helvetica');
+                  
+                  const pages = pdfDoc.getPages();
+                  for (let i = 0; i < pages.length; i++) {
+                    const page = pages[i];
+                    const { width, height } = page.getSize();
+                    const pageNum = i + 1;
+                    const pageText = `${pageNumberPrefix}${pageNum}`;
+                    const fontSize = 12;
+                    const x = width * pageNumberX;
+                    const y = height * (1 - pageNumberY); // PDF座標系は下から上
+                    
+                    page.drawText(pageText, {
+                      x,
+                      y,
+                      size: fontSize,
+                      font: helveticaFont,
+                      color: rgb(0, 0, 0),
+                    });
+                  }
+                  
+                  const pdfBytes = await pdfDoc.save();
+                  const blob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = originalFileName ? `${originalFileName.replace('.pdf', '')}_ページ番号付き.pdf` : 'ページ番号付き.pdf';
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                  
                   toast({
                     title: "成功",
-                    description: "透かしを設定しました。エクスポート時に反映されます。",
+                    description: "ページ番号を追加しました",
                     variant: "success",
                   });
+                  
+                  setShowPageNumberModal(false);
+                  if (pageNumberPreview) {
+                    URL.revokeObjectURL(pageNumberPreview);
+                    setPageNumberPreview(null);
+                  }
+                } catch (error) {
+                  console.error('ページ番号追加エラー:', error);
+                  toast({
+                    title: "エラー",
+                    description: "ページ番号の追加に失敗しました",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setIsExporting(false);
                 }
-                setShowWatermarkDialog(false);
               }}
-              className="h-11 px-6 text-base font-semibold bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white shadow-lg hover:shadow-xl transition-all"
+              disabled={isExporting}
+              className="bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 text-white"
             >
-              設定
+              {isExporting ? '処理中...' : '適用'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
     </>
   );
