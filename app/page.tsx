@@ -3001,7 +3001,7 @@ export default function Home() {
         toast({
           title: "テキストを非表示にしました",
           description: "テキスト注釈を作成しました。ドラッグで移動、クリックで編集できます。",
-          variant: "default",
+          variant: "success",
         });
         
         e.preventDefault();
